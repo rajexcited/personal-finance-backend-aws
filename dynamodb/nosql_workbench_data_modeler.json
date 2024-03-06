@@ -1,0 +1,1319 @@
+{
+  "ModelName": "myfinance",
+  "ModelMetadata": {
+    "Author": "neel",
+    "DateCreated": "Mar 03, 2024, 10:01 PM",
+    "DateLastModified": "Mar 04, 2024, 10:50 PM",
+    "Description": "",
+    "AWSService": "Amazon DynamoDB",
+    "Version": "3.0"
+  },
+  "DataModel": [
+    {
+      "TableName": "expense",
+      "KeyAttributes": {
+        "PartitionKey": {
+          "AttributeName": "PK",
+          "AttributeType": "S"
+        },
+        "SortKey": {
+          "AttributeName": "SK",
+          "AttributeType": "S"
+        }
+      },
+      "NonKeyAttributes": [
+        {
+          "AttributeName": "UE_GSI_PK",
+          "AttributeType": "S"
+        },
+        {
+          "AttributeName": "details",
+          "AttributeType": "M"
+        }
+      ],
+      "GlobalSecondaryIndexes": [
+        {
+          "IndexName": "userIdExpenseIdIndex",
+          "KeyAttributes": {
+            "PartitionKey": {
+              "AttributeName": "UE_GSI_PK",
+              "AttributeType": "S"
+            },
+            "SortKey": {
+              "AttributeName": "PK",
+              "AttributeType": "S"
+            }
+          },
+          "Projection": {
+            "ProjectionType": "KEYS_ONLY"
+          }
+        }
+      ],
+      "TableData": [
+        {
+          "PK": {
+            "S": "xpnsId#274f311d-d104-46c4-bee7-eeee38b4fbf4"
+          },
+          "SK": {
+            "S": "xpnsDt#20240131014309.304"
+          },
+          "UE_GSI_PK": {
+            "S": "userId#2322280d-a0b5-42bd-a501-18b5fca05c29"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "expenseId": {
+                "S": "274f311d-d104-46c4-bee7-eeee38b4fbf4"
+              },
+              "purchasedDate": {
+                "S": "2024-01-31T01:43:09.304Z"
+              },
+              "billName": {
+                "S": "bill 1"
+              },
+              "amount": {
+                "N": "10.34"
+              },
+              "paymentAccountId": {
+                "S": "232a230d-b0b5-42be-a504-c8b56ca0gc22"
+              },
+              "description": {
+                "S": ""
+              },
+              "tags": [
+                {
+                  "S": "Cookies"
+                },
+                {
+                  "S": "grocery"
+                }
+              ],
+              "verifiedTimestamp": {
+                "S": "2024-01-31T01:43:09.304Z"
+              },
+              "expenseCategoryId": {
+                "S": "fc6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+              },
+              "receipts": [
+                {
+                  "M": {
+                    "id": {
+                      "S": "fce73262-4c9b-3bdf-9fd9-60a0af6d61cd"
+                    },
+                    "type": {
+                      "S": "jpg"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "PK": {
+            "S": "xpnsId#274f311d-d104-46c4-bee7-eeee38b4fbf4"
+          },
+          "SK": {
+            "S": "item#001"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "billName": {
+                "S": "bill cookie"
+              },
+              "amount": {
+                "N": "6.34"
+              },
+              "description": {
+                "S": ""
+              },
+              "tags": [
+                {
+                  "S": "Cookies"
+                }
+              ],
+              "expenseCategoryId": {
+                "S": "fc6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+              }
+            }
+          }
+        },
+        {
+          "PK": {
+            "S": "xpnsId#274f311d-d104-46c4-bee7-eeee38b4fbf4"
+          },
+          "SK": {
+            "S": "item#002"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "billName": {
+                "S": "food"
+              },
+              "amount": {
+                "N": "4"
+              },
+              "description": {
+                "S": ""
+              },
+              "tags": [
+                {
+                  "S": "grocery"
+                }
+              ],
+              "expenseCategoryId": {
+                "S": "fc6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+              }
+            }
+          }
+        },
+        {
+          "PK": {
+            "S": "xpnsId#00e4391d-b669-4772-8fe7-2bca8ebd63ea"
+          },
+          "SK": {
+            "S": "xpnsDt#20230516091942.136"
+          },
+          "UE_GSI_PK": {
+            "S": "userId#2322280d-a0b5-42bd-a501-18b5fca05c29"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "expenseId": {
+                "S": "00e4391d-b669-4772-8fe7-2bca8ebd63ea"
+              },
+              "purchasedDate": {
+                "S": "2023-05-16T09:19:42.136Z"
+              },
+              "billName": {
+                "S": "bill 2"
+              },
+              "amount": {
+                "N": "13"
+              },
+              "paymentAccountId": {
+                "S": "232a230d-b0b5-42be-a504-c8b56ca0gc22"
+              },
+              "description": {
+                "S": ""
+              },
+              "tags": [
+                {
+                  "S": "grocery"
+                }
+              ],
+              "verifiedTimestamp": {
+                "S": "2024-01-31T01:43:09.304Z"
+              },
+              "expenseCategoryId": {
+                "S": "fc6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+              },
+              "receipts": [
+                {
+                  "M": {
+                    "id": {
+                      "S": "fceb3262-4c9b-3bdf-9fd9-60a0af6d61c9"
+                    },
+                    "type": {
+                      "S": "jpg"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "PK": {
+            "S": "xpnsId#00e4391d-b669-4772-8fe7-2bca8ebd63ea"
+          },
+          "SK": {
+            "S": "item#001"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "billName": {
+                "S": "homecook"
+              },
+              "amount": {
+                "N": "10"
+              },
+              "description": {
+                "S": ""
+              },
+              "tags": [
+                {
+                  "S": "grocery"
+                }
+              ],
+              "expenseCategoryId": {
+                "S": "fc6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+              }
+            }
+          }
+        },
+        {
+          "PK": {
+            "S": "xpnsId#00e4391d-b669-4772-8fe7-2bca8ebd63ea"
+          },
+          "SK": {
+            "S": "item#002"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "billName": {
+                "S": "fruit"
+              },
+              "amount": {
+                "N": "3"
+              },
+              "description": {
+                "S": ""
+              },
+              "tags": [
+                {
+                  "S": "fruits"
+                }
+              ],
+              "expenseCategoryId": {
+                "S": "fc6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+              }
+            }
+          }
+        },
+        {
+          "PK": {
+            "S": "xpnsId#4e80509a-42fc-4003-a8c2-efb2a0d2e309"
+          },
+          "SK": {
+            "S": "xpnsDt#20230322022010.014"
+          },
+          "UE_GSI_PK": {
+            "S": "userId#2322280d-a0b5-42bd-a501-18b5fca05c29"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "expenseId": {
+                "S": "4e80509a-42fc-4003-a8c2-efb2a0d2e309"
+              },
+              "purchasedDate": {
+                "S": "2023-03-22T02:20:10.014Z"
+              },
+              "billName": {
+                "S": "bill 3"
+              },
+              "amount": {
+                "N": "32.41"
+              },
+              "paymentAccountId": {
+                "S": "232a230d-b0b5-42be-a504-c8b56ca0gc22"
+              },
+              "description": {
+                "S": ""
+              },
+              "tags": [
+                {
+                  "S": "Cookies"
+                },
+                {
+                  "S": "snacks"
+                }
+              ],
+              "verifiedTimestamp": {
+                "S": "2024-01-31T01:43:09.304Z"
+              },
+              "expenseCategoryId": {
+                "S": "fc6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+              },
+              "receipts": [
+                {
+                  "M": {
+                    "id": {
+                      "S": "fde23262-4c9b-3bdf-9fd9-a0a0af6d61c2"
+                    },
+                    "type": {
+                      "S": "pdf"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "PK": {
+            "S": "xpnsId#145ade08-bc35-475e-9581-ac4ad9a5a975"
+          },
+          "SK": {
+            "S": "xpnsDt#20240910193705.018"
+          },
+          "UE_GSI_PK": {
+            "S": "userId#2322280d-a0b5-42bd-a501-18b5fca05c29"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "expenseId": {
+                "S": "145ade08-bc35-475e-9581-ac4ad9a5a975"
+              },
+              "purchasedDate": {
+                "S": "2024-09-10T19:37:05.018Z"
+              },
+              "billName": {
+                "S": "bill 4"
+              },
+              "amount": {
+                "N": "34.1"
+              },
+              "paymentAccountId": {
+                "S": "232a230d-b0b5-42be-a504-c8b56ca0gc22"
+              },
+              "description": {
+                "S": ""
+              },
+              "tags": [
+                {
+                  "S": "shopping"
+                }
+              ],
+              "verifiedTimestamp": {
+                "S": "2024-01-31T01:43:09.304Z"
+              },
+              "expenseCategoryId": {
+                "S": "fc6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+              },
+              "receipts": [
+                {
+                  "M": {
+                    "id": {
+                      "S": "fce7a262-4c9b-3bdf-9fd9-60a08f6d61cd"
+                    },
+                    "type": {
+                      "S": "jpg"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "PK": {
+            "S": "xpnsId#8a3ebdfa-26f7-471d-ae57-4a31050c3726"
+          },
+          "SK": {
+            "S": "xpnsDt#20250225191516.580"
+          },
+          "UE_GSI_PK": {
+            "S": "userId#44780652-e2b1-4c50-a229-2e0f58ee06f3"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "expenseId": {
+                "S": "8a3ebdfa-26f7-471d-ae57-4a31050c3726"
+              },
+              "purchasedDate": {
+                "S": "2025-02-25T19:15:16.580Z"
+              },
+              "billName": {
+                "S": "bill 5"
+              },
+              "amount": {
+                "N": "134.34"
+              },
+              "paymentAccountId": {
+                "S": "232a230d-b0b5-42be-a504-c8b56ca0gc22"
+              },
+              "description": {
+                "S": ""
+              },
+              "tags": [
+                {
+                  "S": "fee"
+                }
+              ],
+              "verifiedTimestamp": {
+                "S": "2024-01-31T01:43:09.304Z"
+              },
+              "expenseCategoryId": {
+                "S": "fc6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+              },
+              "receipts": [
+                {
+                  "M": {
+                    "id": {
+                      "S": "fce7326a-4c9b-3bdf-a4d1-60a0af6d61cd"
+                    },
+                    "type": {
+                      "S": "pdf"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "PK": {
+            "S": "xpnsId#8a3ebdfa-26f7-471d-ae57-4a31050c3726"
+          },
+          "SK": {
+            "S": "item#001"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "billName": {
+                "S": "comcast"
+              },
+              "amount": {
+                "N": "26.53"
+              },
+              "description": {
+                "S": ""
+              },
+              "tags": [
+                {
+                  "S": "fee"
+                }
+              ],
+              "expenseCategoryId": {
+                "S": "fc6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+              }
+            }
+          }
+        },
+        {
+          "PK": {
+            "S": "xpnsId#8a3ebdfa-26f7-471d-ae57-4a31050c3726"
+          },
+          "SK": {
+            "S": "item#002"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "billName": {
+                "S": "electricity"
+              },
+              "amount": {
+                "N": "80"
+              },
+              "description": {
+                "S": ""
+              },
+              "tags": [
+                {
+                  "S": "fee"
+                }
+              ],
+              "expenseCategoryId": {
+                "S": "fc6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+              }
+            }
+          }
+        },
+        {
+          "PK": {
+            "S": "xpnsId#8a3ebdfa-26f7-471d-ae57-4a31050c3726"
+          },
+          "SK": {
+            "S": "item#003"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "billName": {
+                "S": "mobile"
+              },
+              "amount": {
+                "N": "20"
+              },
+              "description": {
+                "S": ""
+              },
+              "tags": [
+                {
+                  "S": "fee"
+                }
+              ],
+              "expenseCategoryId": {
+                "S": "fc6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+              }
+            }
+          }
+        }
+      ],
+      "DataAccess": {
+        "MySql": {}
+      },
+      "SampleDataFormats": {
+        "userId": [
+          "identifiers",
+          "UUID"
+        ],
+        "PK": [
+          "identifiers",
+          "UUID"
+        ],
+        "SK": [
+          "date",
+          "ISO 8601 date and time"
+        ],
+        "UE_GSI_PK": [
+          "identifiers",
+          "UUID"
+        ]
+      },
+      "BillingMode": "PROVISIONED",
+      "ProvisionedCapacitySettings": {
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": 5,
+          "WriteCapacityUnits": 5
+        },
+        "AutoScalingRead": {
+          "ScalableTargetRequest": {
+            "MinCapacity": 1,
+            "MaxCapacity": 10,
+            "ServiceRole": "AWSServiceRoleForApplicationAutoScaling_DynamoDBTable"
+          },
+          "ScalingPolicyConfiguration": {
+            "TargetValue": 70
+          }
+        },
+        "AutoScalingWrite": {
+          "ScalableTargetRequest": {
+            "MinCapacity": 1,
+            "MaxCapacity": 10,
+            "ServiceRole": "AWSServiceRoleForApplicationAutoScaling_DynamoDBTable"
+          },
+          "ScalingPolicyConfiguration": {
+            "TargetValue": 70
+          }
+        }
+      }
+    },
+    {
+      "TableName": "paymentAccount",
+      "KeyAttributes": {
+        "PartitionKey": {
+          "AttributeName": "PK",
+          "AttributeType": "S"
+        }
+      },
+      "NonKeyAttributes": [
+        {
+          "AttributeName": "UP_GSI_PK",
+          "AttributeType": "S"
+        },
+        {
+          "AttributeName": "details",
+          "AttributeType": "M"
+        }
+      ],
+      "GlobalSecondaryIndexes": [
+        {
+          "IndexName": "userIdPymtAccIdIndex",
+          "KeyAttributes": {
+            "PartitionKey": {
+              "AttributeName": "UP_GSI_PK",
+              "AttributeType": "S"
+            },
+            "SortKey": {
+              "AttributeName": "PK",
+              "AttributeType": "S"
+            }
+          },
+          "Projection": {
+            "ProjectionType": "KEYS_ONLY"
+          }
+        }
+      ],
+      "TableData": [
+        {
+          "PK": {
+            "S": "pymtAccId#232a230d-b0b5-42be-a504-c8b56ca0gc22"
+          },
+          "UP_GSI_PK": {
+            "S": "userId#2322280d-a0b5-42bd-a501-18b5fca05c29"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "paymentAccountId": {
+                "S": "232a230d-b0b5-42be-a504-c8b56ca0gc22"
+              },
+              "accNo": {
+                "S": "account-number-or-id"
+              },
+              "shortName": {
+                "S": "checking 1"
+              },
+              "accName": {
+                "S": "account name"
+              },
+              "description": {
+                "S": ""
+              },
+              "accTypeId": {
+                "S": "fc6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+              },
+              "tags": [
+                {
+                  "S": "checking"
+                }
+              ],
+              "institutionName": {
+                "S": "bank of america"
+              },
+              "status": {
+                "S": "active"
+              }
+            }
+          }
+        },
+        {
+          "PK": {
+            "S": "pymtAccId#274f311d-d104-46c4-bee7-eeee38b4fbf4"
+          },
+          "UP_GSI_PK": {
+            "S": "userId#2322280d-a0b5-42bd-a501-18b5fca05c29"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "paymentAccountId": {
+                "S": "274f311d-d104-46c4-bee7-eeee38b4fbf4"
+              },
+              "accNo": {
+                "S": "account number or id 2"
+              },
+              "shortName": {
+                "S": "cash"
+              },
+              "accName": {
+                "S": "account name"
+              },
+              "description": {
+                "S": ""
+              },
+              "accTypeId": {
+                "S": "fc6a32b2-4c9a-4bdf-9ff9-a0a1af6d62cb"
+              },
+              "tags": [
+                {
+                  "S": "cash"
+                }
+              ],
+              "institutionName": {
+                "S": "cash"
+              },
+              "status": {
+                "S": "active"
+              }
+            }
+          }
+        }
+      ],
+      "DataAccess": {
+        "MySql": {}
+      },
+      "SampleDataFormats": {
+        "userId": [
+          "identifiers",
+          "UUID"
+        ],
+        "PK": [
+          "identifiers",
+          "UUID"
+        ],
+        "SK": [
+          "date",
+          "ISO 8601 date and time"
+        ],
+        "UE_GSI_PK": [
+          "identifiers",
+          "UUID"
+        ]
+      },
+      "BillingMode": "PROVISIONED",
+      "ProvisionedCapacitySettings": {
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": 5,
+          "WriteCapacityUnits": 5
+        },
+        "AutoScalingRead": {
+          "ScalableTargetRequest": {
+            "MinCapacity": 1,
+            "MaxCapacity": 10,
+            "ServiceRole": "AWSServiceRoleForApplicationAutoScaling_DynamoDBTable"
+          },
+          "ScalingPolicyConfiguration": {
+            "TargetValue": 70
+          }
+        },
+        "AutoScalingWrite": {
+          "ScalableTargetRequest": {
+            "MinCapacity": 1,
+            "MaxCapacity": 10,
+            "ServiceRole": "AWSServiceRoleForApplicationAutoScaling_DynamoDBTable"
+          },
+          "ScalingPolicyConfiguration": {
+            "TargetValue": 70
+          }
+        }
+      }
+    },
+    {
+      "TableName": "config",
+      "KeyAttributes": {
+        "PartitionKey": {
+          "AttributeName": "PK",
+          "AttributeType": "S"
+        }
+      },
+      "NonKeyAttributes": [
+        {
+          "AttributeName": "UB_GSI_PK",
+          "AttributeType": "S"
+        },
+        {
+          "AttributeName": "details",
+          "AttributeType": "M"
+        }
+      ],
+      "GlobalSecondaryIndexes": [
+        {
+          "IndexName": "userIdBelongsToIndex",
+          "KeyAttributes": {
+            "PartitionKey": {
+              "AttributeName": "UB_GSI_PK",
+              "AttributeType": "S"
+            },
+            "SortKey": {
+              "AttributeName": "PK",
+              "AttributeType": "S"
+            }
+          },
+          "Projection": {
+            "ProjectionType": "KEYS_ONLY"
+          }
+        }
+      ],
+      "TableData": [
+        {
+          "PK": {
+            "S": "cfgId#fc6732b2-4c9a-4bdf-9ff9-10a1af6d62cb"
+          },
+          "UB_GSI_PK": {
+            "S": "userId#2322280d-a0b5-42bd-a501-18b5fca05c29#belongsTo#paymentAccountType"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "configId": {
+                "S": "fc6732b2-4c9a-4bdf-9ff9-10a1af6d62cb"
+              },
+              "name": {
+                "S": "checking"
+              },
+              "value": {
+                "S": "checking"
+              },
+              "belongsTo": {
+                "S": "paymentAccountType"
+              },
+              "description": {
+                "S": "checking payment account type"
+              },
+              "status": {
+                "S": "active"
+              }
+            }
+          }
+        },
+        {
+          "PK": {
+            "S": "cfgId#fc6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+          },
+          "UB_GSI_PK": {
+            "S": "userId#2322280d-a0b5-42bd-a501-18b5fca05c29#belongsTo#expenseCategory"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "configId": {
+                "S": "fc6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+              },
+              "name": {
+                "S": "grocery"
+              },
+              "value": {
+                "S": "grocery"
+              },
+              "belongsTo": {
+                "S": "expenseCategory"
+              },
+              "description": {
+                "S": "grocery expense category"
+              },
+              "status": {
+                "S": "active"
+              }
+            }
+          }
+        },
+        {
+          "PK": {
+            "S": "cfgId#ac6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+          },
+          "UB_GSI_PK": {
+            "S": "userId#2322280d-a0b5-42bd-a501-18b5fca05c29#belongsTo#expenseCategory"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "configId": {
+                "S": "ac6732b2-4c9a-4bdf-9ff9-60a1af6d62cb"
+              },
+              "name": {
+                "S": "shopping"
+              },
+              "value": {
+                "S": "shopping"
+              },
+              "belongsTo": {
+                "S": "expenseCategory"
+              },
+              "description": {
+                "S": "shopping expense category"
+              },
+              "status": {
+                "S": "deactive"
+              }
+            }
+          }
+        }
+      ],
+      "DataAccess": {
+        "MySql": {}
+      },
+      "SampleDataFormats": {
+        "userId": [
+          "identifiers",
+          "UUID"
+        ],
+        "PK": [
+          "identifiers",
+          "UUID"
+        ],
+        "SK": [
+          "date",
+          "ISO 8601 date and time"
+        ],
+        "UE_GSI_PK": [
+          "identifiers",
+          "UUID"
+        ]
+      },
+      "BillingMode": "PROVISIONED",
+      "ProvisionedCapacitySettings": {
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": 5,
+          "WriteCapacityUnits": 5
+        },
+        "AutoScalingRead": {
+          "ScalableTargetRequest": {
+            "MinCapacity": 1,
+            "MaxCapacity": 10,
+            "ServiceRole": "AWSServiceRoleForApplicationAutoScaling_DynamoDBTable"
+          },
+          "ScalingPolicyConfiguration": {
+            "TargetValue": 70
+          }
+        },
+        "AutoScalingWrite": {
+          "ScalableTargetRequest": {
+            "MinCapacity": 1,
+            "MaxCapacity": 10,
+            "ServiceRole": "AWSServiceRoleForApplicationAutoScaling_DynamoDBTable"
+          },
+          "ScalingPolicyConfiguration": {
+            "TargetValue": 70
+          }
+        }
+      }
+    },
+    {
+      "TableName": "user",
+      "KeyAttributes": {
+        "PartitionKey": {
+          "AttributeName": "PK",
+          "AttributeType": "S"
+        }
+      },
+      "NonKeyAttributes": [
+        {
+          "AttributeName": "details",
+          "AttributeType": "M"
+        }
+      ],
+      "TableData": [
+        {
+          "PK": {
+            "S": "userId#2322280d-a0b5-42bd-a501-18b5fca05c29"
+          },
+          "details": {
+            "M": {
+              "auditDetails": {
+                "M": {
+                  "createdOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "updatedOn": {
+                    "S": "2024-01-31T01:43:09.304Z"
+                  },
+                  "createdBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  },
+                  "updatedBy": {
+                    "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+                  }
+                }
+              },
+              "userId": {
+                "S": "2322280d-a0b5-42bd-a501-18b5fca05c29"
+              },
+              "firstName": {
+                "S": "firstName"
+              },
+              "lastName": {
+                "S": "lastName"
+              },
+              "amount": {
+                "N": "10.34"
+              },
+              "userName": {
+                "S": "userName"
+              },
+              "emailId": {
+                "S": "primary_email@Id"
+              }
+            }
+          }
+        }
+      ],
+      "DataAccess": {
+        "MySql": {}
+      },
+      "SampleDataFormats": {
+        "userId": [
+          "identifiers",
+          "UUID"
+        ],
+        "PK": [
+          "identifiers",
+          "UUID"
+        ],
+        "SK": [
+          "date",
+          "ISO 8601 date and time"
+        ],
+        "UE_GSI_PK": [
+          "identifiers",
+          "UUID"
+        ]
+      },
+      "BillingMode": "PROVISIONED",
+      "ProvisionedCapacitySettings": {
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": 5,
+          "WriteCapacityUnits": 5
+        },
+        "AutoScalingRead": {
+          "ScalableTargetRequest": {
+            "MinCapacity": 1,
+            "MaxCapacity": 10,
+            "ServiceRole": "AWSServiceRoleForApplicationAutoScaling_DynamoDBTable"
+          },
+          "ScalingPolicyConfiguration": {
+            "TargetValue": 70
+          }
+        },
+        "AutoScalingWrite": {
+          "ScalableTargetRequest": {
+            "MinCapacity": 1,
+            "MaxCapacity": 10,
+            "ServiceRole": "AWSServiceRoleForApplicationAutoScaling_DynamoDBTable"
+          },
+          "ScalingPolicyConfiguration": {
+            "TargetValue": 70
+          }
+        }
+      }
+    }
+  ]
+}
