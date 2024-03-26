@@ -5,27 +5,40 @@
     "app": "src/main/app.js"
   },
   "scripts": {
+    "prebuild": "tsc --build --clean",
     "build": "tsc",
     "watch": "tsc -w",
+    "pretest": "npm run build",
     "test": "jest",
-    "cdk": "cdk"
+    "cdk": "cdk",
+    "precleanupnodejs": "rmdir /s /q dist\\lambda_layer\\nodejs",
+    "cleanupnodejs": "mkdir dist\\lambda_layer\\nodejs",
+    "precreatelayer": "npm run cleanupnodejs",
+    "createlayer": "jq \"del(.devDependencies, .scripts, .bin)\" package.json > dist/lambda_layer/nodejs/package.json",
+    "postcreatelayer": "cd dist/lambda_layer/nodejs && npm install"
   },
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.507.0",
+    "@aws-sdk/client-secrets-manager": "^3.535.0",
     "@aws-sdk/lib-dynamodb": "^3.509.0",
     "@types/aws-lambda": "^8.10.133",
     "@types/jest": "^29.5.11",
     "@types/node": "20.11.14",
     "aws-cdk": "2.126.0",
     "aws-cdk-lib": "2.126.0",
+    "constructs": "^10.0.0",
     "jest": "^29.7.0",
-    "source-map-support": "^0.5.21",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
-    "constructs": "^10.0.0",
-    "typescript": "~5.3.3"
+    "typescript": "~5.3.3",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.6"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "date-and-time": "^3.0.2",
+    "jsonwebtoken": "^9.0.2",
+    "source-map-support": "^0.5.21",
     "uuidv4": "^6.2.13"
   }
 }

@@ -1,46 +1,54 @@
 import { Construct } from "constructs";
-import { AttributeType, TableV2, TableClass } from "aws-cdk-lib/aws-dynamodb";
+import {
+  AttributeType,
+  TableV2,
+  TableClass,
+  ProjectionType,
+  GlobalSecondaryIndexPropsV2,
+} from "aws-cdk-lib/aws-dynamodb";
 import { ConstructProps, EnvironmentName } from "../common";
 import { RemovalPolicy } from "aws-cdk-lib";
+import { DbProps } from "./db-prop-type";
 
 /**
  * Dynamodb to manage user details
- *  partition Key: id
  *
- * Index: userName-index
- *  partition Key: userName
- *
- * Index: emailId-userName-index
- *  partition Key: userName
- *  sort Key: emailId
- *
- * Attributes:
- * id, userName, emailId, details (json: firstName, lastName, password, updatedBy, updatedOn, createdBy, createdOn)
+ * wiki design:
+ *    https://github.com/rajexcited/personal-finance-backend-aws/wiki/User-Table
  */
 export class UserDBConstruct extends Construct {
-  public readonly userDb: TableV2;
+  public readonly userTable: DbProps;
 
   constructor(scope: Construct, id: string, props: ConstructProps) {
     super(scope, id);
 
+    const tablePartitionKeyName = "PK";
     const db = new TableV2(this, "UserDynamoDb", {
-      tableName: [props.environment, "user", "info", "dynamodb"].join("-"),
-      partitionKey: { name: "id", type: AttributeType.STRING },
+      tableName: [props.resourcePrefix, props.environment, "user", "info", "dynamodb"].join("-"),
+      partitionKey: { name: tablePartitionKeyName, type: AttributeType.STRING },
       tableClass: TableClass.STANDARD_INFREQUENT_ACCESS,
       pointInTimeRecovery: props.environment === EnvironmentName.Production,
+      timeToLiveAttribute: "ExpiresAt",
       removalPolicy: RemovalPolicy.DESTROY,
     });
 
-    db.addGlobalSecondaryIndex({
-      indexName: ["userName", "index"].join("-"),
-      partitionKey: { name: "userName", type: AttributeType.STRING },
-    });
-    db.addGlobalSecondaryIndex({
-      indexName: ["userName", "emailId", "index"].join("-"),
-      partitionKey: { name: "userName", type: AttributeType.STRING },
-      sortKey: { name: "emailId", type: AttributeType.STRING },
-    });
+    const emailIdGsiProp: GlobalSecondaryIndexPropsV2 = {
+      indexName: ["emailId", "index"].join("-"),
+      partitionKey: { name: "E_GSI_PK", type: AttributeType.STRING },
+      projectionType: ProjectionType.KEYS_ONLY,
+    };
+    db.addGlobalSecondaryIndex(emailIdGsiProp);
 
-    this.userDb = db;
+    this.userTable = {
+      table: {
+        ref: db,
+        name: db.tableName,
+      },
+      globalSecondaryIndexes: {
+        emailIdIndex: {
+          name: emailIdGsiProp.indexName,
+        },
+      },
+    };
   }
 }

@@ -1,2 +1,2 @@
 export { AppStack } from "./my-finance-stack";
-export { EnvironmentName } from "./env-enum";
+export { EnvironmentName, ConstructProps } from "./common";

@@ -1,0 +1,16 @@
+export enum HTTP_STATUS_CODE {
+  CREATED = 201,
+  SUCCESS = 200,
+  EMPTY_RESPONSE_CONTENT = 204,
+  BAD_REQUEST = 400,
+  FORBIDDEN = 403,
+  UNAUTHORIZED = 401,
+  UNKNOWN_ERROR = 500,
+}
+
+export enum MethodType {
+  "POST" = "POST",
+  "PUT" = "PUT",
+  "DELETE" = "DELETE",
+  "GET" = "GET",
+}

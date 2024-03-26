@@ -2,43 +2,50 @@ import { Construct } from "constructs";
 import { AttributeType, TableV2, TableClass, ProjectionType } from "aws-cdk-lib/aws-dynamodb";
 import { ConstructProps, EnvironmentName } from "../common";
 import { RemovalPolicy } from "aws-cdk-lib";
+import { DbProps } from "./db-prop-type";
 
 /**
  * Dynamodb to manage user's expenses
- *  partition Key: id
  *
- * Index: createdOn-index
- *  partition Key: createdOn
+ * wiki design:
+ *    https://github.com/rajexcited/personal-finance-backend-aws/wiki/Expense-Table
  *
- * Attributes:
- * id, userId, createdOn, updatedOn,
- *  details (json: billname, amount, pymtAccId, description, purchasedDate, tags, verifiedTimestamp, categoryId, receiptId, expenseItems (json: list of expense attrs), updatedBy, createdBy)
  */
 export class ExpenseDBConstruct extends Construct {
-  public readonly expenseDb: TableV2;
+  public readonly expenseTable: DbProps;
 
   constructor(scope: Construct, id: string, props: ConstructProps) {
     super(scope, id);
 
+    const tablePartitionKeyName = "PK";
+    const tableSortKeyName = "SK";
     const db = new TableV2(this, "ExpenseDynamoDb", {
-      tableName: [props.environment, "expenses", "dynamodb"].join("-"),
-      partitionKey: { name: "id", type: AttributeType.STRING },
+      tableName: [props.resourcePrefix, props.environment, "expenses", "dynamodb"].join("-"),
+      partitionKey: { name: tablePartitionKeyName, type: AttributeType.STRING },
+      sortKey: { name: tableSortKeyName, type: AttributeType.STRING },
       tableClass: TableClass.STANDARD_INFREQUENT_ACCESS,
       pointInTimeRecovery: props.environment === EnvironmentName.Production,
       removalPolicy: RemovalPolicy.DESTROY,
     });
 
-    db.addLocalSecondaryIndex({
-      indexName: ["filter", "by", "user", "index"].join("-"),
-      sortKey: { name: "userId", type: AttributeType.STRING },
+    const gsiProp = {
+      indexName: ["userId", "expenseId", "index"].join("-"),
+      partitionKey: { name: "UE_GSI_PK", type: AttributeType.STRING },
+      sortKey: { name: tablePartitionKeyName, type: AttributeType.STRING },
       projectionType: ProjectionType.KEYS_ONLY,
-    });
+    };
+    db.addGlobalSecondaryIndex(gsiProp);
 
-    db.addGlobalSecondaryIndex({
-      indexName: ["createdOn", "index"].join("-"),
-      partitionKey: { name: "createdOn", type: AttributeType.STRING },
-    });
-
-    this.expenseDb = db;
+    this.expenseTable = {
+      table: {
+        ref: db,
+        name: db.tableName,
+      },
+      globalSecondaryIndexes: {
+        userIdExpenseIdIndex: {
+          name: gsiProp.indexName,
+        },
+      },
+    };
   }
 }
