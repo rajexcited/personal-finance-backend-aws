@@ -7,8 +7,16 @@ export interface DbUserDetailItem {
 }
 export interface DbUserTokenItem {
   PK: string;
-  tokenExpiresAt: number;
+  // ttl value in seconds
   ExpiresAt: number;
+  details: DbUserTokenDetails;
+}
+
+export interface DbUserTokenDetails {
+  // date time in millis
+  tokenExpiresAt: number;
+  // date time in millis
+  iat: number;
 }
 
 export interface DbUserDetails {
@@ -18,6 +26,7 @@ export interface DbUserDetails {
   emailId: string;
   auditDetails: AuditDetailsType;
   phash: string;
+  status: "active" | "inactive" | "deleted";
 }
 
 export interface ApiUserResource {

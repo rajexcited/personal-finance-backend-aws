@@ -4,8 +4,8 @@ import { getLogger } from "./logger";
 
 const _logger = getLogger("validations");
 
-export const isValidUuid = (id: string) => {
-  return uuidValidate(id) && uuidVersion(id) === 4;
+export const isValidUuid = (id?: string) => {
+  return id && uuidValidate(id) && uuidVersion(id) === 4;
 };
 
 /**
@@ -26,14 +26,7 @@ export const isValidDate = (date?: Date | string | number | null, dateFormat?: s
     dupdate = new Date(date || NaN);
   }
   const invalidDate = new Date(NaN);
-  logger.info(
-    "dupdate",
-    dupdate,
-    "invalidDate",
-    invalidDate,
-    "(String(dupdate) === String(invalidDate))?",
-    String(dupdate) === String(invalidDate)
-  );
+  logger.info("dupdate", dupdate, "invalidDate", invalidDate, "(String(dupdate) === String(invalidDate))?", String(dupdate) === String(invalidDate));
   return date && dupdate && String(dupdate) === String(invalidDate);
 };
 

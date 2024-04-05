@@ -6,7 +6,7 @@ import { DbProps } from "../db/db-prop-type";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as kms from "aws-cdk-lib/aws-kms";
 import * as logs from "aws-cdk-lib/aws-logs";
-import { RemovalPolicy } from "aws-cdk-lib";
+import { Duration, RemovalPolicy } from "aws-cdk-lib";
 import { Algorithm } from "jsonwebtoken";
 import { SecretStringGenerator } from "aws-cdk-lib/aws-secretsmanager";
 
@@ -80,11 +80,13 @@ export class TokenAuthorizerConstruct extends Construct {
     tokenSecret.grantRead(tokenAuthorizerFunction);
     props.userTable.table.ref.grantReadData(tokenAuthorizerFunction);
 
-    const authorizer = new apigateway.TokenAuthorizer(this, "AccessTokenAuthorizer", {
-      authorizerName: [props.resourcePrefix, props.environment, "accesstoken", "authorizer"].join("-"),
+    const authorizer = new apigateway.TokenAuthorizer(this, "UserAccessTokenAuthorizer", {
+      authorizerName: [props.resourcePrefix, props.environment, "user", "accesstoken", "authorizer"].join("-"),
       handler: tokenAuthorizerFunction,
+      identitySource: "Authorization",
+      validationRegex: "Bearer .+",
+      resultsCacheTtl: Duration.minutes(1),
     });
-
     this.authorizer = authorizer;
   }
 }

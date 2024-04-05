@@ -19,10 +19,13 @@
   },
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.507.0",
+    "@aws-sdk/client-s3": "^3.540.0",
     "@aws-sdk/client-secrets-manager": "^3.535.0",
     "@aws-sdk/lib-dynamodb": "^3.509.0",
     "@types/aws-lambda": "^8.10.133",
+    "@types/bcryptjs": "^2.4.6",
     "@types/jest": "^29.5.11",
+    "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "20.11.14",
     "aws-cdk": "2.126.0",
     "aws-cdk-lib": "2.126.0",
@@ -30,9 +33,7 @@
     "jest": "^29.7.0",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
-    "typescript": "~5.3.3",
-    "@types/bcryptjs": "^2.4.6",
-    "@types/jsonwebtoken": "^9.0.6"
+    "typescript": "~5.3.3"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

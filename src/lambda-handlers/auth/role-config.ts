@@ -1,4 +1,4 @@
-import { MethodType } from "../http-method-type";
+import { MethodType } from "../apigateway";
 import { Role } from "./auth-type";
 
 interface RoleAuthorizeConfigType {

@@ -17,8 +17,7 @@ import { SecretStringGenerator } from "aws-cdk-lib/aws-secretsmanager";
 import * as jwt from "jsonwebtoken";
 import { TokenSecret } from "./auth-type";
 import { utils, getLogger } from "../utils";
-import { ValidationError } from "../handler-wrapper";
-import { JSONObject } from "../wrapper-types";
+import { ValidationError, JSONObject } from "../apigateway";
 
 const client = new SecretsManagerClient();
 const _logger = getLogger("token-rotator");
@@ -51,26 +50,16 @@ export const secretRotator: SecretsManagerRotationHandler = async (event, contex
     throw new Error("Secret [" + event.SecretId + "] is not enabled for rotation");
   }
   if (!describeResult.VersionIdsToStages[event.ClientRequestToken]) {
-    logger.error(
-      "Secret version [" + event.ClientRequestToken + "] has no stage for rotation of secret [" + event.SecretId + "]."
-    );
-    throw new Error(
-      "Secret version [" + event.ClientRequestToken + "] has no stage for rotation of secret [" + event.SecretId + "]."
-    );
+    logger.error("Secret version [" + event.ClientRequestToken + "] has no stage for rotation of secret [" + event.SecretId + "].");
+    throw new Error("Secret version [" + event.ClientRequestToken + "] has no stage for rotation of secret [" + event.SecretId + "].");
   }
   if (describeResult.VersionIdsToStages[event.ClientRequestToken].includes("AWSCURRENT")) {
-    logger.warn(
-      "Secret version [" + event.ClientRequestToken + "] already set as AWSCURRENT for secret [" + event.SecretId + "]."
-    );
+    logger.warn("Secret version [" + event.ClientRequestToken + "] already set as AWSCURRENT for secret [" + event.SecretId + "].");
     return;
   }
   if (describeResult.VersionIdsToStages[event.ClientRequestToken].includes("AWSPENDING")) {
-    logger.warn(
-      "Secret version [" + event.ClientRequestToken + "] already set as AWSPENDING for secret [" + event.SecretId + "]."
-    );
-    throw new Error(
-      "Secret version [" + event.ClientRequestToken + "] already set as AWSPENDING for secret [" + event.SecretId + "]."
-    );
+    logger.warn("Secret version [" + event.ClientRequestToken + "] already set as AWSPENDING for secret [" + event.SecretId + "].");
+    throw new Error("Secret version [" + event.ClientRequestToken + "] already set as AWSPENDING for secret [" + event.SecretId + "].");
   }
 
   if (event.Step === "createSecret") {
@@ -170,17 +159,10 @@ const finishSecret = async (event: SecretsManagerRotationEvent) => {
     throw new Error("Secret [" + event.SecretId + "] is not describable in finishSecret step");
   }
   for (const version in describeResult.VersionIdsToStages) {
-    logger.info(
-      "version",
-      version,
-      "describeResult.VersionIdsToStages[version]",
-      describeResult.VersionIdsToStages[version]
-    );
+    logger.info("version", version, "describeResult.VersionIdsToStages[version]", describeResult.VersionIdsToStages[version]);
     if (describeResult.VersionIdsToStages[version].includes("AWSCURRENT")) {
       if (version === event.ClientRequestToken) {
-        logger.info(
-          "finishSecret: Version [" + version + "] already marked as AWSCURRENT for [" + event.SecretId + "]"
-        );
+        logger.info("finishSecret: Version [" + version + "] already marked as AWSCURRENT for [" + event.SecretId + "]");
       } else {
         const updateStageCmd = new UpdateSecretVersionStageCommand({
           SecretId: event.SecretId,
@@ -199,9 +181,7 @@ const finishSecret = async (event: SecretsManagerRotationEvent) => {
 
 const generatePassword = async () => {
   const logger = getLogger("generatePassword", _logger);
-  const generateTokenConfiguration = utils.getJsonObj<SecretStringGenerator>(
-    process.env.TOKEN_GENERATE_CONFIG as string
-  );
+  const generateTokenConfiguration = utils.getJsonObj<SecretStringGenerator>(process.env.TOKEN_GENERATE_CONFIG as string);
   logger.info("generateTokenConfiguration", generateTokenConfiguration);
   if (!generateTokenConfiguration) {
     throw new ValidationError([{ path: "token-config", message: "env valud is not valid json" }]);

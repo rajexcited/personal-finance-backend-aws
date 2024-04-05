@@ -1,9 +1,11 @@
 import { Context, APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { JSONValue, LambdaHandler } from "./wrapper-types";
 import { HTTP_STATUS_CODE, MethodType } from "./http-method-type";
-import { utils, getLogger } from "./utils";
+import { utils, getLogger } from "../utils";
+import { UnAuthorizedError, ValidationError } from "./errors";
 
 const _logger = getLogger("handler-wrapper");
+
 export enum RequestBodyContentType {
   JSON = "application/json",
 }
@@ -98,32 +100,3 @@ const convertToAPIGatewayEventResult = (result: JSONValue, statusCode?: HTTP_STA
     body,
   };
 };
-
-export interface InvalidField {
-  path: string;
-  message: string;
-}
-
-export class ValidationError extends Error {
-  private invalidFields: InvalidField[];
-
-  constructor(invalidFields: InvalidField[]) {
-    super(JSON.stringify(invalidFields, null, 2));
-    this.invalidFields = invalidFields;
-  }
-
-  public getInvalidFields(): InvalidField[] {
-    // deep copy to avoid object reference issue
-    return this.invalidFields.map((o) => ({ ...o }));
-  }
-
-  public addInvalidField(fieldPathLocation: string, errorMessage: string) {
-    this.invalidFields = [...this.invalidFields, { path: fieldPathLocation, message: errorMessage }];
-  }
-}
-
-export class UnAuthorizedError extends Error {
-  constructor(message?: string) {
-    super(message);
-  }
-}

@@ -17,7 +17,7 @@ enum LogLevel {
 }
 
 type LogLevelType = "info" | "debug" | "error" | "INFO" | "DEBUG" | "ERROR";
-let defaultLogLevel: LogLevelType = "INFO";
+let defaultLogLevel: LogLevelType = "DEBUG";
 
 export const setDefaultLogLevel = (logLevel: LogLevelType) => {
   defaultLogLevel = logLevel;
@@ -117,22 +117,70 @@ export class LoggerBase {
   }
 
   private printToConsole(ctype: ConsoleLogType, ...args: any[]) {
-    consoleprint(ctype, this.id, ...args);
+    const p = [this.id, ...args.flatMap((a) => a)];
+    consoleprint(ctype, ...p);
   }
 }
 
 type ConsoleLogType = "debug" | "log" | "error" | "warn" | "info";
 const consoleprint = (ctype: ConsoleLogType, ...args: any[]) => {
-  const argscopy = args.flatMap((a) => {
+  const p = args.flatMap((a) => {
     if (a instanceof Error) {
-      console.log([JSON.stringify({ errorMessage: a.message, errorClassName: a.name }), a.stack]);
-      console.warn(a);
-      console.error(a);
+      // console.error("temp testing", [JSON.stringify({ errorMessage: a.message, errorClassName: a.name }), a.stack], a instanceof Error, a);
       return [JSON.stringify({ errorMessage: a.message, errorClassName: a.name }), a.stack];
     }
-    if (typeof a === "object") return JSON.stringify(a, null, 2);
+    if (typeof a === "object") return JSON.stringify(a);
     return a;
   });
 
-  console[ctype](...argscopy);
+  if (p.length === 0) return;
+  if (p.length === 1) console[ctype](p[0]);
+  else if (p.length === 2) console[ctype](p[0], p[1]);
+  else if (p.length === 3) console[ctype](p[0], p[1], p[2]);
+  else if (p.length === 4) console[ctype](p[0], p[1], p[2], p[3]);
+  else if (p.length === 5) console[ctype](p[0], p[1], p[2], p[3], p[4]);
+  else if (p.length === 6) console[ctype](p[0], p[1], p[2], p[3], p[4], p[5]);
+  else if (p.length === 7) console[ctype](p[0], p[1], p[2], p[3], p[4], p[5], p[6]);
+  else if (p.length === 8) console[ctype](p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]);
+  else if (p.length === 9) console[ctype](p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8]);
+  else if (p.length === 10) console[ctype](p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9]);
+  else if (p.length === 11) console[ctype](p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10]);
+  else if (p.length === 12) console[ctype](p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11]);
+  else if (p.length === 13) console[ctype](p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12]);
+  else if (p.length === 14) console[ctype](p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13]);
+  else if (p.length === 15) console[ctype](p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14]);
+  else if (p.length === 16) console[ctype](p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15]);
+  else if (p.length === 17)
+    console[ctype](p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16]);
+  else if (p.length === 18)
+    console[ctype](p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17]);
+  else if (p.length === 19)
+    console[ctype](p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18]);
+  else if (p.length === 20)
+    console[ctype](p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16], p[17], p[18], p[19]);
+  else
+    console[ctype](
+      p[0],
+      p[1],
+      p[2],
+      p[3],
+      p[4],
+      p[5],
+      p[6],
+      p[7],
+      p[8],
+      p[9],
+      p[10],
+      p[11],
+      p[12],
+      p[13],
+      p[14],
+      p[15],
+      p[16],
+      p[17],
+      p[18],
+      p[19],
+      p[20],
+      ...p.slice(21)
+    );
 };

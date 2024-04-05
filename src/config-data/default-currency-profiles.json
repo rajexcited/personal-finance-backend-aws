@@ -1,0 +1,20 @@
+[
+  {
+    "id": "USA-USD",
+    "country": "United States of America",
+    "currency": {
+      "name": "Dollar",
+      "symbol": "$"
+    },
+    "description": "USD currency used in country USA"
+  },
+  {
+    "id": "IND-INR",
+    "country": "India",
+    "currency": {
+      "name": "Rupee",
+      "symbol": "₹"
+    },
+    "description": "Rupee currency used in country India"
+  }
+]

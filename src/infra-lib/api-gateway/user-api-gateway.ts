@@ -1,21 +1,21 @@
 import { Construct } from "constructs";
-import { ConstructProps } from "../common";
+import { RestApiProps } from "./construct-type";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import { HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import * as lambda from "aws-cdk-lib/aws-lambda";
-import { DbProps } from "../db/db-prop-type";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as kms from "aws-cdk-lib/aws-kms";
-import { RemovalPolicy } from "aws-cdk-lib";
-import { JSONObject } from "../../lambda-handlers/wrapper-types";
-import * as bcrypt from "bcryptjs";
+import { Duration, RemovalPolicy } from "aws-cdk-lib";
+import { JSONObject } from "../../lambda-handlers";
+import { DbProps } from "../db";
+import { IBucket } from "aws-cdk-lib/aws-s3";
 
-interface UserApiProps extends ConstructProps {
+interface UserApiProps extends RestApiProps {
   userTable: DbProps;
-  layer: lambda.ILayerVersion;
-  authorizer: apigateway.IAuthorizer;
-  tokenSecret: secretsmanager.Secret;
+  configTypeTable: DbProps;
+  paymentAccountTable: DbProps;
+  configBucket: IBucket;
 }
 
 enum ModelId {
@@ -26,7 +26,6 @@ enum ModelId {
 export class UserApiConstruct extends Construct {
   private readonly props: UserApiProps;
   private modelMap = new Map<ModelId, apigateway.Model>();
-  private readonly restApi: apigateway.RestApi;
   private readonly pSaltSecret: secretsmanager.Secret;
 
   constructor(scope: Construct, id: string, props: UserApiProps) {
@@ -41,75 +40,41 @@ export class UserApiConstruct extends Construct {
       removalPolicy: RemovalPolicy.DESTROY,
     });
 
-    const restApi = new apigateway.RestApi(this, "UserRestApi", {
-      restApiName: [props.resourcePrefix, props.environment, "user"].join("-"),
-      deployOptions: {
-        stageName: props.environment,
-        description: "rest apis",
-      },
-    });
-    this.restApi = restApi;
-
-    const userResource = restApi.root.addResource("user");
+    const userResource = props.restApi.root.addResource("user");
     //  request validator setup
     // https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-method-request-validation.html
     const userLoginResource = userResource.addResource("login");
-    const loginlambdaFunction = this.buildApi(
-      userLoginResource,
-      HttpMethod.POST,
-      "index.userLogin",
-      false,
-      ModelId.UserLoginModel
-    );
+    const loginlambdaFunction = this.buildApi(userLoginResource, HttpMethod.POST, "index.userLogin", false, ModelId.UserLoginModel);
     props.userTable.table.ref.grantReadWriteData(loginlambdaFunction);
 
     const userSignupResource = userResource.addResource("signup");
-    const signuplambdaFunction = this.buildApi(
-      userSignupResource,
-      HttpMethod.POST,
-      "index.userSignup",
-      false,
-      ModelId.UserSignupModel
-    );
+    const signuplambdaFunction = this.buildApi(userSignupResource, HttpMethod.POST, "index.userSignup", false, ModelId.UserSignupModel);
     props.userTable.table.ref.grantReadWriteData(signuplambdaFunction);
+    props.configTypeTable.table.ref.grantWriteData(signuplambdaFunction);
+    props.paymentAccountTable.table.ref.grantWriteData(signuplambdaFunction);
 
     const userLogoutResource = userResource.addResource("logout");
     const logoutlambdaFunction = this.buildApi(userLogoutResource, HttpMethod.POST, "index.userLogout", true);
     props.userTable.table.ref.grantReadWriteData(logoutlambdaFunction);
 
     const userRenewResource = userResource.addResource("refresh");
-    const renewlambdaFunction = this.buildApi(userRenewResource, HttpMethod.POST, "index.renewToken", true);
+    const renewlambdaFunction = this.buildApi(userRenewResource, HttpMethod.POST, "index.userTokenRefresh", true);
     props.userTable.table.ref.grantReadWriteData(renewlambdaFunction);
 
     const userDetailsResource = userResource.addResource("details");
-    const getDetailsLambdaFunction = this.buildApi(userDetailsResource, HttpMethod.GET, "index.getUserDetails", true);
+    const getDetailsLambdaFunction = this.buildApi(userDetailsResource, HttpMethod.GET, "index.userDetailsGet", true);
     props.userTable.table.ref.grantReadData(getDetailsLambdaFunction);
 
-    const updateDetailsLambdaFunction = this.buildApi(
-      userDetailsResource,
-      HttpMethod.POST,
-      "index.updateUserDetails",
-      true
-    );
+    const updateDetailsLambdaFunction = this.buildApi(userDetailsResource, HttpMethod.POST, "index.userDetailsUpdate", true);
     props.userTable.table.ref.grantReadWriteData(updateDetailsLambdaFunction);
   }
 
-  private buildApi(
-    resource: apigateway.Resource,
-    method: HttpMethod,
-    lambdaHandlerName: string,
-    applyAuthorize: boolean,
-    modelId?: ModelId
-  ) {
+  private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: string, applyAuthorize: boolean, modelId?: ModelId) {
     const useTokenSecret =
-      lambdaHandlerName.includes("userLogin") ||
-      lambdaHandlerName.includes("userSignup") ||
-      lambdaHandlerName.includes("renewToken");
+      lambdaHandlerName.includes("userLogin") || lambdaHandlerName.includes("userSignup") || lambdaHandlerName.includes("userTokenRefresh");
 
     const usePsaltSecret =
-      lambdaHandlerName.includes("userLogin") ||
-      lambdaHandlerName.includes("userSignup") ||
-      lambdaHandlerName.includes("updateUserDetails");
+      lambdaHandlerName.includes("userLogin") || lambdaHandlerName.includes("userSignup") || lambdaHandlerName.includes("userDetailsUpdate");
 
     const additionalEnvs: JSONObject = {};
     if (useTokenSecret) {
@@ -119,6 +84,13 @@ export class UserApiConstruct extends Construct {
     if (usePsaltSecret) {
       additionalEnvs.PSALT_SECRET_ID = this.pSaltSecret.secretName;
     }
+
+    if (lambdaHandlerName.includes("userSignup")) {
+      additionalEnvs.CONFIG_DATA_BUCKET_NAME = this.props.configBucket.bucketName;
+      additionalEnvs.CONFIG_TYPE_TABLE_NAME = this.props.configTypeTable.table.name;
+      additionalEnvs.PYMT_ACC_TABLE_NAME = this.props.paymentAccountTable.table.name;
+    }
+
     const uniqueConstructName = method + lambdaHandlerName.replace("index.", "");
     const userLambdaFunction = new lambda.Function(this, `User${uniqueConstructName}Lambda`, {
       functionName: [
@@ -139,13 +111,19 @@ export class UserApiConstruct extends Construct {
         ...additionalEnvs,
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
+      timeout: Duration.seconds(30),
     });
 
     if (useTokenSecret) {
       this.props.tokenSecret.grantRead(userLambdaFunction);
     }
+
     if (usePsaltSecret) {
       this.pSaltSecret.grantRead(userLambdaFunction);
+    }
+
+    if (lambdaHandlerName.includes("userSignup")) {
+      this.props.configBucket.grantRead(userLambdaFunction);
     }
 
     const userLambdaIntegration = new apigateway.LambdaIntegration(userLambdaFunction, {
@@ -197,8 +175,15 @@ export class UserApiConstruct extends Construct {
     return model;
   };
 
+  /**
+   * https://json-schema.org/draft-07/schema#
+   *
+   * @returns
+   */
   private getLoginModel = () => {
-    const userModel: apigateway.Model = this.restApi.addModel(ModelId.UserLoginModel, {
+    const userModel: apigateway.Model = this.props.restApi.addModel(ModelId.UserLoginModel, {
+      contentType: "application/json",
+      description: ModelId.UserLoginModel,
       schema: {
         schema: apigateway.JsonSchemaVersion.DRAFT7,
         title: "Login Schema",
@@ -222,8 +207,16 @@ export class UserApiConstruct extends Construct {
     });
     return userModel;
   };
+
+  /**
+   * https://json-schema.org/draft-07/schema#
+   *
+   * @returns
+   */
   private getSignupModel = () => {
-    const userModel: apigateway.Model = this.restApi.addModel(ModelId.UserSignupModel, {
+    const userModel: apigateway.Model = this.props.restApi.addModel(ModelId.UserSignupModel, {
+      contentType: "application/json",
+      description: ModelId.UserSignupModel,
       schema: {
         schema: apigateway.JsonSchemaVersion.DRAFT7,
         title: "Signup Schema",

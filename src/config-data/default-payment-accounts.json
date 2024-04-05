@@ -1,0 +1,10 @@
+[
+  {
+    "shortName": "cash",
+    "accountName": "cash",
+    "paymentAccountType": "savings",
+    "tags": [],
+    "description": "my cash, notes or coins stored",
+    "institutionName": ""
+  }
+]

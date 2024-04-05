@@ -1,13 +1,19 @@
 import { Construct } from "constructs";
+import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import { UserApiConstruct } from "./user-api-gateway";
 import { ConstructProps } from "../common";
 import { DBConstruct } from "../db";
 import { LambdaLayerConstruct } from "./lambda-layer";
 import { TokenAuthorizerConstruct } from "./authorizer-lambda";
-import { IKey } from "aws-cdk-lib/aws-kms";
+import { ContextInfo } from "../context-type";
+import { ConfigTypeApiConstruct } from "./config-types-api-gateway";
+import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
+import { IBucket } from "aws-cdk-lib/aws-s3";
 
 interface ApiProps extends ConstructProps {
   allDb: DBConstruct;
+  contextInfo: ContextInfo;
+  configBucket: IBucket;
 }
 
 // https://docs.aws.amazon.com/apigateway/latest/developerguide/how-to-set-up-method-using-console.html
@@ -25,12 +31,40 @@ export class ApiConstruct extends Construct {
       userTable: props.allDb.userTable,
     });
 
+    const restApi = new apigateway.RestApi(this, "MyFinanceRestApi", {
+      restApiName: [props.resourcePrefix, props.environment, "rest", "api"].join("-"),
+      deployOptions: {
+        stageName: props.contextInfo.apiStageName,
+        description: "my finance rest apis",
+        loggingLevel: apigateway.MethodLoggingLevel.INFO,
+        // accessLogDestination: new apigateway.LogGroupLogDestination(
+        //   new LogGroup(this, "RestApiAccessLogGroup", {
+        //     // logGroupName: "apigateway/restapi/accesslogs",
+        //     retention: RetentionDays.ONE_WEEK,
+        //   })
+        // ),
+      },
+    });
+
     const userApi = new UserApiConstruct(this, "UserApiConstruct", {
       ...props,
       userTable: props.allDb.userTable,
+      configTypeTable: props.allDb.configTypeTable,
+      paymentAccountTable: props.allDb.paymentAccountTable,
       layer: lambdaLayer.layer,
       authorizer: tokenAuthorizer.authorizer,
       tokenSecret: tokenAuthorizer.tokenSecret,
+      restApi: restApi,
+    });
+
+    const configTypeApi = new ConfigTypeApiConstruct(this, "ConfigTypeApiConstruct", {
+      ...props,
+      userTable: props.allDb.userTable,
+      configTypeTable: props.allDb.configTypeTable,
+      layer: lambdaLayer.layer,
+      authorizer: tokenAuthorizer.authorizer,
+      tokenSecret: tokenAuthorizer.tokenSecret,
+      restApi: restApi,
     });
   }
 }

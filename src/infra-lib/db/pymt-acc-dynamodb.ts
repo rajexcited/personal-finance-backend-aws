@@ -1,5 +1,11 @@
 import { Construct } from "constructs";
-import { AttributeType, TableV2, TableClass, ProjectionType } from "aws-cdk-lib/aws-dynamodb";
+import {
+  AttributeType,
+  TableV2,
+  TableClass,
+  ProjectionType,
+  GlobalSecondaryIndexPropsV2,
+} from "aws-cdk-lib/aws-dynamodb";
 import { ConstructProps, EnvironmentName } from "../common";
 import { RemovalPolicy } from "aws-cdk-lib";
 import { DbProps } from "./db-prop-type";
@@ -26,7 +32,7 @@ export class PymtAccDBConstruct extends Construct {
       removalPolicy: RemovalPolicy.DESTROY,
     });
 
-    const gsiProp = {
+    const gsiProp: GlobalSecondaryIndexPropsV2 = {
       indexName: ["userId", "pymtAccId", "index"].join("-"),
       partitionKey: { name: "UP_GSI_PK", type: AttributeType.STRING },
       projectionType: ProjectionType.KEYS_ONLY,

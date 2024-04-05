@@ -1,5 +1,11 @@
 import { Construct } from "constructs";
-import { AttributeType, TableV2, TableClass, ProjectionType } from "aws-cdk-lib/aws-dynamodb";
+import {
+  AttributeType,
+  TableV2,
+  TableClass,
+  ProjectionType,
+  GlobalSecondaryIndexPropsV2,
+} from "aws-cdk-lib/aws-dynamodb";
 import { ConstructProps, EnvironmentName } from "../common";
 import { RemovalPolicy } from "aws-cdk-lib";
 import { DbProps } from "./db-prop-type";
@@ -28,7 +34,7 @@ export class ExpenseDBConstruct extends Construct {
       removalPolicy: RemovalPolicy.DESTROY,
     });
 
-    const gsiProp = {
+    const gsiProp: GlobalSecondaryIndexPropsV2 = {
       indexName: ["userId", "expenseId", "index"].join("-"),
       partitionKey: { name: "UE_GSI_PK", type: AttributeType.STRING },
       sortKey: { name: tablePartitionKeyName, type: AttributeType.STRING },

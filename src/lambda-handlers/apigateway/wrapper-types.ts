@@ -1,6 +1,6 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 
-export type JSONValue = string | number | boolean | JSONObject | JSONArray | null | undefined;
+export type JSONValue = string | number | boolean | Date | JSONObject | JSONArray | null | undefined;
 
 export interface JSONObject {
   [key: string]: JSONValue;

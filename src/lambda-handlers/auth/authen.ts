@@ -1,48 +1,12 @@
 import { APIGatewayAuthorizerResult, APIGatewayTokenAuthorizerHandler, PolicyDocument } from "aws-lambda";
-import { GetSecretValueCommand, SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocument } from "@aws-sdk/lib-dynamodb";
 import * as jwt from "jsonwebtoken";
-import * as datetime from "date-and-time";
-import { Role, TokenHeader, TokenPayload, TokenSecret } from "./auth-type";
+import { Role, TokenHeader, TokenPayload } from "./auth-type";
 import { roleAuthConfigList } from "./role-config";
-import { utils, getLogger, validations } from "../utils";
+import { utils, getLogger, validations, dbutil, LoggerBase } from "../utils";
 import { DbUserTokenItem, getTokenTablePk } from "../user";
-import { ValidationError } from "../handler-wrapper";
-
-const _smClient = new SecretsManagerClient();
-const _tokenSecretId = process.env.TOKEN_SECRET_ID;
-
-const _ddbClient = DynamoDBDocument.from(new DynamoDBClient(), utils.DdbTranslateConfig);
-const _userTableName = process.env.USER_TABLE_NAME as string;
-const _maxExpiringSeconds = 60 * 60;
-const _logger = getLogger("authen");
-
-export const getSignedToken = async (userId: string, role?: Role) => {
-  const logger = getLogger("getSignedToken", _logger);
-  const iat = Date.now();
-
-  const payload: TokenPayload = {
-    role: role || Role.PRIMARY,
-    id: userId,
-    iat,
-  };
-  logger.info("token payload", payload);
-
-  const secret = await getSecret();
-  const options: jwt.SignOptions = {
-    expiresIn: "1h",
-    algorithm: secret.algorithm,
-  };
-
-  const token = jwt.sign(payload, secret.tokenSecret, options);
-  logger.info("signed token", token);
-  return {
-    token,
-    expiresIn: _maxExpiringSeconds,
-    expiresAt: datetime.addSeconds(new Date(iat), _maxExpiringSeconds),
-  };
-};
+import { ValidationError } from "../apigateway";
+import { _logger, _smClient, _tokenSecretId, _userTableName } from "./base-config";
+import { getSecret } from "./token-secret";
 
 export const authorizer: APIGatewayTokenAuthorizerHandler = async (event, context) => {
   const logger = getLogger("authorizer", _logger);
@@ -54,13 +18,13 @@ export const authorizer: APIGatewayTokenAuthorizerHandler = async (event, contex
   const payload = getTokenPayload(token);
 
   let iamPolicyDocument = denyPolicy(event.methodArn);
-  const isAuthenticated = await authenticate(token);
-  logger.info("isAuthenticated", isAuthenticated);
-  if (isAuthenticated) {
-    const isAuthorized = await authorize(payload, event.methodArn);
+  const authenticatedResponse = await authenticate(token);
+  logger.info("authenticate response", authenticatedResponse);
+  if (authenticatedResponse.isAuthenticated && authenticatedResponse.decoded) {
+    const isAuthorized = await authorize(payload, event.methodArn, authenticatedResponse.decoded as jwt.JwtPayload);
     logger.info("isAuthorized", isAuthorized);
     if (isAuthorized) {
-      iamPolicyDocument = allowPolicy(event.methodArn);
+      iamPolicyDocument = allowPolicy(event.methodArn, payload.role as Role, logger);
     }
   }
   const resp: APIGatewayAuthorizerResult = {
@@ -87,49 +51,47 @@ const authenticate = async (token: string) => {
 
     const expiringTime = decoded.exp as number;
     if (expiringTime > Date.now()) {
-      return false;
+      throw new UnAuthenticatedError("It is expired. expiringTime [" + expiringTime + "(" + new Date(expiringTime) + ")]");
     }
     if (tokenHeaders.alg !== secret.algorithm) {
-      return false;
+      throw new UnAuthenticatedError(
+        "algorithm used in token is not supported. actual [" + tokenHeaders.alg + "], but expected [" + secret.algorithm + "]"
+      );
     }
     if (tokenHeaders.typ !== secret.type) {
-      return false;
+      throw new UnAuthenticatedError("incorrect type in tokenHeader. actual [" + tokenHeaders.typ + "], but expected [" + secret.type + "]");
     }
     if (!validations.isValidUuid(tokenPayload.id)) {
-      return false;
+      throw new UnAuthenticatedError("invalid user id format in token payload. actual [" + tokenPayload.id + "]");
     }
     if (!tokenPayload.role) {
-      return false;
+      throw new UnAuthenticatedError("role is not found in token");
     }
 
-    return true;
+    return { isAuthenticated: true, decoded: decoded };
   } catch (err) {
     logger.error("authentication failed", err);
-    return false;
+    return { isAuthenticated: false };
   }
 };
 
-const authorize = async (payload: TokenPayload, resourceArn: string) => {
+const authorize = async (payload: TokenPayload, resourceArn: string, jwtPayload: jwt.JwtPayload) => {
   const logger = getLogger("authorize", _logger);
+
   // verify if role is allowed for rest
   const roles = Object.values(Role) as string[];
   if (!roles.includes(payload.role)) {
+    logger.info("given role [" + payload.role + "] in token is not supported");
     return false;
   }
-  const resourceParts = resourceArn.split(":");
-  const resourcePath = resourceParts.slice(-1)[0];
-  const methodParts = resourcePath.split("/");
-  const httpMethod = methodParts[2];
-  const methodUri = methodParts.slice(2).join("/").replace(httpMethod, "");
 
-  logger.info("from resourceArn", "httpMethod", httpMethod, "methodUri", methodUri);
+  const { methodUri, httpMethod } = getResourceParts(resourceArn, logger);
   logger.debug("roleAuthConfigList", roleAuthConfigList);
-  const filteredCfg = roleAuthConfigList.filter(
-    (cfg) => cfg.apiPath === methodUri && cfg.method.toString() === httpMethod
-  );
+  const filteredCfg = roleAuthConfigList.filter((cfg) => cfg.apiPath === methodUri && cfg.method.toString() === httpMethod);
   logger.info("filteredCfg", filteredCfg);
 
   if (filteredCfg.length !== 1) {
+    logger.info("length of filteredCfg array is not equal to 1");
     return false;
   }
 
@@ -137,42 +99,36 @@ const authorize = async (payload: TokenPayload, resourceArn: string) => {
     const rolesAllowed = filteredCfg[0].role.filter((r) => payload.role === r);
     logger.info("rolesAllowed", rolesAllowed);
     if (!rolesAllowed.length) {
+      logger.info("role is not allowed");
       return false;
     }
   }
 
   // verify if user is valid
-  const result = await _ddbClient.get({
+  const result = await dbutil.ddbClient.get({
     TableName: _userTableName,
     Key: { PK: getTokenTablePk(payload.id) },
   });
+
   logger.debug("getUser result", result);
   if (!result.Item) {
+    logger.info("there isn't any token details found in db");
     return false;
   }
 
   const userItem = result.Item as DbUserTokenItem;
-  if (Date.now() > userItem.tokenExpiresAt) {
+  if (Date.now() > userItem.details.tokenExpiresAt) {
+    logger.info("token is expired. expiredAt [" + userItem.details.tokenExpiresAt + "( " + new Date(userItem.details.tokenExpiresAt) + " )]");
+    return false;
+  }
+
+  // making sure that old token is not used to authorize
+  if (userItem.details.iat !== jwtPayload.iat) {
+    logger.info("iat is not same. actual in token [" + jwtPayload.iat + "], but expected in db [" + userItem.details.iat + "]");
     return false;
   }
 
   return true;
-};
-
-const getSecret = async () => {
-  const logger = getLogger("getSecret", _logger);
-  const cmd = new GetSecretValueCommand({
-    SecretId: _tokenSecretId,
-  });
-  const res = await _smClient.send(cmd);
-  //todo remove after testing
-  logger.debug("command", cmd, "result: ", res);
-  const secret = res.SecretString as string;
-  const obj = utils.getJsonObj<TokenSecret>(secret);
-  if (!obj) {
-    throw new ValidationError([{ path: "secret", message: "invalid json" }]);
-  }
-  return obj;
 };
 
 const getTokenHeader = (token: string) => {
@@ -200,11 +156,16 @@ const denyPolicy = (resourceArn: string) => {
   return generatePolicy("Deny", resourceArn);
 };
 
-const allowPolicy = (resourceArn: string) => {
-  return generatePolicy("Allow", resourceArn);
+const allowPolicy = (resourceArn: string, role: Role, baseLogger: LoggerBase) => {
+  const logger = getLogger("allowPolicy", baseLogger);
+  const methodWithUris = roleAuthConfigList.filter((cfg) => cfg.role.includes(role)).map((cfg) => cfg.method + cfg.apiPath);
+  const { resourceArnWithoutMethodAndUri } = getResourceParts(resourceArn, logger);
+  const resources = methodWithUris.map((mu) => resourceArnWithoutMethodAndUri + mu);
+  logger.info("allowed resources", resources);
+  return generatePolicy("Allow", resources);
 };
 
-var generatePolicy = function (effect: "Allow" | "Deny", resourceArn: string) {
+const generatePolicy = function (effect: "Allow" | "Deny", resourceArn: string | string[]) {
   const policyDocument: PolicyDocument = {
     Version: "2012-10-17",
     Statement: [
@@ -217,3 +178,31 @@ var generatePolicy = function (effect: "Allow" | "Deny", resourceArn: string) {
   };
   return policyDocument;
 };
+
+const getResourceParts = (resourceArn: string, baseLogger: LoggerBase) => {
+  const logger = getLogger("getResourceParts", baseLogger);
+
+  const resourceParts = resourceArn.split(":");
+  const resourcePath = resourceParts.slice(-1)[0];
+  const methodParts = resourcePath.split("/");
+  const httpMethod = methodParts[2];
+  const methodUri = methodParts.slice(2).join("/").replace(httpMethod, "");
+
+  logger.info("from resourceArn", "httpMethod", httpMethod, "methodUri", methodUri);
+  return {
+    httpMethod,
+    methodUri,
+    resourceArn,
+    resourceArnWithoutMethodAndUri: resourceArn.replace(httpMethod + methodUri, ""),
+    apiNameWithStage: methodParts.slice(0, 2).join("/"),
+    apiName: methodParts[0],
+    stageName: methodParts[1],
+    resourceArnPrefix: resourceParts.slice(0, -1).join(":"),
+  };
+};
+
+export class UnAuthenticatedError extends Error {
+  constructor(message?: string) {
+    super(message);
+  }
+}

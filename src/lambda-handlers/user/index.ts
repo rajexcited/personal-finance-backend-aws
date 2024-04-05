@@ -1,11 +1,11 @@
-export {
-  getDetails as getUserDetails,
-  login as userLogin,
-  logout as userLogout,
-  renewToken,
-  signup as userSignup,
-  updateDetails as updateUserDetails,
-  getTokenTablePk,
-} from "./user-details";
+export { getDetails as getUserDetails, updateDetails as updateUserDetails, getUserDetailsById } from "./details";
 
-export { DbUserTokenItem, DbUserDetails } from "./user-type";
+export { login as userLogin, logout as userLogout } from "./login-logout";
+
+export { getTokenTablePk, getValidatedUserId } from "./base-config";
+
+export { signup as userSignup } from "./signup";
+
+export { renewToken } from "./token-renew";
+
+export { DbUserTokenItem, DbUserDetails, DbUserTokenDetails } from "./resource-type";

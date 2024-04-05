@@ -6,6 +6,8 @@ import { PymtAccDBConstruct } from "./pymt-acc-dynamodb";
 import { ConfigTypeDBConstruct } from "./config-type-dynamodb";
 import { DbProps } from "./db-prop-type";
 
+export { DbProps } from "./db-prop-type";
+
 export class DBConstruct extends Construct {
   public readonly userTable: DbProps;
   public readonly expenseTable: DbProps;
