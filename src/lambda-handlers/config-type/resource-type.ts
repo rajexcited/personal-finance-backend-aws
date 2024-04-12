@@ -1,17 +1,5 @@
 import { AuditDetailsType } from "../utils";
-import { JSONObject } from "../apigateway";
-
-export enum Status {
-  ENABLE = "enable",
-  DISABLE = "disable",
-  DELETED = "deleted",
-}
-
-export enum BelongsTo {
-  ExpenseCategory = "expense-category",
-  PaymentAccountType = "pymt-account-type",
-  CurrencyProfile = "currency-profile",
-}
+import { BelongsTo, ConfigStatus } from "./base-config";
 
 export interface DbConfigTypeItem {
   PK: string;
@@ -20,43 +8,38 @@ export interface DbConfigTypeItem {
   details: DbConfigTypeDetails;
 }
 
-export interface DbConfigTypeDetails extends JSONObject {
+export interface DbConfigTypeDetails {
   id: string;
   belongsTo: BelongsTo;
   name: string;
   value: string;
-  description: string;
-  status: Status;
+  description?: string;
+  status: ConfigStatus;
   color?: string;
   tags: string[];
   auditDetails: AuditDetailsType;
 }
 
-export interface ApiConfigTypeResource extends JSONObject {
-  id: string;
-  belongsTo: BelongsTo;
+export interface ApiConfigTypeResource {
+  id?: string;
+  belongsTo?: BelongsTo;
   name: string;
+  status: ConfigStatus;
+  description?: string;
+  tags: string[];
+  auditDetails?: AuditDetailsType;
   value: string;
-  description: string;
-  status: Status;
   color?: string;
-  tags: string[];
-  auditDetails: AuditDetailsType;
 }
 
-export interface DefaultConfigData {
-  name: string;
-  value: string;
-  tags: string[];
-  description: string;
-}
-
-export interface CurrencyProfileConfigData {
-  id: string;
-  country: string;
+export interface ApiCurrencyProfileResource extends ApiConfigTypeResource {
+  country: {
+    name: string;
+    code: string;
+  };
   currency: {
     name: string;
+    code: string;
     symbol: string;
   };
-  description: string;
 }

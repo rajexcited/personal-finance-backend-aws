@@ -3,6 +3,7 @@ import { JSONValue, LambdaHandler } from "./wrapper-types";
 import { HTTP_STATUS_CODE, MethodType } from "./http-method-type";
 import { utils, getLogger } from "../utils";
 import { UnAuthorizedError, ValidationError } from "./errors";
+import { StopWatch } from "stopwatch-node";
 
 const _logger = getLogger("handler-wrapper");
 
@@ -24,6 +25,8 @@ const isValidStatusCode = (code: number) => {
 
 export const apiGatewayHandlerWrapper = (callback: LambdaHandler, requiredBodyType?: RequestBodyContentType) => {
   return async (event: APIGatewayProxyEvent, context: Context): Promise<APIGatewayProxyResult> => {
+    const stopwatch = new StopWatch("apiGatewayHandlerWrapper");
+    stopwatch.start();
     const logger = getLogger("handler", _logger);
     try {
       logger.debug("event", event);
@@ -49,6 +52,9 @@ export const apiGatewayHandlerWrapper = (callback: LambdaHandler, requiredBodyTy
       const message = err instanceof Error ? err.message : String(err);
       logger.error("unknown error", message, err);
       return convertToAPIGatewayEventResult("unknown error", HTTP_STATUS_CODE.UNKNOWN_ERROR);
+    } finally {
+      stopwatch.stop();
+      logger.info("stopwatch summary", stopwatch.shortSummary());
     }
   };
 };

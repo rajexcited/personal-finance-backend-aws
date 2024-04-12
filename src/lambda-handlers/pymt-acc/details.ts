@@ -1,9 +1,10 @@
+import { JSONObject } from "../apigateway";
 import { dbutil, getLogger, utils } from "../utils";
 import { _logger, _pymtAccTableName, getDetailsTablePk, getUserIdGsiPk } from "./base-config";
 import { DbPaymentAccountDetails, DbPymtAccItem, DefaultPaymentAccounts } from "./resource-type";
 import { v4 as uuidv4 } from "uuid";
 
-export const createDetails = async (details: DefaultPaymentAccounts[], userId: string) => {
+export const createDetails = async (details: DefaultPaymentAccounts[], userId: string, transactionWriter: dbutil.TransactionWriter) => {
   const logger = getLogger("createDetails", _logger);
   logger.info("details", details);
   const auditDetails = utils.updateAuditDetails(null, userId);
@@ -29,6 +30,7 @@ export const createDetails = async (details: DefaultPaymentAccounts[], userId: s
     return item;
   });
 
-  await dbutil.batchAddUpdate(items, _pymtAccTableName, logger);
+  transactionWriter.putItems(items as unknown as JSONObject[], _pymtAccTableName, logger);
+  // await dbutil.batchAddUpdate(items, _pymtAccTableName, logger);
   return items.map((item) => item.details);
 };

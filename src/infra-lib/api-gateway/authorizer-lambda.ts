@@ -83,7 +83,7 @@ export class TokenAuthorizerConstruct extends Construct {
     const authorizer = new apigateway.TokenAuthorizer(this, "UserAccessTokenAuthorizer", {
       authorizerName: [props.resourcePrefix, props.environment, "user", "accesstoken", "authorizer"].join("-"),
       handler: tokenAuthorizerFunction,
-      identitySource: "Authorization",
+      // identitySource: "Authorization",
       validationRegex: "Bearer .+",
       resultsCacheTtl: Duration.minutes(1),
     });

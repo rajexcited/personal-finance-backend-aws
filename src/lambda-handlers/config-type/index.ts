@@ -1,3 +1,11 @@
-export { createDetails as addConfigType, getDetails as getConfigType } from "./details";
+export { getDetails as getConfigTypes } from "./get-details";
 
-export { DefaultConfigData, DbConfigTypeDetails, BelongsTo, CurrencyProfileConfigData } from "./resource-type";
+export { addUpdateDetails as updateConfigTypes } from "./add-update-details";
+
+export { deleteDetails as deleteConfigType, updateStatusDetails as updateConfigTypeStatus } from "./status";
+
+export { createDefaultDetails as addDefaultConfigTypes, DefaultConfigData } from "./default-details";
+
+export { DbConfigTypeDetails } from "./resource-type";
+
+export { ConfigStatus, BelongsTo } from "./base-config";

@@ -27,6 +27,7 @@ export enum UserResourcePath {
   FIRSTNAME = "firstName",
   LASTNAME = "lastName",
   EMAILID = "emailId",
+  COUNTRY = "country",
 }
 
 export const getDetailsTablePk = (userId: string) => {
@@ -46,5 +47,5 @@ export const getValidatedUserId = (event: APIGatewayProxyEvent) => {
   if (!userId || !validations.isValidUuid(userId)) {
     throw new UnAuthorizedError("missing userId in authorizer");
   }
-  return userId;
+  return userId as string;
 };

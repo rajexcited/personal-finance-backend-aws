@@ -22,8 +22,9 @@ export const updateAuditDetails = (auditDetails: AuditDetailsType | null, userId
   logger.debug("auditDetails", auditDetails, "userId", userId);
   const newAuditDetails: AuditDetailsType = { createdBy: "", createdOn: "", updatedBy: "", updatedOn: "" };
 
-  if (!auditDetails?.createdBy || !validations.isValidUuid(auditDetails.createdBy)) {
-    // this ensures the details coming from rest api
+  if (validations.isValidUuid(auditDetails?.createdBy)) {
+    newAuditDetails.createdBy = auditDetails?.createdBy as string;
+  } else {
     newAuditDetails.createdBy = userId;
   }
   newAuditDetails.updatedBy = userId;
@@ -33,8 +34,10 @@ export const updateAuditDetails = (auditDetails: AuditDetailsType | null, userId
     // the createdOn field may not be avaialble (first time scenario)
     // the createdOn field may not be correct format (some conversion error)
     newAuditDetails.createdOn = formatTimestamp(new Date());
-  } else if (typeof auditDetails?.createdOn === "object") {
-    newAuditDetails.createdOn = formatTimestamp(auditDetails.createdOn as Date);
+  } else if (auditDetails?.createdOn instanceof Date) {
+    newAuditDetails.createdOn = formatTimestamp(auditDetails.createdOn);
+  } else {
+    newAuditDetails.createdOn = auditDetails?.createdOn as string;
   }
 
   newAuditDetails.updatedOn = formatTimestamp(new Date());
@@ -111,7 +114,7 @@ const getValidatedUserDetails = async (userIdOrDetails: string | DbUserDetails) 
   return details;
 };
 
-const DEFAULT_FORMAT_PATTERN = "MMDDYYYY HH:mm:ss.SSS Z";
+const DEFAULT_FORMAT_PATTERN = "MM-DD-YYYY HH:mm:ss.SSS Z";
 export const parseTimestamp = (timestampStr: string, formatPattern?: string): Date => {
   const format = formatPattern || DEFAULT_FORMAT_PATTERN;
   return dateutil.parse(timestampStr, format);

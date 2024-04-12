@@ -2,7 +2,7 @@ import { APIGatewayProxyEvent } from "aws-lambda";
 import { v4 as uuidv4 } from "uuid";
 import { Role, getSignedToken } from "../auth";
 import { apiGatewayHandlerWrapper, RequestBodyContentType, ValidationError, InvalidField } from "../apigateway";
-import { getLogger, utils, AuditDetailsType, LoggerBase, validations, dbutil } from "../utils";
+import { getLogger, utils, AuditDetailsType, LoggerBase, validations, dbutil, s3utils } from "../utils";
 import {
   _logger as userLogger,
   getDetailsTablePk,
@@ -15,66 +15,86 @@ import {
 } from "./base-config";
 import { encrypt } from "./pcrypt";
 import { DbUserDetails, DbUserDetailItem, DbUserTokenItem, ApiUserResource } from "./resource-type";
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { BelongsTo, CurrencyProfileConfigData, DbConfigTypeDetails, DefaultConfigData, addConfigType } from "../config-type";
+import { BelongsTo, DbConfigTypeDetails, DefaultConfigData, addDefaultConfigTypes } from "../config-type";
 import { DefaultPaymentAccounts } from "../pymt-acc/resource-type";
 import { JSONObject } from "../apigateway";
 import { addPymtAccounts } from "../pymt-acc";
+import { StopWatch } from "stopwatch-node";
+import { getAllCountries, getCurrencyByCountry } from "../settings";
 
-const _s3Client = new S3Client({});
 const _logger = getLogger("signup", userLogger);
+
+const COUNTRY_CODE_MAX_LENGTH = 5;
 
 const signupHandler = async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("handler", _logger);
-  const req = await getValidatedRequestForSignup(event, logger);
-  const phash = await encrypt(req.password as string);
-  const userId = uuidv4();
-  const auditDetails = utils.updateAuditDetails(null, userId) as AuditDetailsType;
-  const apiToDbDetails: DbUserDetails = {
-    id: userId,
-    emailId: req.emailId as string,
-    firstName: req.firstName as string,
-    lastName: req.lastName as string,
-    phash: phash,
-    auditDetails: auditDetails,
-    status: "active",
-  };
-  const dbDetailItem: DbUserDetailItem = {
-    PK: getDetailsTablePk(apiToDbDetails.id),
-    E_GSI_PK: getEmailGsiPk(apiToDbDetails.emailId),
-    details: apiToDbDetails,
-  };
-  logger.info("dbDetailItem to be updated", dbDetailItem);
+  const stopwatch = new StopWatch("signupHandler");
 
-  // init config
-  const confInit = await initUserConfigurations(apiToDbDetails.id);
-  // init payment account
-  await initPaymentAccount(apiToDbDetails.id, confInit);
+  try {
+    stopwatch.start("prepareUserDetails");
+    const req = await getValidatedRequestForSignup(event, logger);
+    const transactionWriter = new dbutil.TransactionWriter(logger);
 
-  const accessTokenObj = await getSignedToken(apiToDbDetails.id, Role.PRIMARY);
-  const dbTokenItem: DbUserTokenItem = {
-    PK: getTokenTablePk(apiToDbDetails.id),
-    ExpiresAt: accessTokenObj.getExpiresAt().toSeconds(),
-    details: {
-      iat: accessTokenObj.iat,
-      tokenExpiresAt: accessTokenObj.getExpiresAt().toMillis(),
-    },
-  };
+    const phash = await encrypt(req.password as string);
+    const userId = uuidv4();
+    const auditDetails = utils.updateAuditDetails(null, userId) as AuditDetailsType;
+    const apiToDbDetails: DbUserDetails = {
+      id: userId,
+      emailId: req.emailId as string,
+      firstName: req.firstName as string,
+      lastName: req.lastName as string,
+      phash: phash,
+      auditDetails: auditDetails,
+      status: "active",
+    };
+    const dbDetailItem: DbUserDetailItem = {
+      PK: getDetailsTablePk(apiToDbDetails.id),
+      E_GSI_PK: getEmailGsiPk(apiToDbDetails.emailId),
+      details: apiToDbDetails,
+    };
+    transactionWriter.putItems(dbDetailItem as unknown as JSONObject, _userTableName);
 
-  await dbutil.batchAddUpdate([dbDetailItem, dbTokenItem], _userTableName, logger);
-  logger.info("accessTokenObj", accessTokenObj);
+    stopwatch.stop();
+    logger.info("dbDetailItem to be updated", dbDetailItem, "summary", stopwatch.shortSummary());
 
-  return {
-    accessToken: accessTokenObj.token,
-    expiresIn: accessTokenObj.expiresIn(),
-  };
+    // init config
+    const confInit = await initUserConfigurations(apiToDbDetails.id, req.countryCode as string, stopwatch, transactionWriter);
+    // init payment account
+    stopwatch.start("payment-account");
+    const pymtAccounts = await initPaymentAccount(apiToDbDetails.id, confInit, transactionWriter);
+    stopwatch.stop();
+
+    stopwatch.start("addingNewUser");
+    const accessTokenObj = await getSignedToken(apiToDbDetails.id, Role.PRIMARY);
+    const dbTokenItem: DbUserTokenItem = {
+      PK: getTokenTablePk(apiToDbDetails.id),
+      ExpiresAt: accessTokenObj.getExpiresAt().toSeconds(),
+      details: {
+        iat: accessTokenObj.iat,
+        tokenExpiresAt: accessTokenObj.getExpiresAt().toMillis(),
+      },
+    };
+
+    transactionWriter.putItems(dbTokenItem as unknown as JSONObject, _userTableName);
+    await transactionWriter.executeTransaction();
+    // await dbutil.batchAddUpdate([dbDetailItem, dbTokenItem], _userTableName, logger);
+
+    logger.info("accessTokenObj", accessTokenObj);
+    return {
+      accessToken: accessTokenObj.token,
+      expiresIn: accessTokenObj.expiresIn(),
+    };
+  } finally {
+    stopwatch.stop();
+    stopwatch.prettyPrint();
+  }
 };
 export const signup = apiGatewayHandlerWrapper(signupHandler, RequestBodyContentType.JSON);
 
 const getValidatedRequestForSignup = async (event: APIGatewayProxyEvent, loggerBase: LoggerBase) => {
   const logger = getLogger("validateRequest", loggerBase);
   const req: ApiUserResource | null = utils.getJsonObj(event.body as string);
-  logger.info("request=", req);
+  logger.info("request =", req);
 
   if (!req) {
     throw new ValidationError([{ path: UserResourcePath.REQUEST, message: ErrorMessage.MISSING_VALUE }]);
@@ -96,6 +116,11 @@ const getValidatedRequestForSignup = async (event: APIGatewayProxyEvent, loggerB
     const error = req.emailId ? ErrorMessage.INCORRECT_FORMAT : ErrorMessage.MISSING_VALUE;
     invalidFields.push({ path: UserResourcePath.EMAILID, message: error });
   }
+  if (!isValidCountryCode(req.countryCode)) {
+    const error = req.countryCode ? ErrorMessage.INCORRECT_VALUE : ErrorMessage.MISSING_VALUE;
+    invalidFields.push({ path: UserResourcePath.COUNTRY, message: error });
+  }
+
   logger.info("invalidFields", invalidFields);
   if (invalidFields.length > 0) {
     throw new ValidationError(invalidFields);
@@ -109,7 +134,7 @@ const getValidatedRequestForSignup = async (event: APIGatewayProxyEvent, loggerB
       ":pk": getEmailGsiPk(req.emailId as string),
     },
   });
-  logger.info("output=", output);
+  logger.info("output =", output);
 
   // error if count value is greater than 0
   if (output.Count) {
@@ -124,14 +149,20 @@ const getValidatedRequestForSignup = async (event: APIGatewayProxyEvent, loggerB
  *
  * @param userDetails
  */
-const initUserConfigurations = async (userId: string) => {
+const initUserConfigurations = async (userId: string, countryCode: string, stopwatch: StopWatch, transactionWriter: dbutil.TransactionWriter) => {
   const logger = getLogger("initUserConfigurations", _logger);
   // create default expense categories
-  const xpnsCtgr = await addDefaultConfig("default-expense-categories.json", BelongsTo.ExpenseCategory, userId, logger);
+  stopwatch.start(BelongsTo.ExpenseCategory);
+  const xpnsCtgr = await addDefaultConfig("default-expense-categories.json", BelongsTo.ExpenseCategory, userId, logger, transactionWriter);
+  stopwatch.stop();
   // create default payment account types
-  const pymtAccTyp = await addDefaultConfig("default-payment-account-types.json", BelongsTo.PaymentAccountType, userId, logger);
+  stopwatch.start(BelongsTo.PaymentAccountType);
+  const pymtAccTyp = await addDefaultConfig("default-payment-account-types.json", BelongsTo.PaymentAccountType, userId, logger, transactionWriter);
+  stopwatch.stop();
   // create default currency profiles
-  const currPrf = await addDefaultCurrencyConfig("default-currency-profiles.json", userId, logger);
+  stopwatch.start(BelongsTo.CurrencyProfile);
+  const currPrf = await addCurrencyConfig(countryCode, userId, logger, transactionWriter);
+  stopwatch.stop();
   logger.info("all config types are added to new user");
   const confInitEntries = [
     [BelongsTo.ExpenseCategory, xpnsCtgr],
@@ -140,13 +171,19 @@ const initUserConfigurations = async (userId: string) => {
   ];
 
   const confInit = Object.fromEntries(confInitEntries);
-  return confInit;
+  return confInit as Record<BelongsTo, DbConfigTypeDetails[]>;
 };
 
-const addDefaultConfig = async (s3Key: string, belongsTo: BelongsTo, userId: string, baseLogger: LoggerBase) => {
+const addDefaultConfig = async (
+  s3Key: string,
+  belongsTo: BelongsTo,
+  userId: string,
+  baseLogger: LoggerBase,
+  transactionWriter: dbutil.TransactionWriter
+) => {
   const logger = getLogger(belongsTo, baseLogger);
 
-  const configData = await getJsonObjectFromS3<DefaultConfigData[]>(s3Key, logger);
+  const configData = await s3utils.getJsonObjectFromS3<DefaultConfigData[]>(s3Key, logger);
   if (configData) {
     let filteredData = configData;
 
@@ -157,48 +194,47 @@ const addDefaultConfig = async (s3Key: string, belongsTo: BelongsTo, userId: str
       filteredData.map((d) => d.name)
     );
     // create
-    const configs = await addConfigType(filteredData, belongsTo, userId);
+    const configs = await addDefaultConfigTypes(filteredData, belongsTo, userId, transactionWriter);
     logger.info(belongsTo + " config types are added to user");
     return configs;
   }
   return [];
 };
 
-const addDefaultCurrencyConfig = async (s3Key: string, userId: string, baseLogger: LoggerBase) => {
+const addCurrencyConfig = async (countryCode: string, userId: string, baseLogger: LoggerBase, transactionWriter: dbutil.TransactionWriter) => {
   const belongsTo = BelongsTo.CurrencyProfile;
   const logger = getLogger(belongsTo, baseLogger);
 
-  const currencyConfigData = await getJsonObjectFromS3<CurrencyProfileConfigData[]>(s3Key, logger);
-  if (currencyConfigData) {
-    const filteredData = currencyConfigData.filter((currencyCfg) => currencyCfg.id === "USA-USD");
+  const currencyConfigData = await getCurrencyByCountry(logger);
+  const matchingCurrencyProfile = currencyConfigData.find((currencyCfg) => currencyCfg.country.code === countryCode);
 
-    logger.info(
-      "filteredData.length",
-      filteredData.length,
-      "filteredData names",
-      filteredData.map((d) => d.id)
-    );
+  if (matchingCurrencyProfile) {
+    logger.info("matchingCurrencyProfile", matchingCurrencyProfile);
     // create
-    const configData: DefaultConfigData[] = filteredData.map((cfg) => ({
-      name: cfg.id,
-      value: JSON.stringify(cfg),
+    const configData: DefaultConfigData = {
+      name: matchingCurrencyProfile.country.code,
+      value: matchingCurrencyProfile.currency.code,
       tags: [],
-      description: cfg.description,
-    }));
-    const configs = await addConfigType(configData, belongsTo, userId);
+      description: `currency profile for country, ${matchingCurrencyProfile.country.name} and currency, ${matchingCurrencyProfile.currency.name}`,
+    };
+    const configs = await addDefaultConfigTypes([configData], belongsTo, userId, transactionWriter);
     logger.info(belongsTo + " config types are added to user");
     return configs;
   }
   return [];
 };
 
-const initPaymentAccount = async (userId: string, confInit: JSONObject) => {
+const initPaymentAccount = async (
+  userId: string,
+  confInit: Record<BelongsTo, DbConfigTypeDetails[]>,
+  transactionWriter: dbutil.TransactionWriter
+) => {
   // add default payment accounts
   const logger = getLogger("initPaymentAccount", _logger);
 
   const s3Key = "default-payment-accounts.json";
 
-  const pymtAccs = await getJsonObjectFromS3<DefaultPaymentAccounts[]>(s3Key, logger);
+  const pymtAccs = await s3utils.getJsonObjectFromS3<DefaultPaymentAccounts[]>(s3Key, logger);
   if (pymtAccs) {
     logger.info(
       "pymtAccs.length",
@@ -206,32 +242,27 @@ const initPaymentAccount = async (userId: string, confInit: JSONObject) => {
       "payment Account shortNames",
       pymtAccs.map((p) => p.shortName)
     );
-    const pymtAccTyp = confInit[BelongsTo.PaymentAccountType] as DbConfigTypeDetails[];
+    const pymtAccTyp = confInit[BelongsTo.PaymentAccountType];
     pymtAccs.forEach((pa) => {
       const paymentAccountTypeId = pymtAccTyp.find((pat) => pat.name === pa.paymentAccountType)?.id;
       // either assign matching type or first type
       pa.paymentAccountType = paymentAccountTypeId || pymtAccTyp[0].id;
     });
     // create
-    await addPymtAccounts(pymtAccs, userId);
+    const pymtAccounts = await addPymtAccounts(pymtAccs, userId, transactionWriter);
     logger.info("Payment Accounts are added to user");
+    return pymtAccounts;
   }
+  return [];
 };
 
-async function getJsonObjectFromS3<T>(s3Key: string, baseLogger: LoggerBase): Promise<T | null> {
-  const logger = getLogger("getJsonObjectFromS3", baseLogger);
-  const configDataBucketName = process.env.CONFIG_DATA_BUCKET_NAME as string;
-  logger.info("configDataBucketName", configDataBucketName, "key", s3Key);
+const isValidCountryCode = async (countryCode: string | null | undefined) => {
+  const logger = getLogger("isValidCountryCode", _logger);
+  const validLength = validations.isValidLength(countryCode, 2, COUNTRY_CODE_MAX_LENGTH);
+  if (!validLength) return false;
 
-  const s3Result = await _s3Client.send(new GetObjectCommand({ Bucket: configDataBucketName, Key: s3Key }));
-  logger.info("keys in s3Result", Object.keys(s3Result), "s3 result", { ...s3Result, Body: null });
+  const countries = await getAllCountries(logger);
+  const foundCountry = countries.find((c) => c.code === countryCode);
 
-  const jsonString = await s3Result.Body?.transformToString();
-  if (jsonString) {
-    const configData = JSON.parse(jsonString);
-    logger.info("retrieved json object from s3");
-    return configData as T;
-  }
-  logger.warn("could not retrieve key object as string");
-  return null;
-}
+  return !!foundCountry;
+};

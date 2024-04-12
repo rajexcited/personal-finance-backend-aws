@@ -16,6 +16,7 @@ interface UserApiProps extends RestApiProps {
   configTypeTable: DbProps;
   paymentAccountTable: DbProps;
   configBucket: IBucket;
+  tokenSecret: secretsmanager.Secret;
 }
 
 enum ModelId {
@@ -221,7 +222,7 @@ export class UserApiConstruct extends Construct {
         schema: apigateway.JsonSchemaVersion.DRAFT7,
         title: "Signup Schema",
         type: apigateway.JsonSchemaType.OBJECT,
-        required: ["firstName", "lastName", "emailId", "password"],
+        required: ["firstName", "lastName", "emailId", "password", "countryCode"],
         properties: {
           firstName: {
             type: apigateway.JsonSchemaType.STRING,
@@ -246,6 +247,11 @@ export class UserApiConstruct extends Construct {
             minLength: 8,
             maxLength: 25,
             pattern: "^(?=.*[\\d])(?=.*[A-Z])(?=.*[!@#$%^&*])[\\w!@#$%^&\\(\\)\\=*]{8,25}$",
+          },
+          countryCode: {
+            type: apigateway.JsonSchemaType.STRING,
+            maxLength: 5,
+            pattern: "[A-Z]+",
           },
         },
       },

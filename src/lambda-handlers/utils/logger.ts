@@ -129,6 +129,7 @@ const consoleprint = (ctype: ConsoleLogType, ...args: any[]) => {
       // console.error("temp testing", [JSON.stringify({ errorMessage: a.message, errorClassName: a.name }), a.stack], a instanceof Error, a);
       return [JSON.stringify({ errorMessage: a.message, errorClassName: a.name }), a.stack];
     }
+    if (a instanceof Date) return String(a);
     if (typeof a === "object") return JSON.stringify(a);
     return a;
   });

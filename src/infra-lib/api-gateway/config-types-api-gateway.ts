@@ -6,10 +6,13 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
 import { DbProps } from "../db";
 import { Duration } from "aws-cdk-lib";
+import { ConfigStatus } from "../../lambda-handlers";
+import { IBucket } from "aws-cdk-lib/aws-s3";
 
 interface ConfigTypeApiProps extends RestApiProps {
   userTable: DbProps;
   configTypeTable: DbProps;
+  configBucket: IBucket;
 }
 
 export class ConfigTypeApiConstruct extends Construct {
@@ -28,20 +31,24 @@ export class ConfigTypeApiConstruct extends Construct {
     const getDetailsLambdaFunction = this.buildApi(belongsToResource, HttpMethod.GET, "index.configTypeDetailsGet", { status: false });
     props.userTable.table.ref.grantReadData(getDetailsLambdaFunction);
     props.configTypeTable.table.ref.grantReadData(getDetailsLambdaFunction);
+    props.configBucket.grantRead(getDetailsLambdaFunction);
 
     const addUpdateDetailsLambdaFunction = this.buildApi(belongsToResource, HttpMethod.POST, "index.configTypeDetailsAddUpdate");
     props.userTable.table.ref.grantReadData(addUpdateDetailsLambdaFunction);
     props.configTypeTable.table.ref.grantReadWriteData(addUpdateDetailsLambdaFunction);
+    props.configBucket.grantRead(addUpdateDetailsLambdaFunction);
 
-    const configIdResource = configTypeResource.addResource("id").addResource("{id}");
+    const configIdResource = belongsToResource.addResource("id").addResource("{configId}");
     const deleteConfigTypeLambdaFunction = this.buildApi(configIdResource, HttpMethod.DELETE, "index.configTypeDelete");
     props.userTable.table.ref.grantReadData(deleteConfigTypeLambdaFunction);
     props.configTypeTable.table.ref.grantReadWriteData(deleteConfigTypeLambdaFunction);
+    props.configBucket.grantRead(deleteConfigTypeLambdaFunction);
 
     const statusResource = configIdResource.addResource("status").addResource("{status}");
     const updateStatusLambdaFunction = this.buildApi(statusResource, HttpMethod.POST, "index.configTypeStatusUpdate");
     props.userTable.table.ref.grantReadData(updateStatusLambdaFunction);
     props.configTypeTable.table.ref.grantReadWriteData(updateStatusLambdaFunction);
+    props.configBucket.grantRead(updateStatusLambdaFunction);
   }
 
   private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: string, queryParams?: RequestParameters) {
@@ -60,8 +67,9 @@ export class ConfigTypeApiConstruct extends Construct {
       layers: [this.props.layer],
       environment: {
         USER_TABLE_NAME: this.props.userTable.table.name,
-        CONFIG_TYPE_TABLE_NAME: this.props.userTable.table.name,
-        CONFIG_TYPE_BELONGS_TO_GSI_NAME: this.props.userTable.globalSecondaryIndexes.emailIdIndex.name,
+        CONFIG_TYPE_TABLE_NAME: this.props.configTypeTable.table.name,
+        CONFIG_TYPE_BELONGS_TO_GSI_NAME: this.props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name,
+        CONFIG_DATA_BUCKET_NAME: this.props.configBucket.bucketName,
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
       timeout: Duration.seconds(30),
@@ -100,36 +108,48 @@ export class ConfigTypeApiConstruct extends Construct {
         schema: apigateway.JsonSchemaVersion.DRAFT7,
         title: "ConfigType Detail Schema",
         type: apigateway.JsonSchemaType.OBJECT,
-        required: ["name", "value"],
+        required: ["name", "value", "status", "tags"],
         properties: {
           name: {
             type: apigateway.JsonSchemaType.STRING,
-            minLength: 3,
             maxLength: 15,
-            pattern: "^[\\w\\s\\.,-]+$",
+            pattern: "[\\w\\s\\.,<>\\?'\";:\\{\\}\\[\\]|`~!@#\\$%\\^&\\*\\(\\)\\+=-]+",
           },
           value: {
             type: apigateway.JsonSchemaType.STRING,
-            minLength: 3,
             maxLength: 15,
-            pattern: "^[\\w\\s\\.,-]+$",
+            pattern: "[\\w\\s\\.,<>\\?'\";:\\{\\}\\[\\]|`~!@#\\$%\\^&\\*\\(\\)\\+=-]+",
           },
           description: {
             type: apigateway.JsonSchemaType.STRING,
-            maxLength: 100,
+            maxLength: 400,
+            pattern: "[\\w\\s\\.,<>\\?\\/'\";:\\{\\}\\[\\]|\\\\`~!@#\\$%\\^&\\*\\(\\)\\+=-\\Sc]+",
+          },
+          belongsTo: {
+            type: apigateway.JsonSchemaType.STRING,
+            enum: ["expense-category", "pymt-account-type", "currency-profile"],
           },
           status: {
             type: apigateway.JsonSchemaType.STRING,
-            enum: ["enable", "disable", "deleted"],
+            enum: [ConfigStatus.ENABLE, ConfigStatus.DISABLE, ConfigStatus.DELETED],
           },
           color: {
             type: apigateway.JsonSchemaType.STRING,
             maxLength: 7,
-            pattern: "#[\\w]+",
+            pattern: "#[a-zA-Z0-9]+",
           },
           id: {
             type: apigateway.JsonSchemaType.STRING,
             maxLength: 36,
+          },
+          tags: {
+            type: apigateway.JsonSchemaType.ARRAY,
+            maxItems: 10,
+            items: {
+              type: apigateway.JsonSchemaType.STRING,
+              maxLength: 15,
+              pattern: "^[\\w\\s\\.-]+$",
+            },
           },
         },
       },

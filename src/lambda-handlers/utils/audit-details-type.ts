@@ -1,6 +1,4 @@
-import { JSONObject } from "../apigateway";
-
-export interface AuditDetailsType extends JSONObject {
+export interface AuditDetailsType {
   createdOn: string | Date;
   updatedOn: string | Date;
   createdBy: string;

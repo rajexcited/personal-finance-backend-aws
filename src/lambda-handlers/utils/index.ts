@@ -7,3 +7,5 @@ export * as utils from "./utils";
 export * as validations from "./validations";
 
 export * as dbutil from "./dbutil";
+
+export * as s3utils from "./s3util";

@@ -35,4 +35,5 @@ export interface ApiUserResource {
   emailId?: string;
   password?: string;
   newPassword?: string;
+  countryCode?: string;
 }

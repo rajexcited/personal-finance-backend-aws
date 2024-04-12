@@ -14,3 +14,11 @@ export {
 export { authorizer, secretRotator } from "./auth";
 
 export { JSONObject, JSONValue } from "./apigateway";
+
+export {
+  getConfigTypes as configTypeDetailsGet,
+  updateConfigTypes as configTypeDetailsAddUpdate,
+  deleteConfigType as configTypeDelete,
+  updateConfigTypeStatus as configTypeStatusUpdate,
+  ConfigStatus,
+} from "./config-type";

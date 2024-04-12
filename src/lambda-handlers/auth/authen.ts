@@ -1,7 +1,7 @@
 import { APIGatewayAuthorizerResult, APIGatewayTokenAuthorizerHandler, PolicyDocument } from "aws-lambda";
 import * as jwt from "jsonwebtoken";
 import { Role, TokenHeader, TokenPayload } from "./auth-type";
-import { roleAuthConfigList } from "./role-config";
+import { RoleAuthConfigList } from "./role-config";
 import { utils, getLogger, validations, dbutil, LoggerBase } from "../utils";
 import { DbUserTokenItem, getTokenTablePk } from "../user";
 import { ValidationError } from "../apigateway";
@@ -86,8 +86,19 @@ const authorize = async (payload: TokenPayload, resourceArn: string, jwtPayload:
   }
 
   const { methodUri, httpMethod } = getResourceParts(resourceArn, logger);
-  logger.debug("roleAuthConfigList", roleAuthConfigList);
-  const filteredCfg = roleAuthConfigList.filter((cfg) => cfg.apiPath === methodUri && cfg.method.toString() === httpMethod);
+  logger.debug("roleAuthConfigList", RoleAuthConfigList);
+  const filteredCfg = RoleAuthConfigList.filter((cfg) => {
+    const includesStar = cfg.apiPath.includes("/*");
+    if (includesStar) {
+      const regex = new RegExp("^" + cfg.apiPath.split("*").join("[^/]+") + "$");
+      if (!regex.test(methodUri)) {
+        return false;
+      }
+    } else if (cfg.apiPath !== methodUri) {
+      return false;
+    }
+    return cfg.method.toString() === httpMethod;
+  });
   logger.info("filteredCfg", filteredCfg);
 
   if (filteredCfg.length !== 1) {
@@ -158,7 +169,7 @@ const denyPolicy = (resourceArn: string) => {
 
 const allowPolicy = (resourceArn: string, role: Role, baseLogger: LoggerBase) => {
   const logger = getLogger("allowPolicy", baseLogger);
-  const methodWithUris = roleAuthConfigList.filter((cfg) => cfg.role.includes(role)).map((cfg) => cfg.method + cfg.apiPath);
+  const methodWithUris = RoleAuthConfigList.filter((cfg) => cfg.role.includes(role)).map((cfg) => cfg.method + cfg.apiPath);
   const { resourceArnWithoutMethodAndUri } = getResourceParts(resourceArn, logger);
   const resources = methodWithUris.map((mu) => resourceArnWithoutMethodAndUri + mu);
   logger.info("allowed resources", resources);

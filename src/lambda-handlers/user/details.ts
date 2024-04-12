@@ -13,6 +13,12 @@ import {
   getEmailGsiPk,
   getValidatedUserId,
 } from "./base-config";
+import { caching } from "cache-manager";
+
+const userDetailsMemoryCache = caching("memory", {
+  max: 5,
+  ttl: 5 * 60 * 1000,
+});
 
 export const getDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("getDetails", _logger);
@@ -143,24 +149,28 @@ const getValidatedRequestForUpdateDetails = (event: APIGatewayProxyEvent, logger
 };
 
 export const getUserDetailsById = async (userId: string) => {
-  const logger = getLogger("getUserDetailsById", _logger);
-  if (!userId || !validations.isValidUuid(userId)) {
-    return null;
-  }
-  const output = await dbutil.ddbClient.get({
-    TableName: _userTableName,
-    Key: { PK: getDetailsTablePk(userId) },
+  const userDetailCache = await userDetailsMemoryCache;
+  const details = userDetailCache.wrap(userId, async () => {
+    const logger = getLogger("getUserDetailsById", _logger);
+    if (!userId || !validations.isValidUuid(userId)) {
+      return null;
+    }
+    const output = await dbutil.ddbClient.get({
+      TableName: _userTableName,
+      Key: { PK: getDetailsTablePk(userId) },
+    });
+    logger.info("db result", output);
+    if (!output.Item) {
+      return null;
+    }
+    const dbDetails: DbUserDetails = output.Item.details;
+    return {
+      id: dbDetails.id,
+      firstName: dbDetails.firstName,
+      lastName: dbDetails.lastName,
+      emailId: dbDetails.emailId,
+      status: dbDetails.status,
+    } as DbUserDetails;
   });
-  logger.info("db result", output);
-  if (!output.Item) {
-    return null;
-  }
-  const dbDetails: DbUserDetails = output.Item.details;
-  return {
-    id: dbDetails.id,
-    firstName: dbDetails.firstName,
-    lastName: dbDetails.lastName,
-    emailId: dbDetails.emailId,
-    status: dbDetails.status,
-  } as DbUserDetails;
+  return await details;
 };

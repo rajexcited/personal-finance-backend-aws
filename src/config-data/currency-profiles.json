@@ -1,0 +1,34 @@
+{
+  "countries": [
+    {
+      "name": "United States of America",
+      "code": "USA"
+    },
+    {
+      "name": "India",
+      "code": "IND"
+    }
+  ],
+  "currencies": [
+    {
+      "name": "Dollar",
+      "code": "USD",
+      "symbol": "$"
+    },
+    {
+      "name": "Rupee",
+      "code": "INR",
+      "symbol": "₹"
+    }
+  ],
+  "relations": [
+    {
+      "countryCode": "USA",
+      "currencyCode": "USD"
+    },
+    {
+      "countryCode": "IND",
+      "currencyCode": "INR"
+    }
+  ]
+}

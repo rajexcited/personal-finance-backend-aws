@@ -47,7 +47,9 @@ export class ApiConstruct extends Construct {
     });
 
     const userApi = new UserApiConstruct(this, "UserApiConstruct", {
-      ...props,
+      environment: props.environment,
+      resourcePrefix: props.resourcePrefix,
+      configBucket: props.configBucket,
       userTable: props.allDb.userTable,
       configTypeTable: props.allDb.configTypeTable,
       paymentAccountTable: props.allDb.paymentAccountTable,
@@ -58,12 +60,13 @@ export class ApiConstruct extends Construct {
     });
 
     const configTypeApi = new ConfigTypeApiConstruct(this, "ConfigTypeApiConstruct", {
-      ...props,
+      environment: props.environment,
+      resourcePrefix: props.resourcePrefix,
+      configBucket: props.configBucket,
       userTable: props.allDb.userTable,
       configTypeTable: props.allDb.configTypeTable,
       layer: lambdaLayer.layer,
       authorizer: tokenAuthorizer.authorizer,
-      tokenSecret: tokenAuthorizer.tokenSecret,
       restApi: restApi,
     });
   }
