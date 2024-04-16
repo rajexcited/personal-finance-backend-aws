@@ -1,0 +1,578 @@
+{
+	"info": {
+		"_postman_id": "edbc8e24-107c-4f39-a86f-7a190a2ece3e",
+		"name": "my-finance-aws",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "25929107"
+	},
+	"item": [
+		{
+			"name": "user",
+			"item": [
+				{
+					"name": "user",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/user",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"user"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "user signup",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"\r",
+									"pm.test(\"Response status code is 200\", function () {\r",
+									"    pm.expect(pm.response.code).to.equal(200);\r",
+									"});\r",
+									"\r",
+									"\r",
+									"pm.test(\"Response has the required fields - accessToken and expiresIn\", function () {\r",
+									"    const responseData = pm.response.json();\r",
+									"    \r",
+									"    pm.expect(responseData).to.be.an('object');\r",
+									"    pm.expect(responseData.accessToken).to.exist;\r",
+									"    pm.expect(responseData.expiresIn).to.exist;\r",
+									"});\r",
+									"\r",
+									"\r",
+									"pm.test(\"AccessToken is a non-empty string\", function () {\r",
+									"  const responseData = pm.response.json();\r",
+									"  \r",
+									"  pm.expect(responseData).to.be.an('object');\r",
+									"  pm.expect(responseData.accessToken).to.be.a('string').and.to.have.lengthOf.at.least(1, \"AccessToken should not be empty\");\r",
+									"});\r",
+									"\r",
+									"\r",
+									"pm.test(\"ExpiresIn is a non-negative integer\", function () {\r",
+									"    const responseData = pm.response.json();\r",
+									"    \r",
+									"    pm.expect(responseData).to.be.an('object');\r",
+									"    pm.expect(responseData.expiresIn).to.be.a('number');\r",
+									"    pm.expect(responseData.expiresIn).to.be.at.least(0);\r",
+									"});\r",
+									"\r",
+									"\r",
+									"pm.test(\"Content-Type header is application/json\", function () {\r",
+									"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");\r",
+									"});\r",
+									"\r",
+									"var template = `\r",
+									"<div>\r",
+									"    <p>Access Token: {{response.accessToken}}</p>\r",
+									"    <p>Expires In: {{response.expiresIn}}</p>\r",
+									"</div>\r",
+									"`;\r",
+									"\r",
+									"function constructVisualizerPayload() {\r",
+									"    return {response: pm.response.json()};\r",
+									"}\r",
+									"\r",
+									"pm.visualizer.set(template, constructVisualizerPayload());"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"emailId\": \"email4@domain.org\",\r\n    \"password\": \"p@s5Word\",\r\n    \"firstName\": \"first name\",\r\n    \"lastName\": \"last name\",\r\n    \"countryCode\": \"USA\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/user/signup",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"user",
+								"signup"
+							]
+						},
+						"description": "This endpoint allows users to sign up by creating a new account. The HTTP POST request should be sent to {{base_url}}/user/signup with the required user details in the request body.\n\n### Request Body\n\n- emailId (text, required): The email address of the user.\n- password (text, required): The password for the new account.\n- firstName (text, required): The first name of the user.\n- lastName (text, required): The last name of the user.\n- countryCode (text, required): The country code of the user.\n    \n\n### Response\n\nUpon successful execution, the endpoint returns a status code of 200 and a JSON object with the following fields:\n\n- accessToken: The access token for the newly created account.\n- expiresIn: The expiration time of the access token in seconds.\n    \n\n#### Example Response\n\n``` json\n{\n    \"accessToken\": \"\",\n    \"expiresIn\": 0\n}\n\n ```"
+					},
+					"response": []
+				},
+				{
+					"name": "user login",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"emailId\":\"email@domain.org\",\r\n    \"password\": \"p@s5Word@\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/user/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"user",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "user logout",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicHJpbWFyeSIsImlkIjoiNjQ2ZjcwZjQtZTllYy00ZDJlLThjYzYtNWEyYTA2YzU3YzdjIiwiaWF0IjoxNzEyMjkzMDU4NDI5LCJleHAiOjE3MTIyOTMwNjIwMjl9.W9DeYEwtBBJsfAnHRq_fngxzVDDCyqleplsFF121zwo",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/user/logout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"user",
+								"logout"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "user refresh ",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/user/refresh",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"user",
+								"refresh"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "update password",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"password\": \"p@s5Word@\",\r\n    \"newPassword\":\"p@s5Word@\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/user/details",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"user",
+								"details"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "update name",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"firstName\": \"f/name\",\r\n    \"lastName\":\"lname\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/user/details",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"user",
+								"details"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "get user details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/user/details",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"user",
+								"details"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "config",
+			"item": [
+				{
+					"name": "expense category",
+					"item": [
+						{
+							"name": "get expense categories",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/config/types/belongs-to/expense-category",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"config",
+										"types",
+										"belongs-to",
+										"expense-category"
+									],
+									"query": [
+										{
+											"key": "status",
+											"value": "enable",
+											"disabled": true
+										},
+										{
+											"key": "status",
+											"value": "disable",
+											"disabled": true
+										},
+										{
+											"key": "status",
+											"value": "deleted",
+											"disabled": true
+										},
+										{
+											"key": "status",
+											"value": "dummy",
+											"disabled": true
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "add update expense category",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"id\": \"d949617d-758e-400a-8b09-02d72509eb0b\",\r\n    \"name\": \"fe\",\r\n    \"value\": \"fee-abc\",\r\n    \"belongsTo\": \"expense-category\",\r\n    \"status\": \"enable\",\r\n    \"description\": \"fee described as charges for some services / products, tax, administrative type. \\n fee for tax filing, tax, service charges, stamps, unsetle claim, traffic violations, etc\",\r\n    \"tags\": [\r\n        \"spending\"\r\n    ]\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/config/types/belongs-to/expense-category",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"config",
+										"types",
+										"belongs-to",
+										"expense-category"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "delete expense category",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/config/types/belongs-to/expense-category/id/fd5bcd6a-4a65-45fe-8bed-66f4e0f18cab",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"config",
+										"types",
+										"belongs-to",
+										"expense-category",
+										"id",
+										"fd5bcd6a-4a65-45fe-8bed-66f4e0f18cab"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "update status expense category",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/config/types/belongs-to/expense-category/id/3398c73b-1f7e-46ff-bdfb-c0d209e78886/status/disable",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"config",
+										"types",
+										"belongs-to",
+										"expense-category",
+										"id",
+										"3398c73b-1f7e-46ff-bdfb-c0d209e78886",
+										"status",
+										"disable"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "payment account type",
+					"item": [
+						{
+							"name": "get payment account types",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/config/types/belongs-to/pymt-account-type",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"config",
+										"types",
+										"belongs-to",
+										"pymt-account-type"
+									],
+									"query": [
+										{
+											"key": "status",
+											"value": "disable",
+											"disabled": true
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "currency profile",
+					"item": [
+						{
+							"name": "get currency profiles",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/config/types/belongs-to/currency-profile",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"config",
+										"types",
+										"belongs-to",
+										"currency-profile"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "add update currency profile",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"name\": \"fee-ab\",\r\n    \"value\": \"fee-ab\",\r\n    \"belongsTo\": \"expense-category\",\r\n    \"status\": \"enable\",\r\n    \"description\": \"fee described as charges for some services / products, tax, administrative type. \\n fee for tax filing, tax, service charges, stamps, unsetle claim, traffic violations, etc\",\r\n    \"tags\": []\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/config/types/belongs-to/currency-profile",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"config",
+										"types",
+										"belongs-to",
+										"currency-profile"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "delete currency profile",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/config/types/belongs-to/currency-profile/id/a43b9f09-58e7-4fbb-8e7d-97cd528097cf",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"config",
+										"types",
+										"belongs-to",
+										"currency-profile",
+										"id",
+										"a43b9f09-58e7-4fbb-8e7d-97cd528097cf"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "update status currency profile",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/config/types/belongs-to/currency-profile/id/a43b9f09-58e7-4fbb-8e7d-97cd528097cf/status/disable",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"config",
+										"types",
+										"belongs-to",
+										"currency-profile",
+										"id",
+										"a43b9f09-58e7-4fbb-8e7d-97cd528097cf",
+										"status",
+										"disable"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "root-url",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						""
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoicHJpbWFyeSIsImlkIjoiMmU4MmJhMmYtZGQyMy00NzU5LWE1ZTYtMWY2ZmQ3ZmE4YzMwIiwiaWF0IjoxNzEzMjI5OTgxODQwLCJleHAiOjE3MTMyMjk5ODU0NDB9.vW1Y7IToKwk5X9OHfgkAMyTL8Mz0GhAF6vgHHoI9vtk",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}

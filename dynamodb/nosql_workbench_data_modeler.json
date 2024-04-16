@@ -3,7 +3,7 @@
   "ModelMetadata": {
     "Author": "neel",
     "DateCreated": "Mar 03, 2024, 10:01 PM",
-    "DateLastModified": "Mar 04, 2024, 10:50 PM",
+    "DateLastModified": "Apr 15, 2024, 09:22 PM",
     "Description": "",
     "AWSService": "Amazon DynamoDB",
     "Version": "3.0"
@@ -998,6 +998,10 @@
         {
           "AttributeName": "details",
           "AttributeType": "M"
+        },
+        {
+          "AttributeName": "UB_GSI_SK",
+          "AttributeType": "S"
         }
       ],
       "GlobalSecondaryIndexes": [
@@ -1009,12 +1013,12 @@
               "AttributeType": "S"
             },
             "SortKey": {
-              "AttributeName": "PK",
+              "AttributeName": "UB_GSI_SK",
               "AttributeType": "S"
             }
           },
           "Projection": {
-            "ProjectionType": "KEYS_ONLY"
+            "ProjectionType": "ALL"
           }
         }
       ],
@@ -1060,9 +1064,12 @@
                 "S": "checking payment account type"
               },
               "status": {
-                "S": "active"
+                "S": "enable"
               }
             }
+          },
+          "UB_GSI_SK": {
+            "S": "status#enable"
           }
         },
         {
@@ -1106,9 +1113,12 @@
                 "S": "grocery expense category"
               },
               "status": {
-                "S": "active"
+                "S": "disable"
               }
             }
+          },
+          "UB_GSI_SK": {
+            "S": "status#disable"
           }
         },
         {
@@ -1152,9 +1162,12 @@
                 "S": "shopping expense category"
               },
               "status": {
-                "S": "deactive"
+                "S": "deleted"
               }
             }
+          },
+          "UB_GSI_SK": {
+            "S": "status#deleted"
           }
         }
       ],
@@ -1219,6 +1232,24 @@
         {
           "AttributeName": "details",
           "AttributeType": "M"
+        },
+        {
+          "AttributeName": "E_GSI_PK",
+          "AttributeType": "S"
+        }
+      ],
+      "GlobalSecondaryIndexes": [
+        {
+          "IndexName": "emailIdIndex",
+          "KeyAttributes": {
+            "PartitionKey": {
+              "AttributeName": "E_GSI_PK",
+              "AttributeType": "S"
+            }
+          },
+          "Projection": {
+            "ProjectionType": "KEYS_ONLY"
+          }
         }
       ],
       "TableData": [
@@ -1263,6 +1294,9 @@
                 "S": "primary_email@Id"
               }
             }
+          },
+          "E_GSI_PK": {
+            "S": "emailId#email@orginazation.com"
           }
         }
       ],
