@@ -21,7 +21,7 @@ const DEFAULT_TAG_MIN_LENGTH = 3;
 const DEFAULT_COLOR_MAX_LENGTH = 7;
 const DEFAULT_COLOR_MIN_LENGTH = 4;
 
-const DEFAULT_MAX_ALLOWED_TAGS = 10;
+export const DEFAULT_MAX_ALLOWED_TAGS = 10;
 
 export const isValidUuid = (id?: string) => {
   return id && uuidValidate(id) && uuidVersion(id) === 4;

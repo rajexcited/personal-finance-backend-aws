@@ -16,12 +16,20 @@ enum LogLevel {
   ERROR = 3,
 }
 
-type LogLevelType = "info" | "debug" | "error" | "INFO" | "DEBUG" | "ERROR";
-let defaultLogLevel: LogLevelType = "DEBUG";
+type LogLevelType = "INFO" | "DEBUG" | "ERROR";
+let defaultLogLevel: LogLevelType = "INFO";
 
-export const setDefaultLogLevel = (logLevel: LogLevelType) => {
-  defaultLogLevel = logLevel;
+const setDefaultLogLevel = (logLevel?: string) => {
+  switch ((logLevel || "").toUpperCase()) {
+    case "INFO":
+    case "DEBUG":
+    case "ERROR":
+      defaultLogLevel = logLevel as LogLevelType;
+    default:
+    // do nothing
+  }
 };
+setDefaultLogLevel(process.env.DEFAULT_LOG_LEVEL);
 
 /**
  *

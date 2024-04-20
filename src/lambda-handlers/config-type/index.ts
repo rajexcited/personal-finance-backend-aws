@@ -1,4 +1,4 @@
-export { getDetails as getConfigTypes } from "./get-details";
+export { getListOfDetails as getConfigTypes, getConfigId } from "./get-details";
 
 export { addUpdateDetails as updateConfigTypes } from "./add-update-details";
 

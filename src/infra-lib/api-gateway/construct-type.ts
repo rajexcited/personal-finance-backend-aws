@@ -7,7 +7,3 @@ export interface RestApiProps extends ConstructProps {
   authorizer: apigateway.IAuthorizer;
   restApi: apigateway.RestApi;
 }
-
-export interface RequestParameters {
-  [param: string]: boolean;
-}

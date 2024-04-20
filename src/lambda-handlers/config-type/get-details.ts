@@ -1,6 +1,6 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { JSONArray, JSONObject, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
-import { utils, getLogger, dbutil, LoggerBase, AuditDetailsType } from "../utils";
+import { utils, getLogger, dbutil, LoggerBase, compareutil } from "../utils";
 import { DbConfigTypeItem, ApiConfigTypeResource, ApiCurrencyProfileResource } from "./resource-type";
 import { getValidatedUserId } from "../user";
 import {
@@ -16,27 +16,30 @@ import {
   getBelongsToGsiPk,
 } from "./base-config";
 import { getCurrencyByCountry } from "../settings";
+import { caching } from "cache-manager";
+
+const belongsToConfigListMemoryCache = caching("memory", {
+  max: 3,
+  ttl: 60 * 1000,
+});
 
 /**
  * DynamoDB code example
  * https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/dynamodb-example-dynamodb-utilities.html
  */
 
-export const getDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
+export const getListOfDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("getDetails", _logger);
 
   const belongsTo = getValidatedBelongsTo(event, logger);
-  // if (belongsTo === BelongsTo.CurrencyProfile) {
-  //   logger.info("belongsTo " + belongsTo + " is not supported");
-  //   throw new ValidationError([{ path: ConfigResourcePath.BELONGS_TO, message: ErrorMessage.INCORRECT_VALUE }]);
-  // }
+
   const itemDetails = await getConfigItemDetails(event);
   const userId = getValidatedUserId(event);
   let resourcePromises;
 
   resourcePromises = itemDetails.map(async (details) => {
     const auditDetails = await utils.parseAuditDetails(details.auditDetails, userId);
-    logger.info("userId", userId, "auditDetails", auditDetails);
+    logger.debug("userId", userId, "auditDetails", auditDetails);
 
     const resource: ApiConfigTypeResource = {
       id: details.id,
@@ -121,6 +124,44 @@ const getConfigItemDetails = async (event: APIGatewayProxyEvent) => {
   return configItems.flatMap((items) => items);
 };
 
+export const getConfigId = async (configName: string, userId: string, belongsTo: BelongsTo, _logger: LoggerBase) => {
+  const logger = getLogger("getConfigId", _logger);
+
+  const belongsToConfigListCache = await belongsToConfigListMemoryCache;
+  const items = await belongsToConfigListCache.wrap(userId + belongsTo, async () => {
+    const itemPromises = await dbutil.queryAll<DbConfigTypeItem>(logger, {
+      TableName: _configTypeTableName,
+      IndexName: _belongsToGsiName,
+      KeyConditionExpression: `UB_GSI_PK = :pkv`,
+      ExpressionAttributeValues: {
+        ":pkv": getBelongsToGsiPk(null, logger, userId, belongsTo),
+      },
+    });
+
+    return await Promise.all(itemPromises);
+  });
+
+  logger.info("retrieved", items.length, "items");
+  const matching = items.filter((item) => item.details.name === configName);
+
+  let foundItem = matching.find((item) => item.details.status === ConfigStatus.ENABLE);
+  if (foundItem) {
+    return foundItem.details.id;
+  }
+
+  foundItem = matching.find((item) => item.details.status === ConfigStatus.DISABLE);
+  if (foundItem) {
+    return foundItem.details.id;
+  }
+
+  foundItem = matching.find((item) => item.details.status === ConfigStatus.DELETED);
+  if (foundItem) {
+    return foundItem.details.id;
+  }
+
+  return null;
+};
+
 const sortCompareFn = (item1: ApiConfigTypeResource, item2: ApiConfigTypeResource) => {
   /**
    * priority 1 => by status
@@ -131,10 +172,10 @@ const sortCompareFn = (item1: ApiConfigTypeResource, item2: ApiConfigTypeResourc
   const statusCompareResult = compareStatus(item1.status, item1.status);
   if (statusCompareResult !== 0) return statusCompareResult;
 
-  const updatedOnCompareResult = compareUpdatedOn(item1, item2);
+  const updatedOnCompareResult = compareutil.compareUpdatedOn(item1.auditDetails, item2.auditDetails);
   if (updatedOnCompareResult !== 0) return updatedOnCompareResult;
 
-  const createdOnCompareResult = compareCreatedOn(item1, item2);
+  const createdOnCompareResult = compareutil.compareCreatedOn(item1.auditDetails, item2.auditDetails);
   if (createdOnCompareResult !== 0) return createdOnCompareResult;
 
   const nameCompareResult = item1.name.localeCompare(item2.name);
@@ -163,20 +204,6 @@ const compareStatus = (status1: ConfigStatus, status2: ConfigStatus) => {
     return 1;
   }
   return -1;
-};
-
-const compareUpdatedOn = (item1: ApiConfigTypeResource, item2: ApiConfigTypeResource) => {
-  const updatedOn1 = item1.auditDetails?.updatedOn as string;
-  const updatedOn2 = item2.auditDetails?.updatedOn as string;
-  const updatedOnCompareResult = updatedOn1.localeCompare(updatedOn2);
-  return updatedOnCompareResult;
-};
-
-const compareCreatedOn = (item1: ApiConfigTypeResource, item2: ApiConfigTypeResource) => {
-  const createdOn1 = item1.auditDetails?.createdOn as string;
-  const createdOn2 = item2.auditDetails?.createdOn as string;
-  const createdOnCompareResult = createdOn1.localeCompare(createdOn2);
-  return createdOnCompareResult;
 };
 
 const getValidatedStatus = (val: string) => {

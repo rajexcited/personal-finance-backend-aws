@@ -9,6 +9,7 @@ import { ContextInfo } from "../context-type";
 import { ConfigTypeApiConstruct } from "./config-types-api-gateway";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { IBucket } from "aws-cdk-lib/aws-s3";
+import { PymtAccApiConstruct } from "./pymt-acc-api-gateway";
 
 interface ApiProps extends ConstructProps {
   allDb: DBConstruct;
@@ -65,6 +66,17 @@ export class ApiConstruct extends Construct {
       configBucket: props.configBucket,
       userTable: props.allDb.userTable,
       configTypeTable: props.allDb.configTypeTable,
+      layer: lambdaLayer.layer,
+      authorizer: tokenAuthorizer.authorizer,
+      restApi: restApi,
+    });
+
+    const pymtAccApi = new PymtAccApiConstruct(this, "PymtAccApiConstruct", {
+      environment: props.environment,
+      resourcePrefix: props.resourcePrefix,
+      userTable: props.allDb.userTable,
+      configTypeTable: props.allDb.configTypeTable,
+      pymtAccTable: props.allDb.paymentAccountTable,
       layer: lambdaLayer.layer,
       authorizer: tokenAuthorizer.authorizer,
       restApi: restApi,

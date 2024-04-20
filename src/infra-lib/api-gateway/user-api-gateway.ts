@@ -10,6 +10,7 @@ import { Duration, RemovalPolicy } from "aws-cdk-lib";
 import { JSONObject } from "../../lambda-handlers";
 import { DbProps } from "../db";
 import { IBucket } from "aws-cdk-lib/aws-s3";
+import { EnvironmentName } from "../common";
 
 interface UserApiProps extends RestApiProps {
   userTable: DbProps;
@@ -51,7 +52,7 @@ export class UserApiConstruct extends Construct {
     const userSignupResource = userResource.addResource("signup");
     const signuplambdaFunction = this.buildApi(userSignupResource, HttpMethod.POST, "index.userSignup", false, ModelId.UserSignupModel);
     props.userTable.table.ref.grantReadWriteData(signuplambdaFunction);
-    props.configTypeTable.table.ref.grantWriteData(signuplambdaFunction);
+    props.configTypeTable.table.ref.grantReadWriteData(signuplambdaFunction);
     props.paymentAccountTable.table.ref.grantWriteData(signuplambdaFunction);
 
     const userLogoutResource = userResource.addResource("logout");
@@ -89,7 +90,8 @@ export class UserApiConstruct extends Construct {
     if (lambdaHandlerName.includes("userSignup")) {
       additionalEnvs.CONFIG_DATA_BUCKET_NAME = this.props.configBucket.bucketName;
       additionalEnvs.CONFIG_TYPE_TABLE_NAME = this.props.configTypeTable.table.name;
-      additionalEnvs.PYMT_ACC_TABLE_NAME = this.props.paymentAccountTable.table.name;
+      additionalEnvs.CONFIG_TYPE_BELONGS_TO_GSI_NAME = this.props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name;
+      additionalEnvs.PAYMENT_ACCOUNT_TABLE_NAME = this.props.paymentAccountTable.table.name;
     }
 
     const uniqueConstructName = method + lambdaHandlerName.replace("index.", "");
@@ -109,6 +111,7 @@ export class UserApiConstruct extends Construct {
       environment: {
         USER_TABLE_NAME: this.props.userTable.table.name,
         USER_EMAIL_GSI_NAME: this.props.userTable.globalSecondaryIndexes.emailIdIndex.name,
+        DEFAULT_LOG_LEVEL: this.props.environment === EnvironmentName.LOCAL ? "debug" : "undefined",
         ...additionalEnvs,
       },
       logRetention: logs.RetentionDays.ONE_MONTH,

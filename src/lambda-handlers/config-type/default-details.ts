@@ -29,7 +29,7 @@ export const createDefaultDetails = async (
   userId: string,
   transactionWriter: dbutil.TransactionWriter
 ) => {
-  const logger = getLogger("createDetails", _logger);
+  const logger = getLogger("createDefaultDetails", _logger);
   logger.info("details", details);
 
   const invalidConfData = details.filter((item) => {

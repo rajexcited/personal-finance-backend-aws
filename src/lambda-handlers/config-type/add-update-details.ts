@@ -18,7 +18,7 @@ import {
   BelongsTo,
   ConfigStatus,
 } from "./base-config";
-import { ApiConfigTypeResource, ApiCurrencyProfileResource, DbConfigTypeDetails, DbConfigTypeItem } from "./resource-type";
+import { ApiConfigTypeResource, DbConfigTypeDetails, DbConfigTypeItem } from "./resource-type";
 import { v4 as uuidv4 } from "uuid";
 import { getCurrencyByCountry } from "../settings";
 import { CountryCurrencyRelation } from "../settings/currency-profile";

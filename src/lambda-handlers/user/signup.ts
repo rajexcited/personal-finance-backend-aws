@@ -1,7 +1,7 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { v4 as uuidv4 } from "uuid";
 import { Role, getSignedToken } from "../auth";
-import { apiGatewayHandlerWrapper, RequestBodyContentType, ValidationError, InvalidField } from "../apigateway";
+import { apiGatewayHandlerWrapper, RequestBodyContentType, ValidationError, InvalidField, NotFoundError } from "../apigateway";
 import { getLogger, utils, AuditDetailsType, LoggerBase, validations, dbutil, s3utils } from "../utils";
 import {
   _logger as userLogger,
@@ -18,7 +18,7 @@ import { DbUserDetails, DbUserDetailItem, DbUserTokenItem, ApiUserResource } fro
 import { BelongsTo, DbConfigTypeDetails, DefaultConfigData, addDefaultConfigTypes } from "../config-type";
 import { DefaultPaymentAccounts } from "../pymt-acc/resource-type";
 import { JSONObject } from "../apigateway";
-import { addPymtAccounts } from "../pymt-acc";
+import { addDefaultPymtAccounts } from "../pymt-acc";
 import { StopWatch } from "stopwatch-node";
 import { getAllCountries, getCurrencyByCountry } from "../settings";
 
@@ -243,13 +243,20 @@ const initPaymentAccount = async (
       pymtAccs.map((p) => p.shortName)
     );
     const pymtAccTyp = confInit[BelongsTo.PaymentAccountType];
+    const missingTypeNames: string[] = [];
     pymtAccs.forEach((pa) => {
-      const paymentAccountTypeId = pymtAccTyp.find((pat) => pat.name === pa.paymentAccountType)?.id;
-      // either assign matching type or first type
-      pa.paymentAccountType = paymentAccountTypeId || pymtAccTyp[0].id;
+      const paymentAccountTypeId = pymtAccTyp.find((pat) => pat.name === pa.typeName)?.id;
+      if (!paymentAccountTypeId) {
+        missingTypeNames.push(pa.typeName);
+      } else {
+        pa.typeName = paymentAccountTypeId;
+      }
     });
+    if (missingTypeNames.length) {
+      throw new NotFoundError(`payment account types [${missingTypeNames.join(", ")}] are missing`);
+    }
     // create
-    const pymtAccounts = await addPymtAccounts(pymtAccs, userId, transactionWriter);
+    const pymtAccounts = await addDefaultPymtAccounts(pymtAccs, userId, transactionWriter);
     logger.info("Payment Accounts are added to user");
     return pymtAccounts;
   }

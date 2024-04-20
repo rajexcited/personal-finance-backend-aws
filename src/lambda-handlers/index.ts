@@ -1,7 +1,3 @@
-import { setDefaultLogLevel } from "./utils";
-
-setDefaultLogLevel("DEBUG");
-
 export {
   getUserDetails as userDetailsGet,
   renewToken as userTokenRefresh,
@@ -22,3 +18,10 @@ export {
   updateConfigTypeStatus as configTypeStatusUpdate,
   ConfigStatus,
 } from "./config-type";
+
+export {
+  getPaymentAccounts as pymtAccList,
+  updatePaymentAccount as pymtAccDetailsAddUpdate,
+  deletePaymentAccount as pymtAccDelete,
+  updatePaymentAccountStatus as pymtAccStatusUpdate,
+} from "./pymt-acc";

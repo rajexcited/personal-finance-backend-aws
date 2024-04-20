@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { RequestParameters, RestApiProps } from "./construct-type";
+import { RestApiProps } from "./construct-type";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import { HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import * as lambda from "aws-cdk-lib/aws-lambda";
@@ -8,6 +8,7 @@ import { DbProps } from "../db";
 import { Duration } from "aws-cdk-lib";
 import { ConfigStatus } from "../../lambda-handlers";
 import { IBucket } from "aws-cdk-lib/aws-s3";
+import { EnvironmentName } from "../common";
 
 interface ConfigTypeApiProps extends RestApiProps {
   userTable: DbProps;
@@ -51,7 +52,7 @@ export class ConfigTypeApiConstruct extends Construct {
     props.configBucket.grantRead(updateStatusLambdaFunction);
   }
 
-  private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: string, queryParams?: RequestParameters) {
+  private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: string, queryParams?: Record<string, boolean>) {
     const lambdaFunction = new lambda.Function(this, `${method}${lambdaHandlerName.replace("index.", "")}Lambda`, {
       functionName: [
         this.props.resourcePrefix,
@@ -70,6 +71,7 @@ export class ConfigTypeApiConstruct extends Construct {
         CONFIG_TYPE_TABLE_NAME: this.props.configTypeTable.table.name,
         CONFIG_TYPE_BELONGS_TO_GSI_NAME: this.props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name,
         CONFIG_DATA_BUCKET_NAME: this.props.configBucket.bucketName,
+        DEFAULT_LOG_LEVEL: this.props.environment === EnvironmentName.LOCAL ? "debug" : "undefined",
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
       timeout: Duration.seconds(30),
@@ -101,7 +103,7 @@ export class ConfigTypeApiConstruct extends Construct {
   }
 
   private getAddUpdateDetailModel = () => {
-    const model: apigateway.Model = this.props.restApi.addModel("AddUpdateDetailModel", {
+    const model: apigateway.Model = this.props.restApi.addModel("CfgTypAddUpdateDetailModel", {
       contentType: "application/json",
       description: "add update config type details model",
       schema: {
@@ -148,7 +150,7 @@ export class ConfigTypeApiConstruct extends Construct {
             items: {
               type: apigateway.JsonSchemaType.STRING,
               maxLength: 15,
-              pattern: "^[\\w\\s\\.-]+$",
+              pattern: "^[\\w\\.-]+$",
             },
           },
         },
@@ -157,11 +159,11 @@ export class ConfigTypeApiConstruct extends Construct {
     return model;
   };
 
-  private getRequestParameters = (resource: apigateway.IResource, queryParams?: RequestParameters) => {
+  private getRequestParameters = (resource: apigateway.IResource, queryParams?: Record<string, boolean>) => {
     const pathParams = this.getPathParams(resource);
     const pathParamEntries = pathParams.map((pp) => [`method.request.path.${pp}`, true]);
     const queryParamEntries = Object.entries(queryParams || {}).map((qp) => [`method.request.querystring.${qp[0]}`, qp[1]]);
-    const requestParams: RequestParameters = Object.fromEntries([...pathParamEntries, ...queryParamEntries]);
+    const requestParams: Record<string, boolean> = Object.fromEntries([...pathParamEntries, ...queryParamEntries]);
     return requestParams;
   };
 

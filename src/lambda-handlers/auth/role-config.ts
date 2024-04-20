@@ -113,4 +113,27 @@ const ConfigTypeUriAuthConfigList: RoleAuthorizeConfigType[] = [
   },
 ];
 
-export const RoleAuthConfigList: RoleAuthorizeConfigType[] = [...UserUriAuthConfigList, ...ConfigTypeUriAuthConfigList];
+const PymtAccUriAuthConfigList: RoleAuthorizeConfigType[] = [
+  {
+    apiPath: "/payment/accounts",
+    method: MethodType.GET,
+    role: [Role.ADMIN, Role.PRIMARY],
+  },
+  {
+    apiPath: "/payment/accounts",
+    method: MethodType.POST,
+    role: [Role.ADMIN, Role.PRIMARY],
+  },
+  {
+    apiPath: "/payment/accounts/id/*",
+    method: MethodType.DELETE,
+    role: [Role.ADMIN, Role.PRIMARY],
+  },
+  {
+    apiPath: "/payment/accounts/id/*/status/enable",
+    method: MethodType.POST,
+    role: [Role.ADMIN],
+  },
+];
+
+export const RoleAuthConfigList: RoleAuthorizeConfigType[] = [...UserUriAuthConfigList, ...ConfigTypeUriAuthConfigList, ...PymtAccUriAuthConfigList];

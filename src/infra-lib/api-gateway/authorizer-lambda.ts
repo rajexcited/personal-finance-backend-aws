@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { ConstructProps } from "../common";
+import { ConstructProps, EnvironmentName } from "../common";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import { DbProps } from "../db/db-prop-type";
@@ -74,6 +74,7 @@ export class TokenAuthorizerConstruct extends Construct {
       environment: {
         USER_TABLE_NAME: props.userTable.table.name,
         TOKEN_SECRET_ID: tokenSecret.secretName,
+        DEFAULT_LOG_LEVEL: props.environment === EnvironmentName.LOCAL ? "debug" : "undefined",
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
     });

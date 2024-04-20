@@ -4,7 +4,7 @@ import { Role, TokenHeader, TokenPayload } from "./auth-type";
 import { RoleAuthConfigList } from "./role-config";
 import { utils, getLogger, validations, dbutil, LoggerBase } from "../utils";
 import { DbUserTokenItem, getTokenTablePk } from "../user";
-import { ValidationError } from "../apigateway";
+import { UnAuthenticatedError, ValidationError } from "../apigateway";
 import { _logger, _smClient, _tokenSecretId, _userTableName } from "./base-config";
 import { getSecret } from "./token-secret";
 
@@ -211,9 +211,3 @@ const getResourceParts = (resourceArn: string, baseLogger: LoggerBase) => {
     resourceArnPrefix: resourceParts.slice(0, -1).join(":"),
   };
 };
-
-export class UnAuthenticatedError extends Error {
-  constructor(message?: string) {
-    super(message);
-  }
-}

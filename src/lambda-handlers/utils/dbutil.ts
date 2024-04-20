@@ -12,6 +12,7 @@ import { LoggerBase, getLogger } from "../utils";
 import { scheduler } from "node:timers/promises";
 import { StopWatch } from "stopwatch-node";
 import { JSONObject } from "../apigateway";
+import { MissingError } from "../apigateway/errors";
 
 const DdbTranslateConfig: TranslateConfig = {
   marshallOptions: {
@@ -80,6 +81,9 @@ export async function queryAll<T>(baseLogger: LoggerBase, input: QueryCommandInp
   const qsw = new StopWatch("queryloop");
   try {
     stopwatch.start();
+    if (!input.TableName) {
+      throw new MissingError(`missing tableName [${input.TableName}]`);
+    }
     let output: QueryCommandOutput;
     let lastEvaluatedKey = undefined;
     const items = [];
@@ -156,6 +160,7 @@ export class TransactionWriter {
     const logger = getLogger("writeItems", _logger || this.logger);
     const transactions = input.TransactItems as TransactionItem[];
     this.items.push(...transactions);
+    logger.debug("scheduled writing transactions =", transactions);
     logger.info("items has been scheduled for transaction", "size of scheduled items", this.items.length);
     return this;
   }
@@ -171,16 +176,20 @@ export class TransactionWriter {
         if (it.TableName && it.Item) {
           return it as TransactionPutItem;
         }
-        if (!tableName) {
+        if (!tableName && !it.TableName) {
           throw new Error("unknown tableName in putItem for transaction");
         }
         const item: TransactionPutItem = {
           Item: it,
-          TableName: tableName,
+          TableName: tableName || (it.TableName as string),
         };
         return item;
       })
-      .forEach((it) => this.items.push({ Put: it }));
+      .forEach((it) => {
+        const item: TransactionItem = { Put: it };
+        logger.debug("scheduled putting item =", item);
+        this.items.push(item);
+      });
 
     logger.info("put items has been scheduled for transaction", "size of scheduled items", this.items.length);
     return this;
@@ -192,7 +201,11 @@ export class TransactionWriter {
   public deleteItems(deleteItems: TransactionDeleteItem | TransactionDeleteItem[], _logger?: LoggerBase) {
     const logger = getLogger("deleteItems", _logger || this.logger);
     const itemsDelete = Array.isArray(deleteItems) ? deleteItems : [deleteItems];
-    itemsDelete.map((it) => this.items.push({ Delete: it }));
+    itemsDelete.forEach((it) => {
+      const item: TransactionItem = { Delete: it };
+      logger.debug("scheduled deleting item =", item);
+      this.items.push(item);
+    });
     logger.info("delete items has been scheduled for transaction", "size of scheduled items", this.items.length);
     return this;
   }
@@ -203,7 +216,11 @@ export class TransactionWriter {
   public updateItems(updateItems: TransactionUpdateItem | TransactionUpdateItem[], _logger?: LoggerBase) {
     const logger = getLogger("updateItems", _logger || this.logger);
     const itemsUpdate = Array.isArray(updateItems) ? updateItems : [updateItems];
-    itemsUpdate.map((it) => this.items.push({ Update: it }));
+    itemsUpdate.forEach((it) => {
+      const item: TransactionItem = { Update: it };
+      logger.debug("scheduled updating item =", item);
+      this.items.push(item);
+    });
     logger.info("update items has been scheduled for transaction", "size of scheduled items", this.items.length);
     return this;
   }
