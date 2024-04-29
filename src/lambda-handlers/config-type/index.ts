@@ -8,4 +8,6 @@ export { createDefaultDetails as addDefaultConfigTypes, DefaultConfigData } from
 
 export { DbConfigTypeDetails } from "./resource-type";
 
-export { ConfigStatus, BelongsTo } from "./base-config";
+export { ConfigStatus, BelongsTo, _configDataBucketName } from "./base-config";
+
+export { isValidExpenseCategoryId, isValidPaymentAccountTypeId } from "./validate";

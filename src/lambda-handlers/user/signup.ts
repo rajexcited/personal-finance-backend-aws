@@ -1,21 +1,22 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { v4 as uuidv4 } from "uuid";
-import { Role, getSignedToken } from "../auth";
+import { AuthRole } from "../common";
+import { getSignedToken } from "../auth";
 import { apiGatewayHandlerWrapper, RequestBodyContentType, ValidationError, InvalidField, NotFoundError } from "../apigateway";
 import { getLogger, utils, AuditDetailsType, LoggerBase, validations, dbutil, s3utils } from "../utils";
 import {
   _logger as userLogger,
+  _userTableName,
+  _userEmailGsiName,
   getDetailsTablePk,
   getEmailGsiPk,
-  _userTableName,
+  getTokenTablePk,
   UserResourcePath,
   ErrorMessage,
-  _userEmailGsiName,
-  getTokenTablePk,
 } from "./base-config";
 import { encrypt } from "./pcrypt";
-import { DbUserDetails, DbUserDetailItem, DbUserTokenItem, ApiUserResource } from "./resource-type";
-import { BelongsTo, DbConfigTypeDetails, DefaultConfigData, addDefaultConfigTypes } from "../config-type";
+import { DbUserDetails, DbItemUser, DbItemToken, ApiUserResource } from "./resource-type";
+import { BelongsTo, DbConfigTypeDetails, DefaultConfigData, _configDataBucketName, addDefaultConfigTypes } from "../config-type";
 import { DefaultPaymentAccounts } from "../pymt-acc/resource-type";
 import { JSONObject } from "../apigateway";
 import { addDefaultPymtAccounts } from "../pymt-acc";
@@ -47,7 +48,7 @@ const signupHandler = async (event: APIGatewayProxyEvent) => {
       auditDetails: auditDetails,
       status: "active",
     };
-    const dbDetailItem: DbUserDetailItem = {
+    const dbDetailItem: DbItemUser = {
       PK: getDetailsTablePk(apiToDbDetails.id),
       E_GSI_PK: getEmailGsiPk(apiToDbDetails.emailId),
       details: apiToDbDetails,
@@ -65,8 +66,8 @@ const signupHandler = async (event: APIGatewayProxyEvent) => {
     stopwatch.stop();
 
     stopwatch.start("addingNewUser");
-    const accessTokenObj = await getSignedToken(apiToDbDetails.id, Role.PRIMARY);
-    const dbTokenItem: DbUserTokenItem = {
+    const accessTokenObj = await getSignedToken(apiToDbDetails.id, AuthRole.PRIMARY);
+    const dbTokenItem: DbItemToken = {
       PK: getTokenTablePk(apiToDbDetails.id),
       ExpiresAt: accessTokenObj.getExpiresAt().toSeconds(),
       details: {
@@ -126,15 +127,16 @@ const getValidatedRequestForSignup = async (event: APIGatewayProxyEvent, loggerB
     throw new ValidationError(invalidFields);
   }
 
-  const output = await dbutil.ddbClient.query({
+  const cmdInput = {
     TableName: _userTableName,
     IndexName: _userEmailGsiName,
     KeyConditionExpression: "E_GSI_PK = :pk",
     ExpressionAttributeValues: {
       ":pk": getEmailGsiPk(req.emailId as string),
     },
-  });
-  logger.info("output =", output);
+  };
+  const output = await dbutil.queryOnce(cmdInput, logger);
+  logger.info("query completed");
 
   // error if count value is greater than 0
   if (output.Count) {
@@ -183,7 +185,7 @@ const addDefaultConfig = async (
 ) => {
   const logger = getLogger(belongsTo, baseLogger);
 
-  const configData = await s3utils.getJsonObjectFromS3<DefaultConfigData[]>(s3Key, logger);
+  const configData = await s3utils.getJsonObjectFromS3<DefaultConfigData[]>(_configDataBucketName, s3Key, logger);
   if (configData) {
     let filteredData = configData;
 
@@ -234,7 +236,7 @@ const initPaymentAccount = async (
 
   const s3Key = "default-payment-accounts.json";
 
-  const pymtAccs = await s3utils.getJsonObjectFromS3<DefaultPaymentAccounts[]>(s3Key, logger);
+  const pymtAccs = await s3utils.getJsonObjectFromS3<DefaultPaymentAccounts[]>(_configDataBucketName, s3Key, logger);
   if (pymtAccs) {
     logger.info(
       "pymtAccs.length",

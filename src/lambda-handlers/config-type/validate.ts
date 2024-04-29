@@ -1,27 +1,30 @@
 import { LoggerBase, dbutil, getLogger, validations } from "../utils";
-import { BelongsTo, _configTypeTableName, getDetailsTablePk } from "./base-config";
-import { DbConfigTypeItem } from "./resource-type";
+import { BelongsTo, _configTypeTableName, getBelongsToGsiPk, getDetailsTablePk } from "./base-config";
+import { DbItemConfigType } from "./resource-type";
 
-export const isValidPaymentAccountId = async (pymtAccId: string, _logger: LoggerBase) => {
-  const confDetail = await getConfigDetails(pymtAccId, _logger);
-  return confDetail?.id === pymtAccId && confDetail.belongsTo === BelongsTo.PaymentAccountType;
+export const isValidPaymentAccountTypeId = async (pymtAccId: string | null | undefined, userId: string, _logger: LoggerBase) => {
+  const confItem = await getConfigItem(pymtAccId, _logger);
+  const gsiPk = getBelongsToGsiPk(null, _logger, userId, BelongsTo.PaymentAccountType);
+  return confItem?.details.id === pymtAccId && confItem?.details.belongsTo === BelongsTo.PaymentAccountType && gsiPk === confItem.UB_GSI_PK;
 };
 
-export const isValidExpenseCategoryId = async (xpnsCtgryId: string, _logger: LoggerBase) => {
-  const confDetail = await getConfigDetails(xpnsCtgryId, _logger);
-  return confDetail?.id === xpnsCtgryId && confDetail.belongsTo === BelongsTo.ExpenseCategory;
+export const isValidExpenseCategoryId = async (xpnsCtgryId: string | null | undefined, userId: string, _logger: LoggerBase) => {
+  const confItem = await getConfigItem(xpnsCtgryId, _logger);
+  const gsiPk = getBelongsToGsiPk(null, _logger, userId, BelongsTo.ExpenseCategory);
+  return confItem?.details.id === xpnsCtgryId && confItem?.details.belongsTo === BelongsTo.ExpenseCategory && gsiPk === confItem.UB_GSI_PK;
 };
 
-export const getConfigDetails = async (cfgId: string, _logger: LoggerBase) => {
+const getConfigItem = async (cfgId: string | null | undefined, _logger: LoggerBase) => {
   if (!validations.isValidUuid(cfgId)) {
     return null;
   }
   const logger = getLogger("getConfigDetails", _logger);
-  const getOutput = await dbutil.ddbClient.get({
+  const cmdInput = {
     TableName: _configTypeTableName,
-    Key: { PK: getDetailsTablePk(cfgId) },
-  });
-  logger.info("getOutput", getOutput);
-  const item = getOutput.Item as DbConfigTypeItem | null;
-  return item?.details;
+    Key: { PK: getDetailsTablePk(cfgId as string) },
+  };
+  const getOutput = await dbutil.getItem(cmdInput, logger);
+  logger.info("retrieved get Output");
+  const item = getOutput.Item as DbItemConfigType | null;
+  return item;
 };

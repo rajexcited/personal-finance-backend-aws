@@ -1,12 +1,8 @@
 import { Algorithm } from "jsonwebtoken";
-
-export enum Role {
-  PRIMARY = "primary",
-  ADMIN = "admin",
-}
+import { AuthRole } from "../common";
 
 export interface TokenPayload {
-  role: `${Role}`;
+  role: `${AuthRole}`;
   id: string;
   iat: number;
 }

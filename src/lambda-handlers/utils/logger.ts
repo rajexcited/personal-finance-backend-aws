@@ -35,25 +35,30 @@ setDefaultLogLevel(process.env.DEFAULT_LOG_LEVEL);
  *
  * @param id
  * @param logLevel override default loglevel. if baseLogger is provided, default log level will be referenced from baseLogger
- * @param baseLogger
+ * @param parent1Logger
+ * @param parent2Logger
  * @returns
  */
-export const getLogger = (id: string, baseLogger?: LoggerBase, logLevel?: LogLevelType) => {
-  return new LoggerBase(id, logLevel, baseLogger);
+export const getLogger = (id: string, parent1Logger?: LoggerBase | null, parent2Logger?: LoggerBase | null, logLevel?: LogLevelType) => {
+  return new LoggerBase(id, logLevel, parent1Logger, parent2Logger);
 };
 
 export class LoggerBase {
   public readonly id: string;
   private logLevel: LogLevel;
 
-  constructor(id: string, logLevel?: LogLevelType, baseLogger?: LoggerBase) {
-    if (baseLogger) {
-      this.id = baseLogger.id + "." + id;
-    } else {
-      this.id = id;
+  constructor(id: string, logLevel?: LogLevelType, baseLogger1?: LoggerBase | null, baseLogger2?: LoggerBase | null) {
+    // console.log("in loggerBase", "id =", id, ", logLevel =", logLevel, ", baseLogger1 =", baseLogger1, ", baseLogger2 =", baseLogger2);
+    let convertedId = id;
+    if (baseLogger1?.id) {
+      convertedId = baseLogger1.id + "." + convertedId;
     }
+    if (baseLogger2?.id) {
+      convertedId = baseLogger2.id + "." + convertedId;
+    }
+    this.id = convertedId;
 
-    const level = logLevel || baseLogger?.getLogLevelType() || defaultLogLevel;
+    const level = logLevel || baseLogger1?.getLogLevelType() || baseLogger2?.getLogLevelType() || defaultLogLevel;
     this.setLogLevel(level as LogLevelType);
   }
 
@@ -107,12 +112,6 @@ export class LoggerBase {
   }
 
   public warn(...args: any[]) {
-    if (this.logLevel <= LogLevel.ERROR) {
-      this.printToConsole("warn", args);
-    }
-  }
-
-  public warning(...args: any[]) {
     if (this.logLevel <= LogLevel.ERROR) {
       this.printToConsole("warn", args);
     }

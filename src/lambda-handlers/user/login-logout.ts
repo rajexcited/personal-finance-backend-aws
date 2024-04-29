@@ -1,5 +1,6 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
-import { Role, getSignedToken } from "../auth";
+import { getSignedToken } from "../auth";
+import { AuthRole } from "../common";
 import { UnAuthorizedError, apiGatewayHandlerWrapper, RequestBodyContentType, InvalidField, ValidationError } from "../apigateway";
 import { LoggerBase, getLogger, utils, validations, dbutil } from "../utils";
 import {
@@ -12,38 +13,40 @@ import {
   getTokenTablePk,
   getValidatedUserId,
 } from "./base-config";
-import { ApiUserResource, DbUserDetailItem, DbUserTokenItem } from "./resource-type";
+import { ApiUserResource, DbItemUser, DbItemToken } from "./resource-type";
 import { verify } from "./pcrypt";
 
 const loginHandler = async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("login", _logger);
   const req = getValidatedRequestForLogin(event, logger);
-  const gsioutput = await dbutil.ddbClient.query({
+  const cmdInput = {
     TableName: _userTableName,
     IndexName: _userEmailGsiName,
     KeyConditionExpression: "E_GSI_PK = :pk",
     ExpressionAttributeValues: {
       ":pk": getEmailGsiPk(req.emailId as string),
     },
-  });
-  logger.info("getItem by EmailId, gsi output", gsioutput);
+  };
+  const gsioutput = await dbutil.queryOnce(cmdInput, logger);
+  logger.info("getItem by EmailId");
   if (!gsioutput.Count || !gsioutput.Items || !gsioutput.Items.length) {
     throw new UnAuthorizedError(UserResourcePath.EMAILID + " " + ErrorMessage.INCORRECT_VALUE);
   }
 
-  const output = await dbutil.ddbClient.get({
+  const getcmdInput = {
     TableName: _userTableName,
     Key: { PK: gsioutput.Items[0].PK },
-  });
-  logger.log("getItem by UserDetail PK, output", output);
-  const dbDetailsItem = output.Item as DbUserDetailItem;
+  };
+  const output = await dbutil.getItem(getcmdInput, logger);
+  logger.log("getItem by UserDetail PK");
+  const dbDetailsItem = output.Item as DbItemUser;
   const isMatched = await verify(req.password as string, dbDetailsItem.details.phash);
   if (!isMatched) {
     throw new UnAuthorizedError(UserResourcePath.PASSWORD + " " + ErrorMessage.INCORRECT_VALUE);
   }
 
-  const accessTokenObj = await getSignedToken(dbDetailsItem.details.id, Role.PRIMARY);
-  const dbTokenItem: DbUserTokenItem = {
+  const accessTokenObj = await getSignedToken(dbDetailsItem.details.id, AuthRole.PRIMARY);
+  const dbTokenItem: DbItemToken = {
     PK: getTokenTablePk(dbDetailsItem.details.id),
     ExpiresAt: accessTokenObj.getExpiresAt().toSeconds(),
     details: {
@@ -51,11 +54,12 @@ const loginHandler = async (event: APIGatewayProxyEvent) => {
       tokenExpiresAt: accessTokenObj.getExpiresAt().toMillis(),
     },
   };
-  const updateResult = await dbutil.ddbClient.put({
+  const putcmdInput = {
     TableName: _userTableName,
     Item: dbTokenItem,
-  });
-  logger.info("updateResult", updateResult, "accessTokenObj", accessTokenObj);
+  };
+  const updateResult = await dbutil.putItem(putcmdInput, logger);
+  logger.info("updateResult", "accessTokenObj", accessTokenObj);
 
   return {
     accessToken: accessTokenObj.token,
@@ -68,11 +72,12 @@ export const logout = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEven
   const logger = getLogger("logout", _logger);
   const userId = getValidatedUserId(event);
   logger.info("received request for userId", userId);
-  const updateResult = await dbutil.ddbClient.delete({
+  const delCmdInput = {
     TableName: _userTableName,
     Key: { PK: getTokenTablePk(userId) },
-  });
-  logger.info("updateResult", updateResult);
+  };
+  const updateResult = await dbutil.deleteItem(delCmdInput, logger);
+  logger.info("deleted token");
   return null;
 });
 

@@ -1,6 +1,6 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { InvalidField, JSONObject, UnAuthorizedError, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
-import { getValidatedUserId } from "../user";
+import { getAuthorizeUser, getValidatedUserId } from "../user";
 import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils, validations } from "../utils";
 import {
   CONFIG_DESCRIPTION_MAX_LENGTH,
@@ -18,7 +18,7 @@ import {
   BelongsTo,
   ConfigStatus,
 } from "./base-config";
-import { ApiConfigTypeResource, DbConfigTypeDetails, DbConfigTypeItem } from "./resource-type";
+import { ApiConfigTypeResource, DbConfigTypeDetails, DbItemConfigType } from "./resource-type";
 import { v4 as uuidv4 } from "uuid";
 import { getCurrencyByCountry } from "../settings";
 import { CountryCurrencyRelation } from "../settings/currency-profile";
@@ -35,14 +35,15 @@ export const addUpdateDetails = apiGatewayHandlerWrapper(async (event: APIGatewa
   let configId: string | null = null;
   let auditDetails: AuditDetailsType | null = null;
   if (req.id) {
-    const output = await dbutil.ddbClient.get({
+    const cmdInput = {
       TableName: _configTypeTableName,
       Key: { PK: getDetailsTablePk(req.id) },
-    });
+    };
+    const output = await dbutil.getItem(cmdInput, logger);
 
-    logger.info("retrieved config from DB", output);
+    logger.info("retrieved config from DB");
     if (output.Item) {
-      const dbItem = output.Item as DbConfigTypeItem;
+      const dbItem = output.Item as DbItemConfigType;
       // validate user access to config details
       const gsiPkForReq = getBelongsToGsiPk(null, logger, userId, belongsTo);
       if (gsiPkForReq !== dbItem.UB_GSI_PK) {
@@ -73,20 +74,21 @@ export const addUpdateDetails = apiGatewayHandlerWrapper(async (event: APIGatewa
     auditDetails: auditDetails as AuditDetailsType,
   };
 
-  const dbItem: DbConfigTypeItem = {
+  const dbItem: DbItemConfigType = {
     PK: getDetailsTablePk(configId),
     UB_GSI_PK: getBelongsToGsiPk(event, logger),
     UB_GSI_SK: getBelongsToGsiSk(apiToDbDetails.status),
     details: apiToDbDetails,
   };
 
-  const updateResult = await dbutil.ddbClient.put({
+  const cmdInput = {
     TableName: _configTypeTableName,
     Item: dbItem,
-  });
-  logger.debug("updateResult", updateResult);
+  };
+  const updateResult = await dbutil.putItem(cmdInput, logger);
+  logger.debug("Result updated");
 
-  const apiAuditDetails = await utils.parseAuditDetails(apiToDbDetails.auditDetails, userId);
+  const apiAuditDetails = await utils.parseAuditDetails(apiToDbDetails.auditDetails, userId, getAuthorizeUser(event));
   let currencyCountryResource: JSONObject = {};
   if (belongsTo === BelongsTo.CurrencyProfile) {
     logger.info("special type of belongsTo,", belongsTo, ". so adding additional details to response");

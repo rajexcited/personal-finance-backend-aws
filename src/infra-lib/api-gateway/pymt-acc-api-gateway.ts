@@ -8,6 +8,7 @@ import { DbProps } from "../db";
 import { Duration } from "aws-cdk-lib";
 import { ConfigStatus } from "../../lambda-handlers";
 import { EnvironmentName } from "../common";
+import { BaseApiConstruct } from "./base-api";
 
 interface PymtAccApiProps extends RestApiProps {
   userTable: DbProps;
@@ -15,7 +16,7 @@ interface PymtAccApiProps extends RestApiProps {
   pymtAccTable: DbProps;
 }
 
-export class PymtAccApiConstruct extends Construct {
+export class PymtAccApiConstruct extends BaseApiConstruct {
   private readonly props: PymtAccApiProps;
 
   constructor(scope: Construct, id: string, props: PymtAccApiProps) {
@@ -145,23 +146,4 @@ export class PymtAccApiConstruct extends Construct {
     });
     return model;
   };
-
-  private getRequestParameters = (resource: apigateway.IResource, queryParams?: Record<string, boolean>) => {
-    const pathParams = this.getPathParams(resource);
-    const pathParamEntries = pathParams.map((pp) => [`method.request.path.${pp}`, true]);
-    const queryParamEntries = Object.entries(queryParams || {}).map((qp) => [`method.request.querystring.${qp[0]}`, qp[1]]);
-    const requestParams: Record<string, boolean> = Object.fromEntries([...pathParamEntries, ...queryParamEntries]);
-    return requestParams;
-  };
-
-  private getPathParams(resource: apigateway.IResource) {
-    let pathParams: string[] = [];
-    if (resource.node.id.startsWith("{") && resource.node.id.endsWith("}")) {
-      pathParams.push(resource.node.id.slice(1, -1));
-    }
-    if (resource.parentResource) {
-      pathParams.push(...this.getPathParams(resource.parentResource));
-    }
-    return pathParams;
-  }
 }

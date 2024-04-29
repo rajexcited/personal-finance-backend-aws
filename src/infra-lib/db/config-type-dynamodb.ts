@@ -17,10 +17,9 @@ export class ConfigTypeDBConstruct extends Construct {
   constructor(scope: Construct, id: string, props: ConstructProps) {
     super(scope, id);
 
-    const tablePartitionKeyName = "PK";
     const db = new TableV2(this, "ConfigTypeDynamoDb", {
       tableName: [props.resourcePrefix, props.environment, "cfg", "type", "dynamodb"].join("-"),
-      partitionKey: { name: tablePartitionKeyName, type: AttributeType.STRING },
+      partitionKey: { name: "PK", type: AttributeType.STRING },
       tableClass: TableClass.STANDARD_INFREQUENT_ACCESS,
       pointInTimeRecovery: props.environment === EnvironmentName.Production,
       removalPolicy: RemovalPolicy.DESTROY,

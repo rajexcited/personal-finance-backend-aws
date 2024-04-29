@@ -5,6 +5,8 @@ import { ValidationError } from "../apigateway";
 
 export const _configTypeTableName = process.env.CONFIG_TYPE_TABLE_NAME as string;
 export const _belongsToGsiName = process.env.CONFIG_TYPE_BELONGS_TO_GSI_NAME as string;
+export const _configDataBucketName = process.env.CONFIG_DATA_BUCKET_NAME as string;
+
 export const _logger = getLogger("config-type");
 
 export const MAX_ALLOWED_TAGS = 10;

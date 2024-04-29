@@ -37,8 +37,11 @@ export const getDetailsTablePk = (paymentAccountId: string) => {
   return `pymtAccId#${paymentAccountId}`;
 };
 
-export const getUserIdStatusShortnameGsiPk = (userId: string, status: PymtAccStatus) => {
-  return `userId#${userId}#status#${status}`;
+export const getUserIdStatusShortnameGsiPk = (userId: string, status?: PymtAccStatus) => {
+  if (status) {
+    return `userId#${userId}#status#${status}`;
+  }
+  return `userId#${userId}#status`;
 };
 
 export const getUserIdStatusShortnameGsiSk = (shortName: string) => {

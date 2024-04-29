@@ -1,6 +1,7 @@
 import { caching } from "cache-manager";
 import { LoggerBase, getLogger, s3utils } from "../utils";
 import { _logger } from "./base-config";
+import { _configDataBucketName } from "../config-type";
 
 const CurrencyProfileMemoryCache = caching("memory", {
   max: 3,
@@ -38,7 +39,8 @@ const getAllowedCurrencyProfiles = async (baseLogger: LoggerBase) => {
   const profileCache = await CurrencyProfileMemoryCache;
   const profiles = profileCache.wrap("allowedProfiles", async () => {
     const logger = getLogger("getAllowedCountryCurrencyProfiles", baseLogger);
-    const currencyProfiles = await s3utils.getJsonObjectFromS3<CurrencyProfile>("currency-profiles.json", logger);
+
+    const currencyProfiles = await s3utils.getJsonObjectFromS3<CurrencyProfile>(_configDataBucketName, "currency-profiles.json", logger);
     logger.info(
       "number of countries =",
       currencyProfiles?.countries.length,

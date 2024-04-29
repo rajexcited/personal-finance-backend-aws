@@ -1,7 +1,7 @@
 import { AuditDetailsType } from "../utils";
 import { BelongsTo, ConfigStatus } from "./base-config";
 
-export interface DbConfigTypeItem {
+export interface DbItemConfigType {
   PK: string;
   UB_GSI_PK: string;
   UB_GSI_SK: string;

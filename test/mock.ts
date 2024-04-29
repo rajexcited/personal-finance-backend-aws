@@ -84,3 +84,27 @@ export const getMockApiGatewayProxyEvent = (method: MethodType, body?: JSONValue
 
   return mockEvent;
 };
+
+export interface ConsoleMock {
+  debug: jest.SpyInstance;
+  log: jest.SpyInstance;
+  info: jest.SpyInstance;
+  warn: jest.SpyInstance;
+  error: jest.SpyInstance;
+}
+
+export const spyConsole = () => {
+  const debug = jest.spyOn(console, "debug").mockImplementation(noop);
+  const log = jest.spyOn(console, "log").mockImplementation(noop);
+  const info = jest.spyOn(console, "info").mockImplementation(() => {});
+  const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+  const error = jest.spyOn(console, "error").mockImplementation(() => {});
+
+  return {
+    debug,
+    log,
+    info,
+    warn,
+    error,
+  } as ConsoleMock;
+};

@@ -1,9 +1,10 @@
 import { APIGatewayAuthorizerResult, APIGatewayTokenAuthorizerHandler, PolicyDocument } from "aws-lambda";
 import * as jwt from "jsonwebtoken";
-import { Role, TokenHeader, TokenPayload } from "./auth-type";
+import { TokenHeader, TokenPayload } from "./auth-type";
 import { RoleAuthConfigList } from "./role-config";
 import { utils, getLogger, validations, dbutil, LoggerBase } from "../utils";
-import { DbUserTokenItem, getTokenTablePk } from "../user";
+import { DbItemToken, getTokenTablePk } from "../user";
+import { AuthRole } from "../common";
 import { UnAuthenticatedError, ValidationError } from "../apigateway";
 import { _logger, _smClient, _tokenSecretId, _userTableName } from "./base-config";
 import { getSecret } from "./token-secret";
@@ -24,7 +25,7 @@ export const authorizer: APIGatewayTokenAuthorizerHandler = async (event, contex
     const isAuthorized = await authorize(payload, event.methodArn, authenticatedResponse.decoded as jwt.JwtPayload);
     logger.info("isAuthorized", isAuthorized);
     if (isAuthorized) {
-      iamPolicyDocument = allowPolicy(event.methodArn, payload.role as Role, logger);
+      iamPolicyDocument = allowPolicy(event.methodArn, payload.role as AuthRole, logger);
     }
   }
   const resp: APIGatewayAuthorizerResult = {
@@ -79,7 +80,7 @@ const authorize = async (payload: TokenPayload, resourceArn: string, jwtPayload:
   const logger = getLogger("authorize", _logger);
 
   // verify if role is allowed for rest
-  const roles = Object.values(Role) as string[];
+  const roles = Object.values(AuthRole) as string[];
   if (!roles.includes(payload.role)) {
     logger.info("given role [" + payload.role + "] in token is not supported");
     return false;
@@ -116,18 +117,19 @@ const authorize = async (payload: TokenPayload, resourceArn: string, jwtPayload:
   }
 
   // verify if user is valid
-  const result = await dbutil.ddbClient.get({
+  const cmdInput = {
     TableName: _userTableName,
     Key: { PK: getTokenTablePk(payload.id) },
-  });
+  };
+  const result = await dbutil.getItem(cmdInput, logger);
 
-  logger.debug("getUser result", result);
+  logger.debug("retrieved user");
   if (!result.Item) {
     logger.info("there isn't any token details found in db");
     return false;
   }
 
-  const userItem = result.Item as DbUserTokenItem;
+  const userItem = result.Item as DbItemToken;
   if (Date.now() > userItem.details.tokenExpiresAt) {
     logger.info("token is expired. expiredAt [" + userItem.details.tokenExpiresAt + "( " + new Date(userItem.details.tokenExpiresAt) + " )]");
     return false;
@@ -167,7 +169,7 @@ const denyPolicy = (resourceArn: string) => {
   return generatePolicy("Deny", resourceArn);
 };
 
-const allowPolicy = (resourceArn: string, role: Role, baseLogger: LoggerBase) => {
+const allowPolicy = (resourceArn: string, role: AuthRole, baseLogger: LoggerBase) => {
   const logger = getLogger("allowPolicy", baseLogger);
   const methodWithUris = RoleAuthConfigList.filter((cfg) => cfg.role.includes(role)).map((cfg) => cfg.method + cfg.apiPath);
   const { resourceArnWithoutMethodAndUri } = getResourceParts(resourceArn, logger);

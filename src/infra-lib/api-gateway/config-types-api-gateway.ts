@@ -9,6 +9,7 @@ import { Duration } from "aws-cdk-lib";
 import { ConfigStatus } from "../../lambda-handlers";
 import { IBucket } from "aws-cdk-lib/aws-s3";
 import { EnvironmentName } from "../common";
+import { BaseApiConstruct } from "./base-api";
 
 interface ConfigTypeApiProps extends RestApiProps {
   userTable: DbProps;
@@ -16,7 +17,7 @@ interface ConfigTypeApiProps extends RestApiProps {
   configBucket: IBucket;
 }
 
-export class ConfigTypeApiConstruct extends Construct {
+export class ConfigTypeApiConstruct extends BaseApiConstruct {
   private readonly props: ConfigTypeApiProps;
 
   constructor(scope: Construct, id: string, props: ConfigTypeApiProps) {
@@ -158,23 +159,4 @@ export class ConfigTypeApiConstruct extends Construct {
     });
     return model;
   };
-
-  private getRequestParameters = (resource: apigateway.IResource, queryParams?: Record<string, boolean>) => {
-    const pathParams = this.getPathParams(resource);
-    const pathParamEntries = pathParams.map((pp) => [`method.request.path.${pp}`, true]);
-    const queryParamEntries = Object.entries(queryParams || {}).map((qp) => [`method.request.querystring.${qp[0]}`, qp[1]]);
-    const requestParams: Record<string, boolean> = Object.fromEntries([...pathParamEntries, ...queryParamEntries]);
-    return requestParams;
-  };
-
-  private getPathParams(resource: apigateway.IResource) {
-    let pathParams: string[] = [];
-    if (resource.node.id.startsWith("{") && resource.node.id.endsWith("}")) {
-      pathParams.push(resource.node.id.slice(1, -1));
-    }
-    if (resource.parentResource) {
-      pathParams.push(...this.getPathParams(resource.parentResource));
-    }
-    return pathParams;
-  }
 }

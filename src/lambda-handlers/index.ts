@@ -25,3 +25,11 @@ export {
   deletePaymentAccount as pymtAccDelete,
   updatePaymentAccountStatus as pymtAccStatusUpdate,
 } from "./pymt-acc";
+
+export {
+  getExpenseList as expenseList,
+  getExpeseDetails as expenseGetDetails,
+  addUpdateExpense as expenseAddUpdate,
+  deleteExpense as expenseDeleteDetails,
+  updateExpenseStatus as expenseStatusUpdate,
+} from "./expenses";

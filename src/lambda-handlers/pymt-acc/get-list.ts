@@ -2,8 +2,8 @@ import { APIGatewayProxyEvent } from "aws-lambda";
 import { JSONArray, apiGatewayHandlerWrapper } from "../apigateway";
 import { LoggerBase, compareutil, dbutil, getLogger, utils } from "../utils";
 import { PymtAccStatus, _logger, _pymtAccTableName, _userIdStatusShortnameIndex, getUserIdStatusShortnameGsiPk } from "./base-config";
-import { getValidatedUserId } from "../user";
-import { ApiPaymentAccountResource, DbPymtAccItem } from "./resource-type";
+import { getAuthorizeUser, getValidatedUserId } from "../user";
+import { ApiPaymentAccountResource, DbItemPymtAcc } from "./resource-type";
 
 export const getPaymentAccounts = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("getPaymentAccounts", _logger);
@@ -11,7 +11,7 @@ export const getPaymentAccounts = apiGatewayHandlerWrapper(async (event: APIGate
 
   const pymtAccounts = await getListOfDetails(userId, PymtAccStatus.ENABLE, logger);
   const resourcePromises = pymtAccounts.map(async (details) => {
-    const auditDetails = await utils.parseAuditDetails(details.auditDetails, userId);
+    const auditDetails = await utils.parseAuditDetails(details.auditDetails, userId, getAuthorizeUser(event));
     logger.debug("userId", userId, "auditDetails", auditDetails);
 
     const resource: ApiPaymentAccountResource = {
@@ -36,7 +36,7 @@ export const getPaymentAccounts = apiGatewayHandlerWrapper(async (event: APIGate
 const getListOfDetails = async (userId: string, status: PymtAccStatus, _logger: LoggerBase) => {
   const logger = getLogger("getListOfDetails", _logger);
 
-  const items = await dbutil.queryAll<DbPymtAccItem>(logger, {
+  const items = await dbutil.queryAll<DbItemPymtAcc>(logger, {
     TableName: _pymtAccTableName,
     IndexName: _userIdStatusShortnameIndex,
     KeyConditionExpression: `UP_GSI_PK = :pkv`,

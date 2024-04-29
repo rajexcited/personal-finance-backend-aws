@@ -5,7 +5,7 @@ import { getLogger } from "../utils";
 const _smClient = new SecretsManagerClient();
 const _secretId = process.env.PSALT_SECRET_ID;
 // todo change this to info after successful testing
-const _logger = getLogger("pcrypt", undefined, "DEBUG");
+const _logger = getLogger("pcrypt", null, null, "DEBUG");
 
 const decode = (encoded: string) => {
   // const decoded = atob(encoded);

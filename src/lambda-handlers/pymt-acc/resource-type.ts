@@ -1,7 +1,7 @@
 import { AuditDetailsType } from "../utils";
 import { PymtAccStatus } from "./base-config";
 
-export interface DbPymtAccItem {
+export interface DbItemPymtAcc {
   PK: string;
   UP_GSI_PK: string;
   UP_GSI_SK: string;

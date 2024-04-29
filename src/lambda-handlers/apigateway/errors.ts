@@ -44,3 +44,21 @@ export class MissingError extends Error {
     super(message);
   }
 }
+
+export class IllegelArgumentError extends Error {
+  constructor(message?: string) {
+    super(message);
+  }
+}
+
+export class IncorrectValueError extends Error {
+  constructor(message?: string) {
+    super(message);
+  }
+}
+
+export class InvalidError extends Error {
+  constructor(message?: string) {
+    super(message);
+  }
+}

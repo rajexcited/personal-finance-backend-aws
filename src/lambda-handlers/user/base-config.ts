@@ -1,6 +1,8 @@
 import { getLogger, validations } from "../utils";
+import { AuthRole } from "../common";
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { UnAuthorizedError } from "../apigateway";
+import { AuthorizeUser } from "./resource-type";
 
 /**
  * DynamoDB code example
@@ -42,10 +44,25 @@ export const getEmailGsiPk = (emailId: string) => {
   return `emailId#${emailId}`;
 };
 
-export const getValidatedUserId = (event: APIGatewayProxyEvent) => {
+export const getAuthorizeUser = (event: APIGatewayProxyEvent) => {
   const userId = event.requestContext.authorizer?.principalId;
   if (!userId || !validations.isValidUuid(userId)) {
     throw new UnAuthorizedError("missing userId in authorizer");
   }
-  return userId as string;
+
+  const role = event.requestContext.authorizer?.role;
+  if (role !== AuthRole.ADMIN && role !== AuthRole.PRIMARY) {
+    throw new UnAuthorizedError("incorrect role in authorizer");
+  }
+
+  const authUser: AuthorizeUser = {
+    userId,
+    role,
+  };
+  return authUser;
+};
+
+export const getValidatedUserId = (event: APIGatewayProxyEvent) => {
+  const authUser = getAuthorizeUser(event);
+  return authUser.userId;
 };

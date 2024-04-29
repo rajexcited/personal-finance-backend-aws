@@ -1,10 +1,8 @@
-import { JSONObject, NotFoundError, ValidationError } from "../apigateway";
+import { JSONObject, NotFoundError, MissingError } from "../apigateway";
 import { BelongsTo, getConfigId } from "../config-type";
 import { dbutil, getLogger, utils, validations } from "../utils";
 import {
-  ErrorMessage,
   NAME_MIN_LENGTH,
-  PymtAccResourcePath,
   PymtAccStatus,
   SHORTNAME_MAX_LENGTH,
   _logger,
@@ -13,10 +11,9 @@ import {
   getUserIdStatusShortnameGsiPk,
   getUserIdStatusShortnameGsiSk,
 } from "./base-config";
-import { DbPaymentAccountDetails, DbPymtAccItem, DefaultPaymentAccounts } from "./resource-type";
+import { DbPaymentAccountDetails, DbItemPymtAcc, DefaultPaymentAccounts } from "./resource-type";
 import { v4 as uuidv4 } from "uuid";
 import { isValidAccountIdNum, isValidInstitutionName } from "./validate";
-import { MissingError } from "../apigateway/errors";
 
 export const createDetails = async (details: DefaultPaymentAccounts[], userId: string, transactionWriter: dbutil.TransactionWriter) => {
   const logger = getLogger("createDetails", _logger);
@@ -73,7 +70,7 @@ export const createDetails = async (details: DefaultPaymentAccounts[], userId: s
       auditDetails: { ...auditDetails },
     };
 
-    const item: DbPymtAccItem = {
+    const item: DbItemPymtAcc = {
       PK: getDetailsTablePk(itemDetail.id),
       UP_GSI_PK: getUserIdStatusShortnameGsiPk(userId, itemDetail.status),
       UP_GSI_SK: getUserIdStatusShortnameGsiSk(itemDetail.shortName),
@@ -87,7 +84,7 @@ export const createDetails = async (details: DefaultPaymentAccounts[], userId: s
     throw new NotFoundError(`invalid payment account types ${invalidTypeNames.join(", ")}`);
   }
 
-  const items = (await Promise.all(itemPromises)) as DbPymtAccItem[];
+  const items = (await Promise.all(itemPromises)) as DbItemPymtAcc[];
   transactionWriter.putItems(items as unknown as JSONObject[], _pymtAccTableName, logger);
   return items.map((item) => item.details);
 };

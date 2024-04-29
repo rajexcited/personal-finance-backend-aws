@@ -11,3 +11,5 @@ export * as dbutil from "./dbutil";
 export * as s3utils from "./s3util";
 
 export * as compareutil from "./compare";
+
+export * as dateutil from "./date-util";

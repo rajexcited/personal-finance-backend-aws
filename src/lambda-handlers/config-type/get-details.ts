@@ -1,8 +1,8 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { JSONArray, JSONObject, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
 import { utils, getLogger, dbutil, LoggerBase, compareutil } from "../utils";
-import { DbConfigTypeItem, ApiConfigTypeResource, ApiCurrencyProfileResource } from "./resource-type";
-import { getValidatedUserId } from "../user";
+import { DbItemConfigType, ApiConfigTypeResource, ApiCurrencyProfileResource } from "./resource-type";
+import { getAuthorizeUser, getValidatedUserId } from "../user";
 import {
   _logger,
   _configTypeTableName,
@@ -38,7 +38,7 @@ export const getListOfDetails = apiGatewayHandlerWrapper(async (event: APIGatewa
   let resourcePromises;
 
   resourcePromises = itemDetails.map(async (details) => {
-    const auditDetails = await utils.parseAuditDetails(details.auditDetails, userId);
+    const auditDetails = await utils.parseAuditDetails(details.auditDetails, userId, getAuthorizeUser(event));
     logger.debug("userId", userId, "auditDetails", auditDetails);
 
     const resource: ApiConfigTypeResource = {
@@ -107,7 +107,7 @@ const getConfigItemDetails = async (event: APIGatewayProxyEvent) => {
   }
 
   const configItemPromises = skConditions.map(async (cond) => {
-    const items = await dbutil.queryAll<DbConfigTypeItem>(logger, {
+    const items = await dbutil.queryAll<DbItemConfigType>(logger, {
       TableName: _configTypeTableName,
       IndexName: _belongsToGsiName,
       KeyConditionExpression: `UB_GSI_PK = :pkv ${cond.expression}`,
@@ -129,7 +129,7 @@ export const getConfigId = async (configName: string, userId: string, belongsTo:
 
   const belongsToConfigListCache = await belongsToConfigListMemoryCache;
   const items = await belongsToConfigListCache.wrap(userId + belongsTo, async () => {
-    const itemPromises = await dbutil.queryAll<DbConfigTypeItem>(logger, {
+    const itemPromises = await dbutil.queryAll<DbItemConfigType>(logger, {
       TableName: _configTypeTableName,
       IndexName: _belongsToGsiName,
       KeyConditionExpression: `UB_GSI_PK = :pkv`,

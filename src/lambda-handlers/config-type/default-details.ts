@@ -13,7 +13,7 @@ import {
   BelongsTo,
   ConfigStatus,
 } from "./base-config";
-import { DbConfigTypeDetails, DbConfigTypeItem } from "./resource-type";
+import { DbConfigTypeDetails, DbItemConfigType } from "./resource-type";
 import { v4 as uuidv4 } from "uuid";
 
 export interface DefaultConfigData {
@@ -62,7 +62,7 @@ export const createDefaultDetails = async (
       status: ConfigStatus.ENABLE,
       auditDetails: { ...auditDetails },
     };
-    const item: DbConfigTypeItem = {
+    const item: DbItemConfigType = {
       details: itemDetail,
       PK: getDetailsTablePk(itemDetail.id),
       UB_GSI_PK: getBelongsToGsiPk(null, logger, userId, belongsTo),

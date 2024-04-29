@@ -1,16 +1,17 @@
 import * as jwt from "jsonwebtoken";
 import * as datetime from "date-and-time";
 import { getLogger } from "../utils";
-import { Role, TokenPayload } from "./auth-type";
+import { AuthRole } from "../common";
+import { TokenPayload } from "./auth-type";
 import { _logger } from "./base-config";
 import { getSecret } from "./token-secret";
 
-export const getSignedToken = async (userId: string, role?: Role) => {
+export const getSignedToken = async (userId: string, role?: AuthRole) => {
   const logger = getLogger("getSignedToken", _logger);
   const iat = new Date();
 
   const payload: TokenPayload = {
-    role: role || Role.PRIMARY,
+    role: role || AuthRole.PRIMARY,
     id: userId,
     iat: iat.getTime(),
   };

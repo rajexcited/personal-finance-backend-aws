@@ -11,6 +11,7 @@ import { JSONObject } from "../../lambda-handlers";
 import { DbProps } from "../db";
 import { IBucket } from "aws-cdk-lib/aws-s3";
 import { EnvironmentName } from "../common";
+import { BaseApiConstruct } from "./base-api";
 
 interface UserApiProps extends RestApiProps {
   userTable: DbProps;
@@ -25,7 +26,7 @@ enum ModelId {
   UserSignupModel = "UserSignupModel",
 }
 
-export class UserApiConstruct extends Construct {
+export class UserApiConstruct extends BaseApiConstruct {
   private readonly props: UserApiProps;
   private modelMap = new Map<ModelId, apigateway.Model>();
   private readonly pSaltSecret: secretsmanager.Secret;

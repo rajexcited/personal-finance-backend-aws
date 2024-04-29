@@ -1,11 +1,5 @@
 import { Construct } from "constructs";
-import {
-  AttributeType,
-  TableV2,
-  TableClass,
-  ProjectionType,
-  GlobalSecondaryIndexPropsV2,
-} from "aws-cdk-lib/aws-dynamodb";
+import { AttributeType, TableV2, TableClass, ProjectionType, GlobalSecondaryIndexPropsV2 } from "aws-cdk-lib/aws-dynamodb";
 import { ConstructProps, EnvironmentName } from "../common";
 import { RemovalPolicy } from "aws-cdk-lib";
 import { DbProps } from "./db-prop-type";
@@ -22,10 +16,9 @@ export class UserDBConstruct extends Construct {
   constructor(scope: Construct, id: string, props: ConstructProps) {
     super(scope, id);
 
-    const tablePartitionKeyName = "PK";
     const db = new TableV2(this, "UserDynamoDb", {
       tableName: [props.resourcePrefix, props.environment, "user", "info", "dynamodb"].join("-"),
-      partitionKey: { name: tablePartitionKeyName, type: AttributeType.STRING },
+      partitionKey: { name: "PK", type: AttributeType.STRING },
       tableClass: TableClass.STANDARD_INFREQUENT_ACCESS,
       pointInTimeRecovery: props.environment === EnvironmentName.Production,
       timeToLiveAttribute: "ExpiresAt",

@@ -6,13 +6,24 @@ import {
   QueryCommandInput,
   QueryCommandOutput,
   TransactWriteCommandInput,
+  GetCommandInput,
+  PutCommandInput,
+  DeleteCommandInput,
+  UpdateCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 import { NativeAttributeValue } from "@aws-sdk/util-dynamodb";
 import { LoggerBase, getLogger } from "../utils";
 import { scheduler } from "node:timers/promises";
 import { StopWatch } from "stopwatch-node";
 import { JSONObject } from "../apigateway";
-import { MissingError } from "../apigateway/errors";
+import { MissingError } from "../apigateway";
+import { caching } from "cache-manager";
+
+const getItemMemoryCache = caching("memory", {
+  max: 25,
+  // ttl in seconds
+  ttl: 60 * 1000,
+});
 
 const DdbTranslateConfig: TranslateConfig = {
   marshallOptions: {
@@ -23,7 +34,133 @@ const DdbTranslateConfig: TranslateConfig = {
   },
 };
 
-export const ddbClient = DynamoDBDocument.from(new DynamoDBClient(), DdbTranslateConfig);
+const ddbClient = DynamoDBDocument.from(new DynamoDBClient(), DdbTranslateConfig);
+
+export const getItem = async (input: GetCommandInput, _logger: LoggerBase) => {
+  const stopwatch = new StopWatch("getItem");
+  const logger = getLogger("getItem", _logger);
+  try {
+    stopwatch.start();
+    logger.info("getting results from cache if available", "input =", input);
+    const cache = await getItemMemoryCache;
+    const output = cache.wrap(JSON.stringify(input), async () => {
+      logger.info("calling db api call");
+      const dbOutput = await ddbClient.get(input);
+      return dbOutput;
+    });
+
+    logger.info("output =", output);
+    return output;
+  } finally {
+    stopwatch.stop();
+    logger.info("stopwatch summary", stopwatch.shortSummary());
+  }
+};
+
+export const putItem = async (input: PutCommandInput, _logger: LoggerBase) => {
+  const stopwatch = new StopWatch("putItem");
+  const logger = getLogger("putItem", _logger);
+  try {
+    stopwatch.start();
+    logger.info("input =", input);
+
+    const output = await ddbClient.put(input);
+    logger.info("output =", output);
+    return output;
+  } finally {
+    stopwatch.stop();
+    logger.info("stopwatch summary", stopwatch.shortSummary());
+  }
+};
+
+export const updateAttribute = async (input: UpdateCommandInput, _logger: LoggerBase) => {
+  const stopwatch = new StopWatch("updateAttribute");
+  const logger = getLogger("updateAttribute", _logger);
+  try {
+    stopwatch.start();
+    logger.info("input =", input);
+
+    const output = await ddbClient.update(input);
+    logger.info("output =", output);
+    return output;
+  } finally {
+    stopwatch.stop();
+    logger.info("stopwatch summary", stopwatch.shortSummary());
+  }
+};
+
+export const deleteItem = async (input: DeleteCommandInput, _logger: LoggerBase) => {
+  const stopwatch = new StopWatch("deleteItem");
+  const logger = getLogger("deleteItem", _logger);
+  try {
+    stopwatch.start();
+    logger.info("input =", input);
+
+    const output = await ddbClient.delete(input);
+    logger.info("output =", output);
+    return output;
+  } finally {
+    stopwatch.stop();
+    logger.info("stopwatch summary", stopwatch.shortSummary());
+  }
+};
+
+export const queryOnce = async (input: QueryCommandInput, _logger: LoggerBase) => {
+  const stopwatch = new StopWatch("queryOnce");
+  const logger = getLogger("queryOnce", _logger);
+  try {
+    stopwatch.start();
+    logger.info("input =", input);
+
+    const output = await ddbClient.query(input);
+    logger.info("output =", output);
+    return output;
+  } finally {
+    stopwatch.stop();
+    logger.info("stopwatch summary", stopwatch.shortSummary());
+  }
+};
+
+export const batchGet = async <T>(itemsKeys: Record<string, NativeAttributeValue>[], tableName: string, loggerBase: LoggerBase) => {
+  const stopwatch = new StopWatch("batchGet");
+  const logger = getLogger("batchGet", loggerBase);
+  const counter = 1;
+  const itemResponse: T[] = [];
+  try {
+    let itemsToGet: Record<string, NativeAttributeValue>[] = [...itemsKeys];
+
+    while (itemsToGet.length > 0) {
+      stopwatch.start("iteration-" + counter);
+      try {
+        const requestItems: Record<string, { Keys: Record<string, NativeAttributeValue>[] }> = {};
+        requestItems[tableName] = { Keys: [...itemsToGet] };
+        logger.debug("requesting [", itemsToGet.length, "] items, requestItems =", requestItems);
+
+        const output = await ddbClient.batchGet({ RequestItems: requestItems });
+        const items = (output.Responses && output.Responses[tableName]) || [];
+        logger.info("retrieved items, output =", output, ", size of list=", items.length);
+
+        itemsToGet = (output.UnprocessedKeys && output.UnprocessedKeys[tableName] && output.UnprocessedKeys[tableName].Keys) || [];
+        itemResponse.push(...(items as T[]));
+      } catch (err) {
+        logger.error("unable to complete batchget command.", err);
+
+        if (err instanceof ProvisionedThroughputExceededException) {
+          logger.info("re-attempting the batchget after 1 sec sleep");
+          await scheduler.wait(1000);
+          continue;
+        }
+
+        throw err;
+      }
+      stopwatch.stop();
+    }
+  } finally {
+    if (stopwatch.isRunning()) stopwatch.stop();
+    logger.info("stopwatch summary", stopwatch.shortSummary());
+  }
+  return itemResponse;
+};
 
 export const batchAddUpdate = async (items: Record<string, NativeAttributeValue>[], tableName: string, loggerBase: LoggerBase) => {
   const stopwatch = new StopWatch("batchAddUpdate");
@@ -75,7 +212,7 @@ const batchWriteWithRetry = async (batchWriteItemsInput: BatchWriteCommandInput,
   return results;
 };
 
-export async function queryAll<T>(baseLogger: LoggerBase, input: QueryCommandInput): Promise<T[]> {
+export const queryAll = async <T>(baseLogger: LoggerBase, input: QueryCommandInput): Promise<T[]> => {
   const stopwatch = new StopWatch("queryAll");
   const logger = getLogger("queryAll", baseLogger);
   const qsw = new StopWatch("queryloop");
@@ -121,7 +258,7 @@ export async function queryAll<T>(baseLogger: LoggerBase, input: QueryCommandInp
     qsw.prettyPrint();
     logger.info("stopwatch summary", stopwatch.shortSummary());
   }
-}
+};
 
 export type TransactionPutItem = Omit<Put, "Item" | "ExpressionAttributeValues"> & {
   Item: Record<string, NativeAttributeValue> | undefined;
@@ -156,8 +293,8 @@ export class TransactionWriter {
   /**
    * writeItems
    */
-  public writeItems(input: TransactWriteCommandInput, _logger?: LoggerBase) {
-    const logger = getLogger("writeItems", _logger || this.logger);
+  public writeItems(input: TransactWriteCommandInput, baseLogger?: LoggerBase) {
+    const logger = getLogger("writeItems", baseLogger || this.logger);
     const transactions = input.TransactItems as TransactionItem[];
     this.items.push(...transactions);
     logger.debug("scheduled writing transactions =", transactions);
@@ -168,8 +305,8 @@ export class TransactionWriter {
   /**
    * putItems
    */
-  public putItems(putItems: TransactionPutItem | TransactionPutItem[] | JSONObject | JSONObject[], tableName?: string, _logger?: LoggerBase) {
-    const logger = getLogger("putItems", _logger || this.logger);
+  public putItems(putItems: TransactionPutItem | TransactionPutItem[] | JSONObject | JSONObject[], tableName?: string, baseLogger?: LoggerBase) {
+    const logger = getLogger("putItems", baseLogger || this.logger);
     const itemsPut = Array.isArray(putItems) ? putItems : [putItems];
     itemsPut
       .map((it) => {
@@ -198,9 +335,28 @@ export class TransactionWriter {
   /**
    * deleteItems
    */
-  public deleteItems(deleteItems: TransactionDeleteItem | TransactionDeleteItem[], _logger?: LoggerBase) {
-    const logger = getLogger("deleteItems", _logger || this.logger);
-    const itemsDelete = Array.isArray(deleteItems) ? deleteItems : [deleteItems];
+  public deleteItems(
+    deleteItems: TransactionDeleteItem | TransactionDeleteItem[] | null,
+    partitionKeys?: string | string[] | null,
+    tableName?: string | null,
+    baseLogger?: LoggerBase
+  ) {
+    const logger = getLogger("deleteItems", baseLogger || this.logger);
+    let itemsDelete: TransactionDeleteItem[];
+    if (deleteItems) {
+      logger.debug("found deleteItems");
+      itemsDelete = Array.isArray(deleteItems) ? deleteItems : [deleteItems];
+    } else if (tableName && partitionKeys) {
+      logger.debug("found tableName =", tableName, ", partitionKeys =", partitionKeys);
+      const deletingPKs = Array.isArray(partitionKeys) ? partitionKeys : [partitionKeys];
+      itemsDelete = deletingPKs.map((pkv) => ({
+        Key: { PK: pkv },
+        TableName: tableName,
+      }));
+    } else {
+      logger.debug("none of partitionKeys and tableName Or deleteItems");
+      throw new MissingError("incorrect arguments. partitionKeys and tableName not provided. Or deleteItems not provided");
+    }
     itemsDelete.forEach((it) => {
       const item: TransactionItem = { Delete: it };
       logger.debug("scheduled deleting item =", item);
@@ -213,8 +369,8 @@ export class TransactionWriter {
   /**
    * updateItems
    */
-  public updateItems(updateItems: TransactionUpdateItem | TransactionUpdateItem[], _logger?: LoggerBase) {
-    const logger = getLogger("updateItems", _logger || this.logger);
+  public updateItems(updateItems: TransactionUpdateItem | TransactionUpdateItem[], baseLogger?: LoggerBase) {
+    const logger = getLogger("updateItems", baseLogger || this.logger);
     const itemsUpdate = Array.isArray(updateItems) ? updateItems : [updateItems];
     itemsUpdate.forEach((it) => {
       const item: TransactionItem = { Update: it };

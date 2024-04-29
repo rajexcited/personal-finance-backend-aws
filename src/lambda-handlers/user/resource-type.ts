@@ -1,11 +1,12 @@
 import { AuditDetailsType } from "../utils";
+import { AuthRole } from "../common";
 
-export interface DbUserDetailItem {
+export interface DbItemUser {
   PK: string;
   E_GSI_PK: string;
   details: DbUserDetails;
 }
-export interface DbUserTokenItem {
+export interface DbItemToken {
   PK: string;
   // ttl value in seconds
   ExpiresAt: number;
@@ -36,4 +37,9 @@ export interface ApiUserResource {
   password?: string;
   newPassword?: string;
   countryCode?: string;
+}
+
+export class AuthorizeUser {
+  userId: string;
+  role: AuthRole;
 }

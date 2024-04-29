@@ -1,8 +1,9 @@
 import { validate as uuidValidate, version as uuidVersion } from "uuid";
-import { parseTimestamp } from "./utils";
-import { getLogger } from "./logger";
+import { LoggerBase, getLogger } from "./logger";
+import { _logger } from "./base-config";
+import { parseTimestamp } from "./date-util";
 
-const _logger = getLogger("validations");
+const __logger = getLogger("validations", _logger);
 const DEFAULT_NAME_MAX_LENGTH = 25;
 const DEFAULT_NAME_MIN_LENGTH = 2;
 
@@ -23,7 +24,7 @@ const DEFAULT_COLOR_MIN_LENGTH = 4;
 
 export const DEFAULT_MAX_ALLOWED_TAGS = 10;
 
-export const isValidUuid = (id?: string) => {
+export const isValidUuid = (id: string | null | undefined) => {
   return id && uuidValidate(id) && uuidVersion(id) === 4;
 };
 
@@ -33,26 +34,23 @@ export const isValidUuid = (id?: string) => {
  * @param dateFormat if not provided default format pattern will be used to parsed date string
  * @returns true if valid date
  */
-export const isValidDate = (date?: Date | string | number | null, dateFormat?: string) => {
-  const logger = getLogger("isValidDate", _logger);
+export const isValidDate = (date: Date | string | number | null | undefined, _logger: LoggerBase, dateFormat?: string | null) => {
+  const logger = getLogger("isValidDate", __logger, _logger);
   let dupdate: Date;
   logger.info("param date =", date, ", param dateFormat =", dateFormat);
+  if (date instanceof Date && dateFormat) {
+    throw new Error("dateformat cannot be applied to given date instance");
+  }
+
   if (typeof date === "string") {
-    dupdate = parseTimestamp(date);
+    dupdate = parseTimestamp(date, dateFormat, logger);
   } else if (typeof date === "number") {
     dupdate = new Date(date);
   } else {
     dupdate = new Date(date || NaN);
   }
   const invalidDate = new Date(NaN);
-  logger.debug(
-    "dupdate =",
-    dupdate,
-    ", invalidDate =",
-    String(invalidDate),
-    ", (String(dupdate) === String(invalidDate)) ?",
-    String(dupdate) === String(invalidDate)
-  );
+  logger.debug("dupdate =", dupdate, ", isValid ?", String(dupdate) !== String(invalidDate));
   return date && String(dupdate) !== String(invalidDate);
 };
 

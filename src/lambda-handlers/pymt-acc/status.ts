@@ -10,8 +10,8 @@ import {
   getUserIdStatusShortnameGsiPk,
 } from "./base-config";
 import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils, validations } from "../utils";
-import { getValidatedUserId } from "../user";
-import { ApiPaymentAccountResource, DbPymtAccItem } from "./resource-type";
+import { getAuthorizeUser, getValidatedUserId } from "../user";
+import { ApiPaymentAccountResource, DbItemPymtAcc } from "./resource-type";
 
 export const deletePaymentAccount = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("deletePaymentAccount", _logger);
@@ -20,6 +20,7 @@ export const deletePaymentAccount = apiGatewayHandlerWrapper(async (event: APIGa
   const pymtAccId = getValidatedPymtAccId(event, logger);
 
   const details = await updateStatus(userId, pymtAccId, PymtAccStatus.DELETED);
+  const auditDetails = await utils.parseAuditDetails(details.auditDetails, userId, getAuthorizeUser(event));
   const apiResource: ApiPaymentAccountResource = {
     id: details.id,
     shortName: details.shortName,
@@ -28,7 +29,7 @@ export const deletePaymentAccount = apiGatewayHandlerWrapper(async (event: APIGa
     typeId: details.typeId,
     status: details.status,
     tags: details.tags,
-    auditDetails: await utils.parseAuditDetails(details.auditDetails, userId),
+    auditDetails: auditDetails,
     description: details.description,
   };
 
@@ -43,6 +44,7 @@ export const updatePaymentAccountStatus = apiGatewayHandlerWrapper(async (event:
   const pymtAccStatus = getValidatedPymtAccStatusFromPath(event, logger);
 
   const details = await updateStatus(userId, pymtAccId, pymtAccStatus);
+  const auditDetails = await utils.parseAuditDetails(details.auditDetails, userId, getAuthorizeUser(event));
   const apiResource: ApiPaymentAccountResource = {
     id: details.id,
     shortName: details.shortName,
@@ -51,7 +53,7 @@ export const updatePaymentAccountStatus = apiGatewayHandlerWrapper(async (event:
     typeId: details.typeId,
     status: details.status,
     tags: details.tags,
-    auditDetails: await utils.parseAuditDetails(details.auditDetails, userId),
+    auditDetails: auditDetails,
     description: details.description,
   };
 
@@ -62,13 +64,14 @@ export const updateStatus = async (userId: string, pymtAccId: string, status: Py
   const logger = getLogger("updateStatus", _logger);
 
   logger.info("request, pymtAccId =", pymtAccId, ", status =", status);
-  const getOutput = await dbutil.ddbClient.get({
+  const getCmdInput = {
     TableName: _pymtAccTableName,
     Key: { PK: getDetailsTablePk(pymtAccId) },
-  });
-  logger.info("retrieved db result output", getOutput);
+  };
+  const getOutput = await dbutil.getItem(getCmdInput, logger);
+  logger.info("retrieved db result output");
 
-  const dbItem = getOutput.Item as DbPymtAccItem;
+  const dbItem = getOutput.Item as DbItemPymtAcc;
   // validate user access to config details
   const gsiPkForReq = getUserIdStatusShortnameGsiPk(userId, dbItem.details.status);
   if (gsiPkForReq !== dbItem.UP_GSI_PK) {
@@ -77,7 +80,7 @@ export const updateStatus = async (userId: string, pymtAccId: string, status: Py
   }
 
   const auditDetails = utils.updateAuditDetails(dbItem.details.auditDetails, userId);
-  const updateDbItem: DbPymtAccItem = {
+  const updateDbItem: DbItemPymtAcc = {
     PK: getDetailsTablePk(pymtAccId),
     UP_GSI_PK: getUserIdStatusShortnameGsiPk(userId, status),
     UP_GSI_SK: dbItem.UP_GSI_SK,
@@ -88,12 +91,13 @@ export const updateStatus = async (userId: string, pymtAccId: string, status: Py
     },
   };
 
-  const updatedOutput = await dbutil.ddbClient.put({
+  const putCmdInput = {
     TableName: _pymtAccTableName,
     Item: updateDbItem,
-  });
+  };
+  const updatedOutput = await dbutil.putItem(putCmdInput, logger);
 
-  logger.info("updated status for payment account, output=", updatedOutput);
+  logger.info("updated status for payment account");
   return updateDbItem.details;
 };
 

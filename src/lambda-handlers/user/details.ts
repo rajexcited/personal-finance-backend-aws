@@ -1,7 +1,7 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { InvalidField, RequestBodyContentType, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
 import { utils, validations, AuditDetailsType, getLogger, LoggerBase, dbutil } from "../utils";
-import { DbUserDetails, ApiUserResource, DbUserDetailItem } from "./resource-type";
+import { DbUserDetails, ApiUserResource, DbItemUser } from "./resource-type";
 import { encrypt, verify } from "./pcrypt";
 import {
   ErrorMessage,
@@ -23,11 +23,12 @@ const userDetailsMemoryCache = caching("memory", {
 export const getDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("getDetails", _logger);
   const userId = getValidatedUserId(event);
-  const output = await dbutil.ddbClient.get({
+  const cmdInput = {
     TableName: _userTableName,
     Key: { PK: getDetailsTablePk(userId) },
-  });
-  logger.info("db result", output);
+  };
+  const output = await dbutil.getItem(cmdInput, logger);
+  logger.info("retrieved user item result");
   if (!output.Item) {
     throw new ValidationError([{ message: ErrorMessage.UNKNOWN_USER, path: UserResourcePath.USER }]);
   }
@@ -44,10 +45,11 @@ const updateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("updateDetails", _logger);
   const userId = getValidatedUserId(event);
   const req = getValidatedRequestForUpdateDetails(event, logger);
-  const output = await dbutil.ddbClient.get({
+  const getCmdInput = {
     TableName: _userTableName,
     Key: { PK: getDetailsTablePk(userId) },
-  });
+  };
+  const output = await dbutil.getItem(getCmdInput, logger);
   logger.info("getUserDetails", output);
   if (!output.Item) {
     throw new ValidationError([{ message: ErrorMessage.UNKNOWN_USER, path: UserResourcePath.USER }]);
@@ -81,16 +83,17 @@ const updateDetailsHandler = async (event: APIGatewayProxyEvent) => {
     };
   }
 
-  const dbItem: DbUserDetailItem = {
+  const dbItem: DbItemUser = {
     PK: getDetailsTablePk(userId),
     E_GSI_PK: getEmailGsiPk(dbDetails.emailId),
     details: apiToDbDetails,
   };
-  const updateResult = await dbutil.ddbClient.put({
+  const putCmdInput = {
     TableName: _userTableName,
     Item: dbItem,
-  });
-  logger.debug("updateResult", updateResult);
+  };
+  const updateResult = await dbutil.putItem(putCmdInput, logger);
+
   return null;
 };
 export const updateDetails = apiGatewayHandlerWrapper(updateDetailsHandler, RequestBodyContentType.JSON);
@@ -155,11 +158,12 @@ export const getUserDetailsById = async (userId: string) => {
     if (!userId || !validations.isValidUuid(userId)) {
       return null;
     }
-    const output = await dbutil.ddbClient.get({
+    const cmdInput = {
       TableName: _userTableName,
       Key: { PK: getDetailsTablePk(userId) },
-    });
-    logger.info("db result", output);
+    };
+    const output = await dbutil.getItem(cmdInput, logger);
+    logger.info("retrieved user item ");
     if (!output.Item) {
       return null;
     }

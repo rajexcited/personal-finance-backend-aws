@@ -13,11 +13,11 @@ import {
   getUserIdStatusShortnameGsiSk,
 } from "./base-config";
 import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils, validations } from "../utils";
-import { getValidatedUserId } from "../user";
-import { ApiPaymentAccountResource, DbPaymentAccountDetails, DbPymtAccItem } from "./resource-type";
+import { getAuthorizeUser, getValidatedUserId } from "../user";
+import { ApiPaymentAccountResource, DbPaymentAccountDetails, DbItemPymtAcc } from "./resource-type";
 import { v4 as uuidv4 } from "uuid";
 import { isValidAccountIdNum, isValidInstitutionName } from "./validate";
-import { isValidPaymentAccountId } from "../config-type/validate";
+import { isValidPaymentAccountTypeId } from "../config-type";
 
 export const addUpdateDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("addUpdateDetails", _logger);
@@ -29,14 +29,15 @@ export const addUpdateDetails = apiGatewayHandlerWrapper(async (event: APIGatewa
   let pymtAccId: string | null = null;
   let auditDetails: AuditDetailsType | null = null;
   if (req.id) {
-    const output = await dbutil.ddbClient.get({
+    const cmdInput = {
       TableName: _pymtAccTableName,
       Key: { PK: getDetailsTablePk(req.id) },
-    });
+    };
+    const output = await dbutil.getItem(cmdInput, logger);
 
-    logger.info("retrieved pymt account from DB", output);
+    logger.info("retrieved pymt account from DB");
     if (output.Item) {
-      const dbItem = output.Item as DbPymtAccItem;
+      const dbItem = output.Item as DbItemPymtAcc;
       // validate user access to config details
       const gsiPkForReq = getUserIdStatusShortnameGsiPk(userId, dbItem.details.status);
       if (gsiPkForReq !== dbItem.UP_GSI_PK) {
@@ -67,20 +68,21 @@ export const addUpdateDetails = apiGatewayHandlerWrapper(async (event: APIGatewa
     auditDetails: auditDetails as AuditDetailsType,
   };
 
-  const dbItem: DbPymtAccItem = {
+  const dbItem: DbItemPymtAcc = {
     PK: getDetailsTablePk(pymtAccId),
     UP_GSI_PK: getUserIdStatusShortnameGsiPk(userId, apiToDbDetails.status),
     UP_GSI_SK: getUserIdStatusShortnameGsiSk(apiToDbDetails.shortName),
     details: apiToDbDetails,
   };
 
-  const updateResult = await dbutil.ddbClient.put({
+  const cmdInput = {
     TableName: _pymtAccTableName,
     Item: dbItem,
-  });
-  logger.debug("updateResult", updateResult);
+  };
+  const updateResult = await dbutil.putItem(cmdInput, logger);
+  logger.debug("Result updated");
 
-  const apiAuditDetails = await utils.parseAuditDetails(apiToDbDetails.auditDetails, userId);
+  const apiAuditDetails = await utils.parseAuditDetails(apiToDbDetails.auditDetails, userId, getAuthorizeUser(event));
 
   const resource: ApiPaymentAccountResource = {
     ...req,
@@ -121,7 +123,8 @@ const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, 
   if (req.institutionName && !isValidInstitutionName(req.institutionName)) {
     invalidFields.push({ path: PymtAccResourcePath.INSTITUTION_NAME, message: ErrorMessage.INCORRECT_FORMAT });
   }
-  const isValidPymtAccId = await isValidPaymentAccountId(req.typeId, logger);
+  const userId = getValidatedUserId(event);
+  const isValidPymtAccId = await isValidPaymentAccountTypeId(req.typeId, userId, logger);
   if (!isValidPymtAccId) {
     invalidFields.push({ path: PymtAccResourcePath.TYPE_ID, message: ErrorMessage.INCORRECT_VALUE });
   }
