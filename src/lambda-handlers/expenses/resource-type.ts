@@ -1,5 +1,5 @@
 import { AuditDetailsType } from "../utils";
-import { ExpenseStatus, ReceiptType } from "./base-config";
+import { ExpenseStatus } from "./base-config";
 
 export interface DbItemExpense {
   PK: string;
@@ -34,13 +34,20 @@ export interface DbExpenseDetails extends DbExpenseDetailsBase {
   receipts: DbReceiptDetails[];
   status: ExpenseStatus;
   auditDetails: AuditDetailsType;
+  deletedTimestamp?: string;
 }
 
-//todo revisit this
+export enum ReceiptContentType {
+  PNG = "image/png",
+  JPG = "image/jpeg",
+  PDF = "application/pdf",
+}
+
 export interface DbReceiptDetails {
   id: string;
-  type: ReceiptType;
-  path: string;
+  contentType: ReceiptContentType;
+  name: string;
+  size: number;
 }
 
 export interface DbExpenseItemsDetails {
@@ -59,14 +66,22 @@ export interface ApiExpenseResourceBase {
   tags: string[];
 }
 
+export interface ApiReceiptResource {
+  name: string;
+  id?: string | null;
+  size?: number;
+  contentType: ReceiptContentType;
+}
+
 export interface ApiExpenseItemResource extends ApiExpenseResourceBase {}
 
 export interface ApiExpenseResource extends ApiExpenseResourceBase {
   purchasedDate: string;
   verifiedTimestamp?: string;
   paymentAccountId?: string;
-  receipts: DbReceiptDetails[];
+  receipts: ApiReceiptResource[];
   status?: ExpenseStatus;
   auditDetails?: AuditDetailsType;
   expenseItems?: ApiExpenseItemResource[];
+  deletedTimestamp?: string;
 }

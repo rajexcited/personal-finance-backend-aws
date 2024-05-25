@@ -80,7 +80,7 @@ export class ConfigTypeApiConstruct extends BaseApiConstruct {
 
     const lambdaIntegration = new apigateway.LambdaIntegration(lambdaFunction, {
       proxy: true,
-      passthroughBehavior: apigateway.PassthroughBehavior.WHEN_NO_TEMPLATES,
+      passthroughBehavior: apigateway.PassthroughBehavior.NEVER,
     });
 
     if (lambdaHandlerName.includes("configTypeDetailsAddUpdate")) {

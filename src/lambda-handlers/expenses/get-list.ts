@@ -14,22 +14,36 @@ import {
   getUserIdStatusDateGsiPk,
   getUserIdStatusDateGsiSk,
 } from "./base-config";
-import { getAuthorizeUser, getValidatedUserId } from "../user";
-import { ApiExpenseResource, DbItemExpense } from "./resource-type";
+import { getAuthorizeUser } from "../user";
+import { ApiExpenseResource, ApiReceiptResource, DbItemExpense } from "./resource-type";
 import * as datetime from "date-and-time";
 
 const MONTHS_PER_PAGE = 3;
+const MAX_PAGE_SIZE_COUNT = 50;
 
 export const getExpenseList = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("getExpenseList", _logger);
-  const userId = getValidatedUserId(event);
-  const pageNo = getValidatedPageNumber(event, logger);
+  const pageNoParam = getValidatedPageNumberPathParam(event, logger);
+  const statusParam = getValidatedStatusPathParam(event, logger);
+  const pageMonthsParam = getValidatedPageMonthsPathParam(event, statusParam, logger);
+  const pageCountParam = getValidatedPageCountPathParam(event, statusParam, logger);
+  const authUser = getAuthorizeUser(event);
 
-  const dbExpenses = await getListOfDetails(userId, ExpenseStatus.ENABLE, pageNo, logger);
+  const dbExpenses = await getListOfDetails(authUser.userId, statusParam, pageNoParam, pageMonthsParam, pageCountParam, logger);
   const resourcePromises = dbExpenses.map(async (details) => {
-    const auditDetails = await utils.parseAuditDetails(details.auditDetails, userId, getAuthorizeUser(event));
+    const auditDetails = await utils.parseAuditDetails(details.auditDetails, authUser.userId, authUser);
 
-    logger.debug("userId", userId, "auditDetails", auditDetails);
+    logger.debug("auditDetails", auditDetails);
+
+    const apiReceipts = details.receipts.map((dbReceipt) => {
+      const apiReceipt: ApiReceiptResource = {
+        id: dbReceipt.id,
+        name: dbReceipt.name,
+        contentType: dbReceipt.contentType,
+        size: dbReceipt.size,
+      };
+      return apiReceipt;
+    });
 
     const resource: ApiExpenseResource = {
       id: details.id,
@@ -39,11 +53,12 @@ export const getExpenseList = apiGatewayHandlerWrapper(async (event: APIGatewayP
       purchasedDate: details.purchasedDate,
       verifiedTimestamp: details.verifiedTimestamp,
       paymentAccountId: details.paymentAccountId,
-      receipts: details.receipts,
+      receipts: apiReceipts,
       status: details.status,
       description: details.description,
       tags: details.tags,
       auditDetails: auditDetails,
+      deletedTimestamp: details.deletedTimestamp,
     };
     return resource;
   });
@@ -53,15 +68,29 @@ export const getExpenseList = apiGatewayHandlerWrapper(async (event: APIGatewayP
   return resources as unknown as JSONArray;
 });
 
-const getListOfDetails = async (userId: string, status: ExpenseStatus, pageNo: number, _logger: LoggerBase) => {
+const getListOfDetails = async (
+  userId: string,
+  status: ExpenseStatus,
+  pageNo: number,
+  pageMonths: number | null,
+  pageCount: number | null,
+  _logger: LoggerBase
+) => {
   const logger = getLogger("getListOfDetails", _logger);
-  const expenseIds = await getListOfExpenseIds(userId, status, pageNo, logger);
+  const expenseIds = await getListOfExpenseIds(userId, status, pageNo, pageMonths, pageCount, logger);
   const itemKeys = [...expenseIds].map((id) => ({ PK: getDetailsTablePk(id) }));
   const items = await dbutil.batchGet<DbItemExpense>(itemKeys, _expenseTableName, logger);
   return items.map((item) => item.details);
 };
 
-const getListOfExpenseIds = async (userId: string, status: ExpenseStatus, pageNo: number, _logger: LoggerBase) => {
+const getListOfExpenseIds = async (
+  userId: string,
+  status: ExpenseStatus,
+  pageNo: number,
+  pageMonths: number | null,
+  pageCount: number | null,
+  _logger: LoggerBase
+) => {
   const logger = getLogger("getListOfExpenseIds", _logger);
 
   /**
@@ -81,27 +110,49 @@ const getListOfExpenseIds = async (userId: string, status: ExpenseStatus, pageNo
    *      so date range is
    *
    */
+  let expenseItems: DbItemExpense[] = [];
+  if (pageMonths && status === ExpenseStatus.ENABLE) {
+    expenseItems = await getListByPageMonths(userId, status, pageNo, pageMonths, logger);
+  }
+  if (pageCount && status === ExpenseStatus.DELETED) {
+    expenseItems = await getListByPageCount(userId, status, pageNo, pageCount, logger);
+  }
+
+  const expenseIds = new Set<string>();
+  expenseItems
+    .filter((item) => typeof item.ExpiresAt !== "number")
+    .forEach((item) => {
+      expenseIds.add(getExpenseIdFromTablePk(item.PK));
+    });
+
+  return expenseIds;
+};
+
+const getListByPageMonths = async (userId: string, status: ExpenseStatus, pageNo: number, pageMonths: number, _logger: LoggerBase) => {
+  const logger = getLogger("getListByPageMonths", _logger);
+
   const now = new Date();
-  const searchEndDate = getEndDateAfterMonths(now, (1 - pageNo) * MONTHS_PER_PAGE, logger);
-  const searchStartDate = getStartDateBeforeMonths(now, -1 * pageNo * MONTHS_PER_PAGE, logger);
+  const searchEndDate = getEndDateAfterMonths(now, (1 - pageNo) * pageMonths, logger);
+  const searchStartDate = getStartDateBeforeMonths(now, -1 * pageNo * pageMonths, logger);
 
   const itemsByUpdatedOn = await dbutil.queryAll<DbItemExpense>(logger, {
     TableName: _expenseTableName,
     IndexName: _userIdStatusDateIndex,
     KeyConditionExpression: "UD_GSI_PK = :gpkv and UD_GSI_SK BETWEEN :gskv1 and :gskv2",
     ExpressionAttributeValues: {
-      ":gpkv": getUserIdStatusDateGsiPk(userId, status, false),
+      ":gpkv": getUserIdStatusDateGsiPk(userId, status),
       ":gskv1": getUserIdStatusDateGsiSk(searchStartDate, logger),
       ":gskv2": getUserIdStatusDateGsiSk(searchEndDate, logger),
     },
   });
+
   const itemsByPurchaseDate = await dbutil.queryAll<DbItemExpense>(logger, {
     TableName: _expenseTableName,
     IndexName: _userIdStatusDateIndex,
     KeyConditionExpression: "UD_GSI_PK = :gpkv and UD_GSI_SK >= :gskv",
     FilterExpression: "UD_GSI_ATTR1 BETWEEN :gatt1v1 and :gatt1v2",
     ExpressionAttributeValues: {
-      ":gpkv": getUserIdStatusDateGsiPk(userId, status, false),
+      ":gpkv": getUserIdStatusDateGsiPk(userId, status),
       ":gskv": getUserIdStatusDateGsiSk(searchStartDate, logger),
       ":gatt1v1": getUserIdStatusDateGsiAttribute1(searchStartDate, logger),
       ":gatt1v2": getUserIdStatusDateGsiAttribute1(searchEndDate, logger),
@@ -109,17 +160,34 @@ const getListOfExpenseIds = async (userId: string, status: ExpenseStatus, pageNo
   });
 
   const itemsofItems = await Promise.all([itemsByUpdatedOn, itemsByPurchaseDate]);
+  const items = itemsofItems.flatMap((it) => it);
 
-  const expenseIds = new Set<string>();
-  itemsofItems
-    .flatMap((it) => it)
-    .filter((item) => typeof item.ExpiresAt !== "number")
-    .forEach((item) => {
-      expenseIds.add(getExpenseIdFromTablePk(item.PK));
-    });
+  logger.info("retrieved", items.length, "items of status [", status, "] for date range from [", searchStartDate, "] to [" + searchEndDate + "]");
+  return items;
+};
 
-  logger.info("retrieved", expenseIds.size, "items for date range from [", searchStartDate, "] to [" + searchEndDate + "]");
-  return expenseIds;
+const getListByPageCount = async (userId: string, status: ExpenseStatus, pageNo: number, pageCount: number, _logger: LoggerBase) => {
+  const logger = getLogger("getListByPageMonths", _logger);
+
+  const startNum = (pageNo - 1) * pageCount;
+  const endNum = pageNo * pageCount;
+  const now = new Date();
+  const searchStartDate = getStartDateBeforeMonths(now, -12, logger);
+
+  const itemsByUpdatedOn = await dbutil.queryAll<DbItemExpense>(logger, {
+    TableName: _expenseTableName,
+    IndexName: _userIdStatusDateIndex,
+    KeyConditionExpression: "UD_GSI_PK = :gpkv and UD_GSI_SK > :gskv",
+    ExpressionAttributeValues: {
+      ":gpkv": getUserIdStatusDateGsiPk(userId, status),
+      ":gskv": getUserIdStatusDateGsiSk(searchStartDate, logger),
+    },
+  });
+
+  const items = await Promise.all(itemsByUpdatedOn);
+
+  logger.info("retrieved", items.length, "items of status [", status, "] with startDate [", searchStartDate, "]");
+  return items.slice(startNum, endNum);
 };
 
 const getStartDateBeforeMonths = (date: Date, months: number, logger?: LoggerBase) => {
@@ -158,7 +226,7 @@ const sortCompareFn = (item1: ApiExpenseResource, item2: ApiExpenseResource) => 
   return 0;
 };
 
-const getValidatedPageNumber = (event: APIGatewayProxyEvent, _logger: LoggerBase) => {
+const getValidatedPageNumberPathParam = (event: APIGatewayProxyEvent, _logger: LoggerBase) => {
   const logger = getLogger("getValidatedPageNumber", _logger);
   const pageNo = event.queryStringParameters?.pageNo;
   logger.info("query parameter, pageNo =", pageNo);
@@ -167,5 +235,74 @@ const getValidatedPageNumber = (event: APIGatewayProxyEvent, _logger: LoggerBase
     throw new ValidationError([{ path: ExpenseResourcePath.PAGE_NO, message: ErrorMessage.MISSING_VALUE }]);
   }
 
+  if (isNaN(Number(pageNo))) {
+    throw new ValidationError([{ path: ExpenseResourcePath.PAGE_NO, message: ErrorMessage.INCORRECT_VALUE }]);
+  }
+
   return Number(pageNo);
+};
+
+const getValidatedStatusPathParam = (event: APIGatewayProxyEvent, _logger: LoggerBase) => {
+  const logger = getLogger("getValidatedStatus", _logger);
+  const status = event.queryStringParameters?.status;
+  logger.info("query parameter, status =", status);
+
+  if (status && status !== ExpenseStatus.DELETED && status !== ExpenseStatus.ENABLE) {
+    throw new ValidationError([{ path: ExpenseResourcePath.STATUS, message: ErrorMessage.INCORRECT_VALUE }]);
+  }
+
+  if (!status) {
+    return ExpenseStatus.ENABLE;
+  }
+  return status as ExpenseStatus;
+};
+
+const getValidatedPageMonthsPathParam = (event: APIGatewayProxyEvent, status: ExpenseStatus, _logger: LoggerBase) => {
+  const logger = getLogger("getValidatedPageMonths", _logger);
+  const pageMonths = event.queryStringParameters?.pageMonths;
+  const pageCount = event.queryStringParameters?.pageCount;
+  logger.info("query parameter, pageMonths =", pageMonths, ", pageCount =", pageCount);
+
+  if (pageMonths && pageCount && !isNaN(Number(pageMonths)) && !isNaN(Number(pageCount))) {
+    throw new ValidationError([
+      { path: ExpenseResourcePath.PAGE_MONTHS, message: ErrorMessage.CANNOT_COMBINE_PAGE_COUNT_MONTHS },
+      { path: ExpenseResourcePath.PAGE_COUNT, message: ErrorMessage.CANNOT_COMBINE_PAGE_COUNT_MONTHS },
+    ]);
+  }
+  const pageMonthsNum = Number(pageMonths);
+  if (pageMonths && isNaN(pageMonthsNum)) {
+    throw new ValidationError([{ path: ExpenseResourcePath.PAGE_MONTHS, message: ErrorMessage.INCORRECT_VALUE }]);
+  }
+  if (!pageMonths && !pageCount && status === ExpenseStatus.ENABLE) {
+    return MONTHS_PER_PAGE;
+  }
+  if (!pageMonths && (pageCount || status === ExpenseStatus.DELETED)) {
+    return null;
+  }
+  return pageMonthsNum;
+};
+
+const getValidatedPageCountPathParam = (event: APIGatewayProxyEvent, status: ExpenseStatus, _logger: LoggerBase) => {
+  const logger = getLogger("getValidatedPageCount", _logger);
+  const pageMonths = event.queryStringParameters?.pageMonths;
+  const pageCount = event.queryStringParameters?.pageCount;
+  logger.info("query parameter, pageMonths =", pageMonths, ", pageCount =", pageCount);
+
+  if (pageMonths && pageCount && !isNaN(Number(pageMonths)) && !isNaN(Number(pageCount))) {
+    throw new ValidationError([
+      { path: ExpenseResourcePath.PAGE_MONTHS, message: ErrorMessage.CANNOT_COMBINE_PAGE_COUNT_MONTHS },
+      { path: ExpenseResourcePath.PAGE_COUNT, message: ErrorMessage.CANNOT_COMBINE_PAGE_COUNT_MONTHS },
+    ]);
+  }
+  const pageCountNum = Number(pageCount);
+  if (pageCount && isNaN(pageCountNum)) {
+    throw new ValidationError([{ path: ExpenseResourcePath.PAGE_COUNT, message: ErrorMessage.INCORRECT_VALUE }]);
+  }
+  if (!pageCount) {
+    return status === ExpenseStatus.DELETED ? MAX_PAGE_SIZE_COUNT : null;
+  }
+  if (pageCountNum > MAX_PAGE_SIZE_COUNT) {
+    throw new ValidationError([{ path: ExpenseResourcePath.PAGE_COUNT, message: ErrorMessage.LIMIT_EXCEEDED }]);
+  }
+  return pageCountNum;
 };

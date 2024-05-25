@@ -1,5 +1,13 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
-import { InvalidField, JSONObject, UnAuthorizedError, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
+import {
+  InvalidField,
+  JSONObject,
+  RequestBodyContentType,
+  UnAuthorizedError,
+  ValidationError,
+  apiGatewayHandlerWrapper,
+  convertToCreatedResponse,
+} from "../apigateway";
 import {
   ErrorMessage,
   NAME_MIN_LENGTH,
@@ -19,15 +27,14 @@ import { v4 as uuidv4 } from "uuid";
 import { isValidAccountIdNum, isValidInstitutionName } from "./validate";
 import { isValidPaymentAccountTypeId } from "../config-type";
 
-export const addUpdateDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
+const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("addUpdateDetails", _logger);
 
   const req = await getValidatedRequestForUpdateDetails(event, logger);
   const userId = getValidatedUserId(event);
   // find db record if any.
   // perform the add or update
-  let pymtAccId: string | null = null;
-  let auditDetails: AuditDetailsType | null = null;
+  let existingDbItem: DbItemPymtAcc | null = null;
   if (req.id) {
     const cmdInput = {
       TableName: _pymtAccTableName,
@@ -37,24 +44,18 @@ export const addUpdateDetails = apiGatewayHandlerWrapper(async (event: APIGatewa
 
     logger.info("retrieved pymt account from DB");
     if (output.Item) {
-      const dbItem = output.Item as DbItemPymtAcc;
+      existingDbItem = output.Item as DbItemPymtAcc;
       // validate user access to config details
-      const gsiPkForReq = getUserIdStatusShortnameGsiPk(userId, dbItem.details.status);
-      if (gsiPkForReq !== dbItem.UP_GSI_PK) {
+      const gsiPkForReq = getUserIdStatusShortnameGsiPk(userId, existingDbItem.details.status);
+      if (gsiPkForReq !== existingDbItem.UP_GSI_PK) {
         // not same user
         throw new UnAuthorizedError("not authorized to update payment type details");
       }
-
-      auditDetails = utils.updateAuditDetails(dbItem.details.auditDetails, userId);
-      pymtAccId = dbItem.details.id;
     }
   }
-  if (!pymtAccId) {
-    pymtAccId = uuidv4();
-  }
-  if (!auditDetails) {
-    auditDetails = utils.updateAuditDetails(null, userId);
-  }
+
+  const pymtAccId = existingDbItem?.details.id || uuidv4();
+  const auditDetails = utils.updateAuditDetails(existingDbItem?.details.auditDetails, userId);
 
   const apiToDbDetails: DbPaymentAccountDetails = {
     id: pymtAccId,
@@ -90,8 +91,13 @@ export const addUpdateDetails = apiGatewayHandlerWrapper(async (event: APIGatewa
     auditDetails: apiAuditDetails,
   };
 
-  return resource as unknown as JSONObject;
-});
+  const result = resource as unknown as JSONObject;
+  if (!existingDbItem) {
+    return convertToCreatedResponse(result);
+  }
+  return result;
+};
+export const addUpdateDetails = apiGatewayHandlerWrapper(addUpdateDetailsHandler, RequestBodyContentType.JSON);
 
 const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, loggerBase: LoggerBase) => {
   const logger = getLogger("validateRequest", loggerBase);

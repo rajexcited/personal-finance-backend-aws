@@ -5,6 +5,7 @@ import { ConstructProps } from "./common";
 import { ApiConstruct } from "./api-gateway";
 import { ContextInfo } from "./context-type";
 import { ConfigS3Construct } from "./config-s3";
+import { ReceiptS3Construct } from "./receipts-s3";
 
 /*
  * https://awscli.amazonaws.com/v2/documentation/api/latest/reference/kms/list-aliases.html#examples
@@ -23,11 +24,13 @@ export class AppStack extends Stack {
 
     const allDbs = new DBConstruct(this, "DatabaseConstruct", { ...props });
     const configS3 = new ConfigS3Construct(this, "ConfigS3Construct", { ...props });
+    const receiptS3 = new ReceiptS3Construct(this, "ReceiptS3Construct", { ...props });
     const allApis = new ApiConstruct(this, "RestApiConstruct", {
       ...props,
       allDb: allDbs,
       contextInfo: contextInfo,
       configBucket: configS3.configBucket,
+      receiptS3: receiptS3,
     });
 
     // upload image, textextract to invoice details, retireve image

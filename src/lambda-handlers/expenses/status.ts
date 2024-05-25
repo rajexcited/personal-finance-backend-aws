@@ -1,5 +1,5 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
-import { JSONObject, UnAuthorizedError, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
+import { InvalidError, JSONObject, NotFoundError, UnAuthorizedError, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
 import {
   ErrorMessage,
   ExpenseResourcePath,
@@ -12,9 +12,14 @@ import {
   getUserIdStatusDateGsiSk,
   getValidatedExpenseIdFromPathParam,
 } from "./base-config";
-import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils } from "../utils";
+import { AuditDetailsType, LoggerBase, dateutil, dbutil, getLogger, s3utils, utils } from "../utils";
 import { getAuthorizeUser } from "../user";
-import { ApiExpenseItemResource, ApiExpenseResource, DbItemExpense, DbItemExpenseItem } from "./resource-type";
+import { ApiExpenseItemResource, ApiExpenseResource, ApiReceiptResource, DbItemExpense, DbItemExpenseItem } from "./resource-type";
+import * as datetime from "date-and-time";
+import { ReceiptActions, updateReceiptsIns3 } from "./receipt-details";
+import { UpdateCommandInput } from "@aws-sdk/lib-dynamodb";
+
+const DELETE_EXPENSE_EXPIRES_IN_SEC = Number(process.env.DELETE_EXPENSE_EXPIRES_IN_SEC);
 
 export const deleteExpense = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("deleteExpense", _logger);
@@ -23,31 +28,68 @@ export const deleteExpense = apiGatewayHandlerWrapper(async (event: APIGatewayPr
   const expenseId = getValidatedExpenseIdFromPathParam(event, logger);
 
   const dbItem = await getValidatedExpenseFromDb(authUser.userId, expenseId, ExpenseStatus.ENABLE, logger);
-  // allowing 10 seconds to revert back delete action
-  const deleteGracefulTimeInSec = 10;
-  const xpnsCmdInput = {
-    TableName: _expenseTableName,
-    Key: { PK: getDetailsTablePk(dbItem.details.id) },
-    UpdateExpression: "set ExpiresAt = :eav , UD_GSI_PK = :gpkv , UD_GSI_SK = :gskv",
-    ExpressionAttributeValues: {
-      ":eav": deleteGracefulTimeInSec,
-      ":gpkv": getUserIdStatusDateGsiPk(authUser.userId, ExpenseStatus.DELETED, false),
-      ":gskv": getUserIdStatusDateGsiSk(new Date(), logger),
-    },
-  };
-  const updateAttrXpnsOutputPromise = dbutil.updateAttribute(xpnsCmdInput, logger);
-  const xpnsItemCmdInput = {
-    TableName: _expenseTableName,
-    Key: { PK: getItemsTablePk(dbItem.details.id) },
-    UpdateExpression: "set ExpiresAt = :eav",
-    ExpressionAttributeValues: {
-      ":eav": deleteGracefulTimeInSec,
-    },
-  };
-  const updateAttrXpnsItmOutputPromise = dbutil.updateAttribute(xpnsItemCmdInput, logger);
+  if (!dbItem.details.deletedTimestamp) {
+    if (isNaN(DELETE_EXPENSE_EXPIRES_IN_SEC)) {
+      throw new InvalidError("value of DELETE_EXPENSE_EXPIRES_IN_SEC is not a number. configured value is " + DELETE_EXPENSE_EXPIRES_IN_SEC);
+    }
+    const deleteGracefulTimeInSec = Math.ceil(datetime.addSeconds(new Date(), DELETE_EXPENSE_EXPIRES_IN_SEC + 1).getTime() / 1000);
+    const xpnsCmdInput: UpdateCommandInput = {
+      TableName: _expenseTableName,
+      Key: { PK: getDetailsTablePk(dbItem.details.id) },
+      UpdateExpression: "set #eak = :eav , #gpkk = :gpkv , #gskk = :gskv , #dtl.#deltmpstmpk = :dtv, #dtl.#stk = :stv",
+      ExpressionAttributeValues: {
+        ":eav": deleteGracefulTimeInSec,
+        ":gpkv": getUserIdStatusDateGsiPk(authUser.userId, ExpenseStatus.DELETED),
+        ":gskv": getUserIdStatusDateGsiSk(new Date(), logger),
+        ":dtv": dateutil.formatTimestamp(new Date()),
+        ":stv": ExpenseStatus.DELETED,
+      },
+      ExpressionAttributeNames: {
+        "#eak": "ExpiresAt",
+        "#gpkk": "UD_GSI_PK",
+        "#gskk": "UD_GSI_SK",
+        "#dtl": "details",
+        "#deltmpstmpk": "deletedTimestamp",
+        "#stk": "status",
+      },
+    };
+    const updateAttrXpnsOutput = await dbutil.updateAttribute(xpnsCmdInput, logger);
+    if (updateAttrXpnsOutput.Attributes === undefined) {
+      logger.info("Expense is already deleted. this request cannot be fulfilled.");
+      throw new NotFoundError("already deleted");
+    }
 
-  await Promise.all([updateAttrXpnsOutputPromise, updateAttrXpnsItmOutputPromise]);
+    const xpnsItemCmdInput = {
+      TableName: _expenseTableName,
+      Key: { PK: getItemsTablePk(dbItem.details.id) },
+      UpdateExpression: "set ExpiresAt = :eav",
+      ExpressionAttributeValues: {
+        ":eav": deleteGracefulTimeInSec,
+      },
+      ConditionExpression: "attribute_exists(details)",
+    };
+    const updateAttrXpnsItmOutputPromise = dbutil.updateAttribute(xpnsItemCmdInput, logger);
+
+    const deleteReceiptAction: ReceiptActions = {
+      dbReceiptsToRemove: [...dbItem.details.receipts],
+      dbReceiptsWithNoChange: [],
+      requestReceiptsToAdd: [],
+      dbReceiptsToReverseRemove: [],
+    };
+    const deleteReceiptPromise = updateReceiptsIns3(deleteReceiptAction, null, expenseId, authUser.userId, logger);
+    await Promise.all([updateAttrXpnsItmOutputPromise, deleteReceiptPromise]);
+  }
   const auditDetails = await utils.parseAuditDetails(dbItem.details.auditDetails, authUser.userId, authUser);
+
+  const apiReceipts = dbItem.details.receipts.map((dbReceipt) => {
+    const apiReceipt: ApiReceiptResource = {
+      id: dbReceipt.id,
+      name: dbReceipt.name,
+      contentType: dbReceipt.contentType,
+      size: dbReceipt.size,
+    };
+    return apiReceipt;
+  });
 
   const resource: ApiExpenseResource = {
     id: dbItem.details.id,
@@ -57,7 +99,7 @@ export const deleteExpense = apiGatewayHandlerWrapper(async (event: APIGatewayPr
     purchasedDate: dbItem.details.purchasedDate,
     verifiedTimestamp: dbItem.details.verifiedTimestamp,
     paymentAccountId: dbItem.details.paymentAccountId,
-    receipts: dbItem.details.receipts,
+    receipts: apiReceipts,
     status: ExpenseStatus.DELETED,
     description: dbItem.details.description,
     tags: dbItem.details.tags,
@@ -83,18 +125,27 @@ export const updateExpenseStatus = apiGatewayHandlerWrapper(async (event: APIGat
   };
   const getOutputItemsPromise = dbutil.getItem(cmdInput, logger);
   const xpns = await xpnsPromise;
-  if (typeof xpns.ExpiresAt !== "number") {
+  if (xpns.details.status === ExpenseStatus.ENABLE) {
     throw new ValidationError([{ path: ExpenseResourcePath.REQUEST, message: ErrorMessage.INCORRECT_VALUE }]);
   }
 
   const dbAuditDetails = utils.updateAuditDetails(xpns.details.auditDetails, authUser.userId) as AuditDetailsType;
   const xpns2: DbItemExpense = {
     PK: xpns.PK,
-    UD_GSI_PK: getUserIdStatusDateGsiPk(authUser.userId, status, false),
+    UD_GSI_PK: getUserIdStatusDateGsiPk(authUser.userId, status),
     UD_GSI_SK: getUserIdStatusDateGsiSk(dbAuditDetails.updatedOn, logger) as string,
     UD_GSI_ATTR1: xpns.UD_GSI_ATTR1,
     details: {
-      ...xpns.details,
+      id: xpns.details.id,
+      billName: xpns.details.billName,
+      purchasedDate: xpns.details.purchasedDate,
+      receipts: xpns.details.receipts,
+      amount: xpns.details.amount,
+      description: xpns.details.description,
+      tags: xpns.details.tags,
+      expenseCategoryId: xpns.details.expenseCategoryId,
+      paymentAccountId: xpns.details.paymentAccountId,
+      verifiedTimestamp: xpns.details.verifiedTimestamp,
       status: status,
       auditDetails: dbAuditDetails,
     },
@@ -115,7 +166,16 @@ export const updateExpenseStatus = apiGatewayHandlerWrapper(async (event: APIGat
     };
     transactWriter.putItems(xpnsItems2 as unknown as JSONObject, _expenseTableName, logger);
   }
-  await transactWriter.executeTransaction();
+  const transactPromise = transactWriter.executeTransaction();
+
+  const undeleteReceiptAction: ReceiptActions = {
+    dbReceiptsToRemove: [],
+    dbReceiptsToReverseRemove: [...xpns2.details.receipts],
+    dbReceiptsWithNoChange: [],
+    requestReceiptsToAdd: [],
+  };
+  const undeletePromise = updateReceiptsIns3(undeleteReceiptAction, null, expenseId, authUser.userId, logger);
+  await Promise.all([transactPromise, undeletePromise]);
 
   const auditDetails = await utils.parseAuditDetails(xpns2.details.auditDetails, authUser.userId, authUser);
 
@@ -132,6 +192,16 @@ export const updateExpenseStatus = apiGatewayHandlerWrapper(async (event: APIGat
     return resource;
   });
 
+  const apiReceipts = xpns2.details.receipts.map((dbReceipt) => {
+    const apiReceipt: ApiReceiptResource = {
+      id: dbReceipt.id,
+      name: dbReceipt.name,
+      contentType: dbReceipt.contentType,
+      size: dbReceipt.size,
+    };
+    return apiReceipt;
+  });
+
   const resource: ApiExpenseResource = {
     id: xpns2.details.id,
     billName: xpns2.details.billName,
@@ -140,7 +210,7 @@ export const updateExpenseStatus = apiGatewayHandlerWrapper(async (event: APIGat
     purchasedDate: xpns2.details.purchasedDate,
     verifiedTimestamp: xpns2.details.verifiedTimestamp,
     paymentAccountId: xpns2.details.paymentAccountId,
-    receipts: xpns2.details.receipts,
+    receipts: apiReceipts,
     status: xpns2.details.status,
     description: xpns2.details.description,
     tags: xpns2.details.tags,
@@ -160,10 +230,13 @@ export const getValidatedExpenseFromDb = async (userId: string, expenseId: strin
   };
   const getOutput = await dbutil.getItem(cmdInput, logger);
   logger.info("retrieved db result output");
+  if (!getOutput.Item) {
+    throw new NotFoundError("expense doesn't exist");
+  }
 
   const dbItem = getOutput.Item as DbItemExpense;
   // validate user access
-  const gsiPkForReq = getUserIdStatusDateGsiPk(userId, dbItem.details.status, false);
+  const gsiPkForReq = getUserIdStatusDateGsiPk(userId, dbItem.details.status);
   if (gsiPkForReq !== dbItem.UD_GSI_PK) {
     // not same user
     throw new UnAuthorizedError("not authorized to update status of expense");

@@ -153,7 +153,7 @@ const getValidatedRequestForUpdateDetails = (event: APIGatewayProxyEvent, logger
 
 export const getUserDetailsById = async (userId: string) => {
   const userDetailCache = await userDetailsMemoryCache;
-  const details = userDetailCache.wrap(userId, async () => {
+  const detailsPromise = userDetailCache.wrap(userId, async () => {
     const logger = getLogger("getUserDetailsById", _logger);
     if (!userId || !validations.isValidUuid(userId)) {
       return null;
@@ -176,5 +176,5 @@ export const getUserDetailsById = async (userId: string) => {
       status: dbDetails.status,
     } as DbUserDetails;
   });
-  return await details;
+  return await detailsPromise;
 };

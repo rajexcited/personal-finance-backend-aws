@@ -1,5 +1,6 @@
 import { MethodType } from "../apigateway";
 import { AuthRole } from "../common";
+import { v4 as uuidv4 } from "uuid";
 
 interface RoleAuthorizeConfigType {
   apiPath: string;
@@ -143,12 +144,12 @@ const ExpenseUriAuthConfigList: RoleAuthorizeConfigType[] = [
     role: [AuthRole.ADMIN, AuthRole.PRIMARY],
   },
   {
-    apiPath: "/expenses/id/*",
+    apiPath: "/expenses/deleted",
     method: MethodType.GET,
     role: [AuthRole.ADMIN, AuthRole.PRIMARY],
   },
   {
-    apiPath: "/expenses/id/*/receipts/id/*",
+    apiPath: "/expenses/id/*",
     method: MethodType.GET,
     role: [AuthRole.ADMIN, AuthRole.PRIMARY],
   },
@@ -158,23 +159,23 @@ const ExpenseUriAuthConfigList: RoleAuthorizeConfigType[] = [
     role: [AuthRole.ADMIN, AuthRole.PRIMARY],
   },
   {
-    apiPath: "/expenses/receipts",
-    method: MethodType.POST,
-    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
-  },
-  {
     apiPath: "/expenses/id/*",
-    method: MethodType.DELETE,
-    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
-  },
-  {
-    apiPath: "/expenses/id/*/receipts/id/*",
     method: MethodType.DELETE,
     role: [AuthRole.ADMIN, AuthRole.PRIMARY],
   },
   {
     apiPath: "/expenses/id/*/status/enable",
     method: MethodType.POST,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
+    apiPath: "/expenses/id/*/receipts/id/*",
+    method: MethodType.POST,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
+    apiPath: "/expenses/id/*/receipts/id/*",
+    method: MethodType.GET,
     role: [AuthRole.ADMIN, AuthRole.PRIMARY],
   },
 ];

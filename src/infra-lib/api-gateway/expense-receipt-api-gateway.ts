@@ -2,19 +2,13 @@ import { Construct } from "constructs";
 import { RestApiProps } from "./construct-type";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import { HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
-import * as lambda from "aws-cdk-lib/aws-lambda";
-import * as logs from "aws-cdk-lib/aws-logs";
-import { DbProps } from "../db";
-import { Duration } from "aws-cdk-lib";
-import { EnvironmentName } from "../common";
 import { BaseApiConstruct } from "./base-api";
+import { IBucket } from "aws-cdk-lib/aws-s3";
+import * as iam from "aws-cdk-lib/aws-iam";
+import { RECEIPT_KEY_PREFIX, RECEIPT_TEMP_KEY_PREFIX } from "../../lambda-handlers";
 
 interface ExpenseReceiptsApiProps extends RestApiProps {
-  userTable: DbProps;
-  configTypeTable: DbProps;
-  pymtAccTable: DbProps;
-  expenseTable: DbProps;
-  expensesResource: apigateway.Resource;
+  receiptBucket: IBucket;
   expenseIdResource: apigateway.Resource;
 }
 
@@ -26,55 +20,104 @@ export class ExpenseReceiptsApiConstruct extends BaseApiConstruct {
 
     this.props = props;
 
-    const receiptsResource = this.props.expenseIdResource.addResource("receipts");
-    const receiptIdResource = receiptsResource.addResource("id").addResource("{receiptId}");
-
-    //todo streaming proxy
-    const addUpdateDetailsLambdaFunction = this.buildApi(receiptsResource, HttpMethod.POST, "index.receiptAdd");
-    const getDetailsLambdaFunction = this.buildApi(receiptIdResource, HttpMethod.GET, "index.receiptGetDetails");
-    const deleteDetailsLambdaFunction = this.buildApi(receiptIdResource, HttpMethod.DELETE, "index.receiptDeleteDetails");
+    const receiptIdResource = this.props.expenseIdResource.addResource("receipts").addResource("id").addResource("{receiptId}");
+    this.uploadReceiptApi(receiptIdResource);
+    this.downloadReceiptApi(receiptIdResource);
   }
 
-  private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: string) {
-    const lambdaFunction = new lambda.Function(this, `${method}${lambdaHandlerName.replace("index.", "")}Lambda`, {
-      functionName: [
-        this.props.resourcePrefix,
-        this.props.environment,
-        ...lambdaHandlerName.split(".").slice(1),
-        String(method).toLowerCase(),
-        "func",
-      ].join("-"),
-      runtime: lambda.Runtime.NODEJS_LATEST,
-      handler: lambdaHandlerName,
-      // asset path is relative to project
-      code: lambda.Code.fromAsset("src/lambda-handlers"),
-      layers: [this.props.layer],
-      environment: {
-        USER_TABLE_NAME: this.props.userTable.table.name,
-        CONFIG_TYPE_TABLE_NAME: this.props.configTypeTable.table.name,
-        CONFIG_TYPE_BELONGS_TO_GSI_NAME: this.props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name,
-        PAYMENT_ACCOUNT_TABLE_NAME: this.props.pymtAccTable.table.name,
-        PAYMENT_ACCOUNT_USERID_GSI_NAME: this.props.pymtAccTable.globalSecondaryIndexes.userIdStatusShortnameIndex.name,
-        EXPENSES_TABLE_NAME: this.props.expenseTable.table.name,
-        DEFAULT_LOG_LEVEL: this.props.environment === EnvironmentName.LOCAL ? "debug" : "undefined",
+  private downloadReceiptApi(resource: apigateway.Resource) {
+    const executeRole = new iam.Role(this, "downloadReceiptApiGatewayRole", {
+      assumedBy: new iam.ServicePrincipal("apigateway.amazonaws.com"),
+      roleName: [this.props.resourcePrefix, this.props.environment, "receipt", "download", "apigateway", "exec", "role"].join("-"),
+      description: "s3 integration execution role to download file",
+    });
+    this.props.receiptBucket.grantRead(executeRole, [RECEIPT_KEY_PREFIX, "*"].join("/"));
+
+    const bucket = this.props.receiptBucket.bucketName;
+    const key = RECEIPT_KEY_PREFIX + "/{userId}/{expenseId}/{receiptId}";
+
+    // https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-mapping-template-reference.html#context-variable-reference
+    const s3integration = new apigateway.AwsIntegration({
+      service: "s3",
+      path: `${bucket}/${key}`,
+      integrationHttpMethod: HttpMethod.GET,
+      options: {
+        credentialsRole: executeRole,
+        passthroughBehavior: apigateway.PassthroughBehavior.WHEN_NO_TEMPLATES,
+        requestParameters: {
+          "integration.request.path.receiptId": "method.request.path.receiptId",
+          "integration.request.path.expenseId": "method.request.path.expenseId",
+          "integration.request.path.userId": "context.authorizer.principalId",
+        },
+        integrationResponses: [
+          {
+            statusCode: "200",
+            selectionPattern: "200",
+          },
+          {
+            statusCode: "404",
+            selectionPattern: "4\\d\\d",
+            contentHandling: apigateway.ContentHandling.CONVERT_TO_TEXT,
+            responseTemplates: { "text/html": "receipt not found" },
+          },
+          { statusCode: "500" },
+        ],
       },
-      logRetention: logs.RetentionDays.ONE_MONTH,
-      timeout: Duration.seconds(30),
     });
 
-    const lambdaIntegration = new apigateway.LambdaIntegration(lambdaFunction, {
-      proxy: true,
-      passthroughBehavior: apigateway.PassthroughBehavior.WHEN_NO_TEMPLATES,
-    });
-
-    const resourceMethod = resource.addMethod(String(method), lambdaIntegration, {
+    const resourceMethod = resource.addMethod(HttpMethod.GET, s3integration, {
       authorizationType: apigateway.AuthorizationType.CUSTOM,
       authorizer: this.props.authorizer,
-      requestModels: undefined,
       requestValidatorOptions: { validateRequestBody: true, validateRequestParameters: true },
       requestParameters: this.getRequestParameters(resource),
+      methodResponses: [{ statusCode: "200" }, { statusCode: "404" }],
+    });
+  }
+
+  private uploadReceiptApi(resource: apigateway.Resource) {
+    const executeRole = new iam.Role(this, "uploadReceiptApiGatewayRole", {
+      assumedBy: new iam.ServicePrincipal("apigateway.amazonaws.com"),
+      roleName: [this.props.resourcePrefix, this.props.environment, "receipt", "upload", "apigateway", "exec", "role"].join("-"),
+      description: "s3 integration execution role to upload file",
+    });
+    this.props.receiptBucket.grantPut(executeRole, [RECEIPT_TEMP_KEY_PREFIX, "*"].join("/"));
+
+    const bucket = this.props.receiptBucket.bucketName;
+    const key = RECEIPT_TEMP_KEY_PREFIX + "/{userId}/{expenseId}/{receiptId}";
+
+    // https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-mapping-template-reference.html#context-variable-reference
+    const s3integration = new apigateway.AwsIntegration({
+      service: "s3",
+      path: `${bucket}/${key}`,
+      integrationHttpMethod: HttpMethod.PUT,
+      options: {
+        credentialsRole: executeRole,
+        passthroughBehavior: apigateway.PassthroughBehavior.WHEN_NO_TEMPLATES,
+        requestParameters: {
+          "integration.request.path.receiptId": "method.request.path.receiptId",
+          "integration.request.path.expenseId": "method.request.path.expenseId",
+          "integration.request.path.userId": "context.authorizer.principalId",
+        },
+        integrationResponses: [
+          {
+            statusCode: "200",
+            selectionPattern: "200",
+          },
+          {
+            statusCode: "403",
+            selectionPattern: "4\\d\\d",
+          },
+          { statusCode: "500" },
+        ],
+      },
     });
 
-    return lambdaFunction;
+    const resourceMethod = resource.addMethod(HttpMethod.POST, s3integration, {
+      authorizationType: apigateway.AuthorizationType.CUSTOM,
+      authorizer: this.props.authorizer,
+      requestValidatorOptions: { validateRequestBody: true, validateRequestParameters: true },
+      requestParameters: this.getRequestParameters(resource),
+      methodResponses: [{ statusCode: "200" }, { statusCode: "403" }],
+    });
   }
 }

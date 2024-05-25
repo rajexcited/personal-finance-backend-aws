@@ -1,4 +1,4 @@
-export { apiGatewayHandlerWrapper, RequestBodyContentType } from "./handler-wrapper";
+export { apiGatewayHandlerWrapper, RequestBodyContentType, convertToCreatedResponse } from "./handler-wrapper";
 export {
   ValidationError,
   InvalidField,

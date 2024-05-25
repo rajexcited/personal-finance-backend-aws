@@ -2,7 +2,14 @@ import { APIGatewayProxyEvent } from "aws-lambda";
 import { v4 as uuidv4 } from "uuid";
 import { AuthRole } from "../common";
 import { getSignedToken } from "../auth";
-import { apiGatewayHandlerWrapper, RequestBodyContentType, ValidationError, InvalidField, NotFoundError } from "../apigateway";
+import {
+  apiGatewayHandlerWrapper,
+  RequestBodyContentType,
+  ValidationError,
+  InvalidField,
+  NotFoundError,
+  convertToCreatedResponse,
+} from "../apigateway";
 import { getLogger, utils, AuditDetailsType, LoggerBase, validations, dbutil, s3utils } from "../utils";
 import {
   _logger as userLogger,
@@ -81,10 +88,12 @@ const signupHandler = async (event: APIGatewayProxyEvent) => {
     // await dbutil.batchAddUpdate([dbDetailItem, dbTokenItem], _userTableName, logger);
 
     logger.info("accessTokenObj", accessTokenObj);
-    return {
+    const result = {
       accessToken: accessTokenObj.token,
       expiresIn: accessTokenObj.expiresIn(),
     };
+
+    return convertToCreatedResponse(result);
   } finally {
     stopwatch.stop();
     stopwatch.prettyPrint();

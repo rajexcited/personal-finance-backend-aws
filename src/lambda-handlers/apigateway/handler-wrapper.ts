@@ -2,7 +2,7 @@ import { Context, APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda
 import { JSONValue, LambdaHandler } from "./wrapper-types";
 import { HTTP_STATUS_CODE, MethodType } from "./http-method-type";
 import { utils, getLogger } from "../utils";
-import { UnAuthorizedError, ValidationError } from "./errors";
+import { NotFoundError, UnAuthorizedError, ValidationError } from "./errors";
 import { StopWatch } from "stopwatch-node";
 
 const _logger = getLogger("handler-wrapper");
@@ -49,6 +49,11 @@ export const apiGatewayHandlerWrapper = (callback: LambdaHandler, requiredBodyTy
         return convertToAPIGatewayEventResult("not authorized", HTTP_STATUS_CODE.UNAUTHORIZED);
       }
 
+      if (err instanceof NotFoundError) {
+        logger.error("request not exist", err.message);
+        return convertToAPIGatewayEventResult("not found", HTTP_STATUS_CODE.NOT_FOUND);
+      }
+
       const message = err instanceof Error ? err.message : String(err);
       logger.error("unknown error", message, err);
       return convertToAPIGatewayEventResult("unknown error", HTTP_STATUS_CODE.UNKNOWN_ERROR);
@@ -67,13 +72,23 @@ const validateEvent = (event: APIGatewayProxyEvent, requiredBodyType?: RequestBo
     if (!event.body) {
       throw new ValidationError([{ path: "request", message: "missing request body" }]);
     }
-    if (event.headers["Content-Type"] === RequestBodyContentType.JSON && !utils.getJsonObj(event.body as string)) {
-      throw new ValidationError([{ path: "request", message: "not valid json" }]);
+    if (event.headers["Content-Type"] !== requiredBodyType) {
+      throw new ValidationError([{ path: "request", message: "incorrect request body" }]);
+    }
+    if (event.headers["Content-Type"] === RequestBodyContentType.JSON) {
+      event.body = atob(event.body);
+      if (!utils.getJsonObj(event.body)) {
+        throw new ValidationError([{ path: "request", message: "not valid json" }]);
+      }
     }
   }
 };
 
-const convertToAPIGatewayEventResult = (result: JSONValue, statusCode?: HTTP_STATUS_CODE): APIGatewayProxyResult => {
+export const convertToCreatedResponse = (result: JSONValue) => {
+  return convertToAPIGatewayEventResult(result, HTTP_STATUS_CODE.CREATED);
+};
+
+const convertToAPIGatewayEventResult = (result: JSONValue | APIGatewayProxyResult, statusCode?: HTTP_STATUS_CODE | null): APIGatewayProxyResult => {
   if (!result) {
     return {
       statusCode: Number(HTTP_STATUS_CODE.EMPTY_RESPONSE_CONTENT),
@@ -81,18 +96,20 @@ const convertToAPIGatewayEventResult = (result: JSONValue, statusCode?: HTTP_STA
     };
   }
 
-  if (typeof result === "object" && ("statusCode" in result || "body" in result)) {
+  if (isInstanceofAPIGatewayProxyResult(result)) {
     let statusCode: number | null = null;
+    const res = result as APIGatewayProxyResult;
 
-    const code = Number(result.statusCode);
+    const code = Number(res.statusCode);
     if (isValidStatusCode(code)) {
       statusCode = code;
     }
 
-    const resp = convertToAPIGatewayEventResult(result.body);
+    const resp = convertToAPIGatewayEventResult(res.body);
     return {
       statusCode: statusCode ? statusCode : resp.statusCode,
       body: resp.body,
+      headers: res.headers,
     };
   }
   let body: string;
@@ -105,4 +122,12 @@ const convertToAPIGatewayEventResult = (result: JSONValue, statusCode?: HTTP_STA
     statusCode: Number(statusCode || HTTP_STATUS_CODE.SUCCESS),
     body,
   };
+};
+
+const isInstanceofAPIGatewayProxyResult = (obj: unknown) => {
+  let key: string | undefined = undefined;
+  if (obj && typeof obj === "object") {
+    key = ["statusCode", "body", "headers"].find((key) => key in obj);
+  }
+  return key !== undefined;
 };

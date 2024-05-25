@@ -133,7 +133,7 @@ export class UserApiConstruct extends BaseApiConstruct {
 
     const userLambdaIntegration = new apigateway.LambdaIntegration(userLambdaFunction, {
       proxy: true,
-      passthroughBehavior: apigateway.PassthroughBehavior.WHEN_NO_TEMPLATES,
+      passthroughBehavior: apigateway.PassthroughBehavior.NEVER,
     });
 
     const userMethod = resource.addMethod(String(method), userLambdaIntegration, {

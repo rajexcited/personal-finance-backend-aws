@@ -1,5 +1,13 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
-import { InvalidField, JSONObject, UnAuthorizedError, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
+import {
+  InvalidField,
+  JSONObject,
+  RequestBodyContentType,
+  UnAuthorizedError,
+  ValidationError,
+  apiGatewayHandlerWrapper,
+  convertToCreatedResponse,
+} from "../apigateway";
 import { getAuthorizeUser, getValidatedUserId } from "../user";
 import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils, validations } from "../utils";
 import {
@@ -23,7 +31,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getCurrencyByCountry } from "../settings";
 import { CountryCurrencyRelation } from "../settings/currency-profile";
 
-export const addUpdateDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
+const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("addUpdateDetails", _logger);
 
   const belongsTo = getValidatedBelongsTo(event, logger);
@@ -32,8 +40,7 @@ export const addUpdateDetails = apiGatewayHandlerWrapper(async (event: APIGatewa
   const userId = getValidatedUserId(event);
   // find db record if any.
   // perform the add or update
-  let configId: string | null = null;
-  let auditDetails: AuditDetailsType | null = null;
+  let existingDbItem: DbItemConfigType | null = null;
   if (req.id) {
     const cmdInput = {
       TableName: _configTypeTableName,
@@ -43,24 +50,17 @@ export const addUpdateDetails = apiGatewayHandlerWrapper(async (event: APIGatewa
 
     logger.info("retrieved config from DB");
     if (output.Item) {
-      const dbItem = output.Item as DbItemConfigType;
+      existingDbItem = output.Item as DbItemConfigType;
       // validate user access to config details
       const gsiPkForReq = getBelongsToGsiPk(null, logger, userId, belongsTo);
-      if (gsiPkForReq !== dbItem.UB_GSI_PK) {
+      if (gsiPkForReq !== existingDbItem.UB_GSI_PK) {
         // not same user
         throw new UnAuthorizedError("not authorized to update config type details");
       }
-
-      auditDetails = utils.updateAuditDetails(dbItem.details.auditDetails, userId);
-      configId = dbItem.details.id;
     }
   }
-  if (!configId) {
-    configId = uuidv4();
-  }
-  if (!auditDetails) {
-    auditDetails = utils.updateAuditDetails(null, userId);
-  }
+  const auditDetails = utils.updateAuditDetails(existingDbItem?.details.auditDetails, userId);
+  const configId = existingDbItem?.details.id || uuidv4();
 
   const apiToDbDetails: DbConfigTypeDetails = {
     id: configId,
@@ -113,8 +113,13 @@ export const addUpdateDetails = apiGatewayHandlerWrapper(async (event: APIGatewa
     ...currencyCountryResource,
   };
 
-  return resource as unknown as JSONObject;
-});
+  const result = resource as unknown as JSONObject;
+  if (!existingDbItem) {
+    return convertToCreatedResponse(result);
+  }
+  return result;
+};
+export const addUpdateDetails = apiGatewayHandlerWrapper(addUpdateDetailsHandler, RequestBodyContentType.JSON);
 
 const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, loggerBase: LoggerBase) => {
   const logger = getLogger("validateRequest", loggerBase);

@@ -37,7 +37,7 @@ export interface CountryCurrencyRelation {
 
 const getAllowedCurrencyProfiles = async (baseLogger: LoggerBase) => {
   const profileCache = await CurrencyProfileMemoryCache;
-  const profiles = profileCache.wrap("allowedProfiles", async () => {
+  const profilesPromise = profileCache.wrap("allowedProfiles", async () => {
     const logger = getLogger("getAllowedCountryCurrencyProfiles", baseLogger);
 
     const currencyProfiles = await s3utils.getJsonObjectFromS3<CurrencyProfile>(_configDataBucketName, "currency-profiles.json", logger);
@@ -80,7 +80,7 @@ const getAllowedCurrencyProfiles = async (baseLogger: LoggerBase) => {
     return result;
   });
 
-  return await profiles;
+  return await profilesPromise;
 };
 
 export const getAllCountries = async (baseLogger: LoggerBase) => {

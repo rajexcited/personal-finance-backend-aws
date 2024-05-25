@@ -10,11 +10,13 @@ import { ConfigTypeApiConstruct } from "./config-types-api-gateway";
 import { IBucket } from "aws-cdk-lib/aws-s3";
 import { PymtAccApiConstruct } from "./pymt-acc-api-gateway";
 import { ExpenseApiConstruct } from "./expenses-api-gateway";
+import { ReceiptS3Construct } from "../receipts-s3";
 
 interface ApiProps extends ConstructProps {
   allDb: DBConstruct;
   contextInfo: ContextInfo;
   configBucket: IBucket;
+  receiptS3: ReceiptS3Construct;
 }
 
 // https://docs.aws.amazon.com/apigateway/latest/developerguide/how-to-set-up-method-using-console.html
@@ -34,6 +36,7 @@ export class ApiConstruct extends Construct {
 
     const restApi = new apigateway.RestApi(this, "MyFinanceRestApi", {
       restApiName: [props.resourcePrefix, props.environment, "rest", "api"].join("-"),
+      binaryMediaTypes: ["*/*"],
       deployOptions: {
         stageName: props.contextInfo.apiStageName,
         description: "my finance rest apis",
@@ -92,6 +95,8 @@ export class ApiConstruct extends Construct {
       layer: lambdaLayer.layer,
       authorizer: tokenAuthorizer.authorizer,
       restApi: restApi,
+      receiptBucket: props.receiptS3.receiptBucket,
+      receiptDeleteTags: props.receiptS3.deleteTags,
     });
   }
 }

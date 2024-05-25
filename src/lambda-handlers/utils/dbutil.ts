@@ -1,4 +1,4 @@
-import { Delete, DynamoDBClient, ProvisionedThroughputExceededException, Put, Update } from "@aws-sdk/client-dynamodb";
+import { Delete, DynamoDBClient, ProvisionedThroughputExceededException, Put, ReturnValue, Update } from "@aws-sdk/client-dynamodb";
 import {
   BatchWriteCommandInput,
   DynamoDBDocument,
@@ -43,14 +43,14 @@ export const getItem = async (input: GetCommandInput, _logger: LoggerBase) => {
     stopwatch.start();
     logger.info("getting results from cache if available", "input =", input);
     const cache = await getItemMemoryCache;
-    const output = cache.wrap(JSON.stringify(input), async () => {
+    const outputPromise = cache.wrap(JSON.stringify(input), async () => {
       logger.info("calling db api call");
       const dbOutput = await ddbClient.get(input);
       return dbOutput;
     });
 
-    logger.info("output =", output);
-    return output;
+    logger.info("output =", await outputPromise);
+    return await outputPromise;
   } finally {
     stopwatch.stop();
     logger.info("stopwatch summary", stopwatch.shortSummary());
@@ -78,9 +78,10 @@ export const updateAttribute = async (input: UpdateCommandInput, _logger: Logger
   const logger = getLogger("updateAttribute", _logger);
   try {
     stopwatch.start();
+    const modifiedInput: UpdateCommandInput = { ReturnValues: ReturnValue.ALL_OLD, ...input };
     logger.info("input =", input);
 
-    const output = await ddbClient.update(input);
+    const output = await ddbClient.update(modifiedInput);
     logger.info("output =", output);
     return output;
   } finally {

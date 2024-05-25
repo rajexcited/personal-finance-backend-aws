@@ -26,19 +26,31 @@ export const isValidInstitutionName = (institutionName: string | undefined | nul
   return institutionNameRegex.test(institutionName as string);
 };
 
+/**
+ * checks if payment Account Id is valid uuid pattern and payment account exist for given userId.
+ *
+ *
+ * @param paymentAccountId
+ * @param userId
+ * @param _logger
+ * @returns true if valid otherwise false
+ */
 export const isValidPaymentAccount = async (paymentAccountId: string, userId: string, _logger: LoggerBase) => {
   const logger = getLogger("isValidPaymentAccount", _logger);
+  if (!validations.isValidUuid(paymentAccountId)) {
+    return false;
+  }
   const getCmdInput: GetCommandInput = {
     TableName: _pymtAccTableName,
     Key: { PK: getDetailsTablePk(paymentAccountId) },
   };
   const output = await dbutil.getItem(getCmdInput, logger);
-  logger.info("retrieved payment account Item from DB");
+  logger.info("retrieved payment account Item from DB. validating whether user is authorized");
 
-  const item = output.Item as DbItemPymtAcc;
-  if (!!item) {
-    const gsiPk = getUserIdStatusShortnameGsiPk(userId);
-    return item.UP_GSI_PK.startsWith(gsiPk);
+  if (!output.Item) {
+    return false;
   }
-  return false;
+  const item = output.Item as DbItemPymtAcc;
+  const gsiPk = getUserIdStatusShortnameGsiPk(userId);
+  return item.UP_GSI_PK.startsWith(gsiPk);
 };

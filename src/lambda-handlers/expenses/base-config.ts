@@ -1,17 +1,25 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { IllegelArgumentError, ValidationError } from "../apigateway";
-import { getLogger, validations, dateutil, LoggerBase } from "../utils";
+import { getLogger, validations, dateutil, LoggerBase, s3utils } from "../utils";
+import { ApiReceiptResource, DbItemExpense, DbItemExpenseItem, DbReceiptDetails } from "./resource-type";
 
 export const _expenseTableName = process.env.EXPENSES_TABLE_NAME as string;
 export const _userIdStatusDateIndex = process.env.EXPENSE_USERID_DATE_GSI_NAME as string;
+export const _expenseReceiptsBucketName = process.env.EXPENSE_RECEIPTS_BUCKET_NAME as string;
+
 export const _logger = getLogger("expenses");
+
 export const GSI_ATTR_DATE_FORMAT = "YYYY-MM-DD";
+export const RECEIPT_TEMP_KEY_PREFIX = "temp";
+export const RECEIPT_KEY_PREFIX = "receipts";
 
 export enum ErrorMessage {
   INCORRECT_VALUE = "incorrect value",
   INCORRECT_FORMAT = "incorrect format",
   MISSING_VALUE = "missing value",
   LIMIT_EXCEEDED = "allowed items in list is exceeeded limit",
+  CANNOT_COMBINE_PAGE_COUNT_MONTHS = "not allowed both values of n page months and page count",
 }
 
 export enum ExpenseResourcePath {
@@ -31,6 +39,8 @@ export enum ExpenseResourcePath {
   RECEIPT_ID = "receipts.id",
   RECEIPT_TYPE = "receipts.type",
   EXPENSE_ITEMS = "expenseItems",
+  PAGE_MONTHS = "pageMonths",
+  PAGE_COUNT = "pageCount",
 }
 
 export enum ExpenseStatus {
@@ -38,10 +48,11 @@ export enum ExpenseStatus {
   DELETED = "deleted",
 }
 
-export enum ReceiptType {
-  PNG = "image/png",
-  JPG = "image/jpeg",
-  PDF = "application/pdf",
+export enum FileExtension {
+  JPG = "jpg",
+  JPEG = "jpeg",
+  PNG = "png",
+  PDF = "pdf",
 }
 
 export const getDetailsTablePk = (expenseId: string) => {
@@ -64,10 +75,7 @@ export const getYearMonthTablePk = (year: number, month: number) => {
   return `year#${year}#month#${month}`;
 };
 
-export const getUserIdStatusDateGsiPk = (userId: string, status: ExpenseStatus, isForCount: boolean) => {
-  if (isForCount) {
-    return `userId#${userId}#status#${status}#count`;
-  }
+export const getUserIdStatusDateGsiPk = (userId: string, status: ExpenseStatus) => {
   return `userId#${userId}#status#${status}`;
 };
 
@@ -133,13 +141,18 @@ const getValidatedDateForGsiAttr = (date: string | Date | undefined | null, _log
 
 export const getValidatedExpenseIdFromPathParam = (event: APIGatewayProxyEvent, _logger: LoggerBase) => {
   const logger = getLogger("getValidatedExpenseIdFromPathParam", _logger);
-  let expenseId = event.pathParameters?.expenseId;
+  const expenseId = event.pathParameters?.expenseId;
+  logger.info("in pathparam, expenseId =", expenseId);
+
   if (!expenseId) {
     throw new ValidationError([{ path: ExpenseResourcePath.ID, message: ErrorMessage.MISSING_VALUE }]);
   }
   if (!validations.isValidUuid(expenseId)) {
-    throw new ValidationError([{ path: ExpenseResourcePath.ID, message: ErrorMessage.INCORRECT_VALUE }]);
+    throw new ValidationError([{ path: ExpenseResourcePath.ID, message: ErrorMessage.INCORRECT_FORMAT }]);
   }
-  logger.debug("expenseId =", expenseId);
   return expenseId;
+};
+
+export const getReceiptPathkey = (receiptId: string, expenseId: string, userId: string) => {
+  return [RECEIPT_KEY_PREFIX, userId, expenseId, receiptId].join("/");
 };
