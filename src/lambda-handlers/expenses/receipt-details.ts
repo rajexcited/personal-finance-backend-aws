@@ -1,5 +1,5 @@
 import { LoggerBase, getLogger, s3utils } from "../utils";
-import { RECEIPT_TEMP_KEY_PREFIX, _expenseReceiptsBucketName, getReceiptPathkey } from "./base-config";
+import { _receiptTempKeyPrefix, _expenseReceiptsBucketName, getReceiptPathkey } from "./base-config";
 import { ApiExpenseResource, ApiReceiptResource, DbItemExpense, DbReceiptDetails, ReceiptContentType } from "./resource-type";
 import { caching } from "cache-manager";
 import { RECEIPTS_MAX_ALLOWED, isValidFileSize } from "./validate";
@@ -143,7 +143,7 @@ export const updateReceiptsIns3 = async (
 };
 
 const getTempReceiptPathkey = (fileName: string, expenseId: string, userId: string) => {
-  const tempPath = [RECEIPT_TEMP_KEY_PREFIX, userId, expenseId, fileName].join("/");
+  const tempPath = [_receiptTempKeyPrefix, userId, expenseId, fileName].join("/");
   return tempPath;
 };
 

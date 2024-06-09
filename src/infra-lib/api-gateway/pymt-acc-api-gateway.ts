@@ -7,7 +7,7 @@ import * as logs from "aws-cdk-lib/aws-logs";
 import { DbProps } from "../db";
 import { Duration } from "aws-cdk-lib";
 import { ConfigStatus } from "../../lambda-handlers";
-import { EnvironmentName } from "../common";
+import { AwsResourceType, EnvironmentName, buildResourceName } from "../common";
 import { BaseApiConstruct } from "./base-api";
 
 interface PymtAccApiProps extends RestApiProps {
@@ -24,7 +24,7 @@ export class PymtAccApiConstruct extends BaseApiConstruct {
 
     this.props = props;
 
-    const pymtAccResource = this.props.restApi.root.addResource("payment").addResource("accounts");
+    const pymtAccResource = this.props.apiResource.addResource("payment").addResource("accounts");
 
     //  request validator setup
     // https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-method-request-validation.html
@@ -49,14 +49,10 @@ export class PymtAccApiConstruct extends BaseApiConstruct {
   }
 
   private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: string) {
+    const lambdaNameParts = [...lambdaHandlerName.split(".").slice(1), String(method).toLowerCase()];
+
     const lambdaFunction = new lambda.Function(this, `${method}${lambdaHandlerName.replace("index.", "")}Lambda`, {
-      functionName: [
-        this.props.resourcePrefix,
-        this.props.environment,
-        ...lambdaHandlerName.split(".").slice(1),
-        String(method).toLowerCase(),
-        "func",
-      ].join("-"),
+      functionName: buildResourceName(lambdaNameParts, AwsResourceType.Lambda, this.props),
       runtime: lambda.Runtime.NODEJS_LATEST,
       handler: lambdaHandlerName,
       // asset path is relative to project
@@ -92,6 +88,7 @@ export class PymtAccApiConstruct extends BaseApiConstruct {
 
   private getAddUpdateDetailModel = () => {
     const model: apigateway.Model = this.props.restApi.addModel("PymtAccAddUpdateDetailModel", {
+      modelName: "PymtAccAddUpdateDetailModel",
       contentType: "application/json",
       description: "add update payment account details model",
       schema: {

@@ -10,7 +10,7 @@ import { Duration, RemovalPolicy } from "aws-cdk-lib";
 import { JSONObject } from "../../lambda-handlers";
 import { DbProps } from "../db";
 import { IBucket } from "aws-cdk-lib/aws-s3";
-import { EnvironmentName } from "../common";
+import { AwsResourceType, EnvironmentName, buildResourceName } from "../common";
 import { BaseApiConstruct } from "./base-api";
 
 interface UserApiProps extends RestApiProps {
@@ -38,12 +38,12 @@ export class UserApiConstruct extends BaseApiConstruct {
     // https://awscli.amazonaws.com/v2/documentation/api/latest/reference/kms/list-aliases.html#examples
     this.pSaltSecret = new secretsmanager.Secret(this, "PSaltSecret", {
       description: "secret used in encryption",
-      secretName: [props.resourcePrefix, props.environment, "encrypt", "secret"].join("-"),
+      secretName: buildResourceName(["encrypt"], AwsResourceType.SecretManager, props),
       encryptionKey: kms.Alias.fromAliasName(this, "PSaltKms", "alias/aws/secretsmanager"),
       removalPolicy: RemovalPolicy.DESTROY,
     });
 
-    const userResource = props.restApi.root.addResource("user");
+    const userResource = props.apiResource.addResource("user");
     //  request validator setup
     // https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-method-request-validation.html
     const userLoginResource = userResource.addResource("login");
@@ -96,14 +96,9 @@ export class UserApiConstruct extends BaseApiConstruct {
     }
 
     const uniqueConstructName = method + lambdaHandlerName.replace("index.", "");
+    const lambdaNameParts = [...lambdaHandlerName.split(".").slice(1), String(method).toLowerCase()];
     const userLambdaFunction = new lambda.Function(this, `User${uniqueConstructName}Lambda`, {
-      functionName: [
-        this.props.resourcePrefix,
-        this.props.environment,
-        ...lambdaHandlerName.split(".").slice(1),
-        String(method).toLowerCase(),
-        "func",
-      ].join("-"),
+      functionName: buildResourceName(lambdaNameParts, AwsResourceType.Lambda, this.props),
       runtime: lambda.Runtime.NODEJS_LATEST,
       handler: lambdaHandlerName,
       // asset path is relative to project
@@ -187,8 +182,9 @@ export class UserApiConstruct extends BaseApiConstruct {
    */
   private getLoginModel = () => {
     const userModel: apigateway.Model = this.props.restApi.addModel(ModelId.UserLoginModel, {
+      modelName: ModelId.UserLoginModel,
       contentType: "application/json",
-      description: ModelId.UserLoginModel,
+      description: "model for user login",
       schema: {
         schema: apigateway.JsonSchemaVersion.DRAFT7,
         title: "Login Schema",
@@ -220,8 +216,9 @@ export class UserApiConstruct extends BaseApiConstruct {
    */
   private getSignupModel = () => {
     const userModel: apigateway.Model = this.props.restApi.addModel(ModelId.UserSignupModel, {
+      modelName: ModelId.UserSignupModel,
       contentType: "application/json",
-      description: ModelId.UserSignupModel,
+      description: "model for user signup",
       schema: {
         schema: apigateway.JsonSchemaVersion.DRAFT7,
         title: "Signup Schema",

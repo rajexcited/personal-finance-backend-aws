@@ -6,6 +6,9 @@ import { TokenPayload } from "./auth-type";
 import { _logger } from "./base-config";
 import { getSecret } from "./token-secret";
 
+/** 1h */
+const expiresInMillis = 60 * 60 * 1000;
+
 export const getSignedToken = async (userId: string, role?: AuthRole) => {
   const logger = getLogger("getSignedToken", _logger);
   const iat = new Date();
@@ -19,25 +22,36 @@ export const getSignedToken = async (userId: string, role?: AuthRole) => {
 
   const secret = await getSecret();
   const options: jwt.SignOptions = {
-    expiresIn: "1h",
+    expiresIn: 60 * 60 * 1000,
     algorithm: secret.algorithm,
   };
 
   const token = jwt.sign(payload, secret.tokenSecret, options);
   logger.info("signed token", token);
-  return new SignedToken(token, iat);
+  const signedResponse = new SignedToken(token, iat);
+
+  logger.info("now =", Date.now(), ", new Date() =", new Date());
+  logger.info("iat=", signedResponse.iat);
+  logger.info(
+    "expiresAt =",
+    signedResponse.getExpiresAt().toMillis(),
+    "ms, / ",
+    signedResponse.getExpiresAt().toSeconds(),
+    "sec / ",
+    signedResponse.getExpiresAt().toDate()
+  );
+
+  return signedResponse;
 };
 
 class SignedToken {
   public readonly token: string;
-  public readonly initialExpiresIn: number;
   public readonly expiresAt: Date;
   public readonly iat: number;
 
   constructor(token: string, iat: Date) {
-    this.initialExpiresIn = 60 * 60;
     this.token = token;
-    this.expiresAt = datetime.addSeconds(new Date(iat), this.initialExpiresIn);
+    this.expiresAt = datetime.addMilliseconds(iat, expiresInMillis);
     this.iat = iat.getTime();
   }
 

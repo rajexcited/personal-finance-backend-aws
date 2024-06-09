@@ -91,6 +91,7 @@ const signupHandler = async (event: APIGatewayProxyEvent) => {
     const result = {
       accessToken: accessTokenObj.token,
       expiresIn: accessTokenObj.expiresIn(),
+      expiryTime: accessTokenObj.getExpiresAt().toMillis(),
     };
 
     return convertToCreatedResponse(result);

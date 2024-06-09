@@ -6,7 +6,7 @@ import { utils, getLogger, validations, dbutil, LoggerBase } from "../utils";
 import { DbItemToken, getTokenTablePk } from "../user";
 import { AuthRole } from "../common";
 import { UnAuthenticatedError, ValidationError } from "../apigateway";
-import { _logger, _smClient, _tokenSecretId, _userTableName } from "./base-config";
+import { _logger, _smClient, _tokenSecretId, _userTableName, _rootPath } from "./base-config";
 import { getSecret } from "./token-secret";
 
 export const authorizer: APIGatewayTokenAuthorizerHandler = async (event, context) => {
@@ -51,7 +51,20 @@ const authenticate = async (token: string) => {
     logger.info("decoded result", decoded);
 
     const expiringTime = decoded.exp as number;
-    if (expiringTime > Date.now()) {
+    logger.info("expiringTime =", expiringTime, " / ", new Date(expiringTime));
+    logger.info("iat =", decoded.iat, " / ", new Date(decoded.iat as number));
+    const nowInMillis = Date.now();
+    logger.info(
+      "Date.now =",
+      nowInMillis,
+      ", new Date() =",
+      new Date(nowInMillis),
+      "; expiringTime-iat =",
+      expiringTime - (decoded.iat as number),
+      ", now-expiringTime =",
+      expiringTime - nowInMillis
+    );
+    if (expiringTime < nowInMillis) {
       throw new UnAuthenticatedError("It is expired. expiringTime [" + expiringTime + "(" + new Date(expiringTime) + ")]");
     }
     if (tokenHeaders.alg !== secret.algorithm) {
@@ -87,15 +100,16 @@ const authorize = async (payload: TokenPayload, resourceArn: string, jwtPayload:
   }
 
   const { methodUri, httpMethod } = getResourceParts(resourceArn, logger);
-  logger.debug("roleAuthConfigList", RoleAuthConfigList);
+  // logger.debug("roleAuthConfigList", RoleAuthConfigList);
   const filteredCfg = RoleAuthConfigList.filter((cfg) => {
     const includesStar = cfg.apiPath.includes("/*");
+    const fullApiPath = _rootPath + cfg.apiPath;
     if (includesStar) {
-      const regex = new RegExp("^" + cfg.apiPath.split("*").join("[^/]+") + "$");
+      const regex = new RegExp("^" + fullApiPath.split("*").join("[^/]+") + "$");
       if (!regex.test(methodUri)) {
         return false;
       }
-    } else if (cfg.apiPath !== methodUri) {
+    } else if (fullApiPath !== methodUri) {
       return false;
     }
     return cfg.method.toString() === httpMethod;
@@ -147,14 +161,18 @@ const authorize = async (payload: TokenPayload, resourceArn: string, jwtPayload:
 const getTokenHeader = (token: string) => {
   const headerPart = token.split(".", 1)[0];
   const decodedHeader = atob(headerPart);
-  return utils.getJsonObj(decodedHeader) as TokenHeader;
+  const obj = utils.getJsonObj<TokenHeader>(decodedHeader);
+  if (!obj || !obj.typ || !obj.alg) {
+    throw new ValidationError([{ path: "header", message: "invalid json" }]);
+  }
+  return obj;
 };
 
 const getTokenPayload = (token: string) => {
   const payloadPart = token.split(".", 2)[1];
   const decodedPayload = atob(payloadPart);
   const obj = utils.getJsonObj<TokenPayload>(decodedPayload);
-  if (!obj) {
+  if (!obj || !obj.iat || !obj.id || !obj.role) {
     throw new ValidationError([{ path: "payload", message: "invalid json" }]);
   }
   return obj;
@@ -171,10 +189,10 @@ const denyPolicy = (resourceArn: string) => {
 
 const allowPolicy = (resourceArn: string, role: AuthRole, baseLogger: LoggerBase) => {
   const logger = getLogger("allowPolicy", baseLogger);
-  const methodWithUris = RoleAuthConfigList.filter((cfg) => cfg.role.includes(role)).map((cfg) => cfg.method + cfg.apiPath);
+  const methodWithUris = RoleAuthConfigList.filter((cfg) => cfg.role.includes(role)).map((cfg) => cfg.method + _rootPath + cfg.apiPath);
   const { resourceArnWithoutMethodAndUri } = getResourceParts(resourceArn, logger);
   const resources = methodWithUris.map((mu) => resourceArnWithoutMethodAndUri + mu);
-  logger.info("allowed resources", resources);
+  // logger.debug("allowed resources", resources);
   return generatePolicy("Allow", resources);
 };
 

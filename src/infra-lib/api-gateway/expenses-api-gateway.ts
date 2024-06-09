@@ -7,11 +7,10 @@ import * as logs from "aws-cdk-lib/aws-logs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import { DbProps } from "../db";
 import { Duration } from "aws-cdk-lib";
-import { EnvironmentName } from "../common";
+import { AwsResourceType, EnvironmentName, buildResourceName, ExpenseReceiptContextInfo } from "../common";
 import { BaseApiConstruct } from "./base-api";
 import { ExpenseReceiptsApiConstruct } from "./expense-receipt-api-gateway";
 import { IBucket } from "aws-cdk-lib/aws-s3";
-import { RECEIPT_KEY_PREFIX } from "../../lambda-handlers";
 
 interface ExpensesApiProps extends RestApiProps {
   userTable: DbProps;
@@ -19,7 +18,7 @@ interface ExpensesApiProps extends RestApiProps {
   pymtAccTable: DbProps;
   expenseTable: DbProps;
   receiptBucket: IBucket;
-  receiptDeleteTags: Record<string, string>;
+  expenseReceiptContext: ExpenseReceiptContextInfo;
 }
 
 export class ExpenseApiConstruct extends BaseApiConstruct {
@@ -30,7 +29,7 @@ export class ExpenseApiConstruct extends BaseApiConstruct {
 
     this.props = props;
 
-    const expensesResource = this.props.restApi.root.addResource("expenses");
+    const expensesResource = this.props.apiResource.addResource("expenses");
 
     //  request validator setup
     // https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-method-request-validation.html
@@ -64,7 +63,7 @@ export class ExpenseApiConstruct extends BaseApiConstruct {
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: ["s3:PutObjectTagging"],
-        resources: [props.receiptBucket.arnForObjects([RECEIPT_KEY_PREFIX, "*"].join("/"))],
+        resources: [props.receiptBucket.arnForObjects(props.expenseReceiptContext.finalizeReceiptKeyPrefix + "*")],
       })
     );
 
@@ -78,13 +77,20 @@ export class ExpenseApiConstruct extends BaseApiConstruct {
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: ["s3:DeleteObjectTagging"],
-        resources: [props.receiptBucket.arnForObjects([RECEIPT_KEY_PREFIX, "*"].join("/"))],
+        resources: [props.receiptBucket.arnForObjects(props.expenseReceiptContext.finalizeReceiptKeyPrefix + "*")],
       })
     );
 
     const receiptApi = new ExpenseReceiptsApiConstruct(this, "ExpenseReceiptsApiConstruct", {
-      ...props,
+      environment: props.environment,
+      resourcePrefix: props.resourcePrefix,
+      restApi: props.restApi,
+      apiResource: props.apiResource,
+      layer: props.layer,
+      authorizer: props.authorizer,
+      receiptBucket: props.receiptBucket,
       expenseIdResource: expenseIdResource,
+      expenseReceiptContext: props.expenseReceiptContext,
     });
   }
 
@@ -102,18 +108,16 @@ export class ExpenseApiConstruct extends BaseApiConstruct {
     }
     if (lambdaHandlerName.endsWith("expenseDeleteDetails")) {
       additionalEnvs.EXPENSE_RECEIPTS_BUCKET_NAME = this.props.receiptBucket.bucketName;
-      additionalEnvs.RECEIPT_S3_TAGS_TO_ADD = JSON.stringify(this.props.receiptDeleteTags);
-      additionalEnvs.DELETE_EXPENSE_EXPIRES_IN_SEC = Duration.days(1).toSeconds().toString();
+      additionalEnvs.RECEIPT_S3_TAGS_TO_ADD = JSON.stringify(this.props.expenseReceiptContext.deleteTags);
+      additionalEnvs.DELETE_EXPENSE_EXPIRES_IN_SEC = Duration.days(this.props.expenseReceiptContext.expirationDays.finalizeReceipt)
+        .toSeconds()
+        .toString();
     }
 
+    const lambdaNameParts = [...lambdaHandlerName.split(".").slice(1), String(method).toLowerCase()];
+
     const lambdaFunction = new lambda.Function(this, `${method}${lambdaHandlerName.replace("index.", "")}Lambda`, {
-      functionName: [
-        this.props.resourcePrefix,
-        this.props.environment,
-        ...lambdaHandlerName.split(".").slice(1),
-        String(method).toLowerCase(),
-        "func",
-      ].join("-"),
+      functionName: buildResourceName(lambdaNameParts, AwsResourceType.Lambda, this.props),
       runtime: lambda.Runtime.NODEJS_LATEST,
       handler: lambdaHandlerName,
       // asset path is relative to project
@@ -123,6 +127,8 @@ export class ExpenseApiConstruct extends BaseApiConstruct {
         USER_TABLE_NAME: this.props.userTable.table.name,
         EXPENSES_TABLE_NAME: this.props.expenseTable.table.name,
         EXPENSE_USERID_DATE_GSI_NAME: this.props.expenseTable.globalSecondaryIndexes.userIdStatusDateIndex.name,
+        RECEIPT_KEY_PREFIX: this.props.expenseReceiptContext.finalizeReceiptKeyPrefix.split("/")[0],
+        RECEIPT_TEMP_KEY_PREFIX: this.props.expenseReceiptContext.temporaryKeyPrefix.split("/")[0],
         DEFAULT_LOG_LEVEL: this.props.environment === EnvironmentName.LOCAL ? "debug" : "undefined",
         ...additionalEnvs,
       },
@@ -148,6 +154,7 @@ export class ExpenseApiConstruct extends BaseApiConstruct {
 
   private getAddUpdateDetailModel = () => {
     const model: apigateway.Model = this.props.restApi.addModel("ExpenseAddUpdateDetailModel", {
+      modelName: "ExpenseAddUpdateDetailModel",
       contentType: "application/json",
       description: "add update expense details model",
       schema: {

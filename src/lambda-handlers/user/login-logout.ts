@@ -64,6 +64,7 @@ const loginHandler = async (event: APIGatewayProxyEvent) => {
   return {
     accessToken: accessTokenObj.token,
     expiresIn: accessTokenObj.expiresIn(),
+    expiryTime: accessTokenObj.getExpiresAt().toMillis(),
   };
 };
 export const login = apiGatewayHandlerWrapper(loginHandler, RequestBodyContentType.JSON);

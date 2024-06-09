@@ -8,7 +8,7 @@ import { DbProps } from "../db";
 import { Duration } from "aws-cdk-lib";
 import { ConfigStatus } from "../../lambda-handlers";
 import { IBucket } from "aws-cdk-lib/aws-s3";
-import { EnvironmentName } from "../common";
+import { AwsResourceType, EnvironmentName, buildResourceName } from "../common";
 import { BaseApiConstruct } from "./base-api";
 
 interface ConfigTypeApiProps extends RestApiProps {
@@ -25,7 +25,7 @@ export class ConfigTypeApiConstruct extends BaseApiConstruct {
 
     this.props = props;
 
-    const configTypeResource = this.props.restApi.root.addResource("config").addResource("types");
+    const configTypeResource = this.props.apiResource.addResource("config").addResource("types");
     const belongsToResource = configTypeResource.addResource("belongs-to").addResource("{belongsTo}");
 
     //  request validator setup
@@ -54,14 +54,10 @@ export class ConfigTypeApiConstruct extends BaseApiConstruct {
   }
 
   private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: string, queryParams?: Record<string, boolean>) {
+    const lambdaNameParts = [...lambdaHandlerName.split(".").slice(1), String(method).toLowerCase()];
+
     const lambdaFunction = new lambda.Function(this, `${method}${lambdaHandlerName.replace("index.", "")}Lambda`, {
-      functionName: [
-        this.props.resourcePrefix,
-        this.props.environment,
-        ...lambdaHandlerName.split(".").slice(1),
-        String(method).toLowerCase(),
-        "func",
-      ].join("-"),
+      functionName: buildResourceName(lambdaNameParts, AwsResourceType.Lambda, this.props),
       runtime: lambda.Runtime.NODEJS_LATEST,
       handler: lambdaHandlerName,
       // asset path is relative to project
@@ -104,7 +100,8 @@ export class ConfigTypeApiConstruct extends BaseApiConstruct {
   }
 
   private getAddUpdateDetailModel = () => {
-    const model: apigateway.Model = this.props.restApi.addModel("CfgTypAddUpdateDetailModel", {
+    const model: apigateway.Model = this.props.restApi.addModel("ConfigTypeAddUpdateDetailModel", {
+      modelName: "ConfigTypeAddUpdateDetailModel",
       contentType: "application/json",
       description: "add update config type details model",
       schema: {

@@ -6,4 +6,5 @@ export interface RestApiProps extends ConstructProps {
   layer: lambda.ILayerVersion;
   authorizer: apigateway.IAuthorizer;
   restApi: apigateway.RestApi;
+  apiResource: apigateway.IResource;
 }

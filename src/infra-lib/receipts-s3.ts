@@ -1,31 +1,33 @@
 import { Construct } from "constructs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import { Duration, RemovalPolicy } from "aws-cdk-lib";
-import { ConstructProps, EnvironmentName } from "./common";
+import { ConstructProps, EnvironmentName, buildResourceName, AwsResourceType, ExpenseReceiptContextInfo } from "./common";
 
 const ONE_MONTH = 30;
 const HALF_YEAR = 6 * ONE_MONTH;
 const ONE_YEAR = 2 * HALF_YEAR;
 
+interface receiptS3Props extends ConstructProps {
+  expenseReceiptContext: ExpenseReceiptContextInfo;
+}
+
 export class ReceiptS3Construct extends Construct {
   public readonly receiptBucket: s3.IBucket;
-  public readonly deleteTags: Record<string, string>;
 
-  constructor(scope: Construct, id: string, props: ConstructProps) {
+  constructor(scope: Construct, id: string, props: receiptS3Props) {
     super(scope, id);
-    this.deleteTags = { delete: "schedule" };
 
     const receiptBucket = new s3.Bucket(this, "ReceiptBucketS3", {
-      bucketName: [props.resourcePrefix, props.environment, "expense", "receipt", "bucket", "s3"].join("-"),
+      bucketName: buildResourceName(["expense", "receipt"], AwsResourceType.S3Bucket, props),
       removalPolicy: props.environment === EnvironmentName.Production ? RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE : RemovalPolicy.DESTROY,
       lifecycleRules: [
         {
-          expiration: Duration.days(2),
-          prefix: "temp/",
+          expiration: Duration.days(props.expenseReceiptContext.expirationDays.temporaryReceipt),
+          prefix: props.expenseReceiptContext.temporaryKeyPrefix,
           abortIncompleteMultipartUploadAfter: Duration.days(1),
         },
         {
-          prefix: "receipts/",
+          prefix: props.expenseReceiptContext.finalizeReceiptKeyPrefix,
           transitions: [
             {
               storageClass: s3.StorageClass.INTELLIGENT_TIERING,
@@ -42,9 +44,9 @@ export class ReceiptS3Construct extends Construct {
           ],
         },
         {
-          prefix: "receipts/",
-          expiration: Duration.days(1),
-          tagFilters: { ...this.deleteTags },
+          prefix: props.expenseReceiptContext.finalizeReceiptKeyPrefix,
+          expiration: Duration.days(props.expenseReceiptContext.expirationDays.finalizeReceipt),
+          tagFilters: { ...props.expenseReceiptContext.deleteTags },
         },
       ],
     });

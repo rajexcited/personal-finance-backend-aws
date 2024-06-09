@@ -2,6 +2,7 @@ import { validate as uuidValidate, version as uuidVersion } from "uuid";
 import { LoggerBase, getLogger } from "./logger";
 import { _logger } from "./base-config";
 import { parseTimestamp } from "./date-util";
+import { decode } from "../user/pcrypt";
 
 const __logger = getLogger("validations", _logger);
 const DEFAULT_NAME_MAX_LENGTH = 25;
@@ -55,11 +56,13 @@ export const isValidDate = (date: Date | string | number | null | undefined, _lo
 };
 
 export const isValidPassword = (password: string | undefined | null) => {
-  const validLength = isValidLength(password, DEFAULT_PASSWORD_MIN_LENGTH, DEFAULT_PASSWORD_MAX_LENGTH);
+  if (!password) return false;
+  const pprd = decode(password);
+  const validLength = isValidLength(pprd, DEFAULT_PASSWORD_MIN_LENGTH, DEFAULT_PASSWORD_MAX_LENGTH);
   if (!validLength) return false;
 
   const passwordRegex = /^(?=.*[\d])(?=.*[A-Z])(?=.*[!@#$%^&*])[\w!@#$%^&\(\)\=*]{8,25}$/;
-  return passwordRegex.test(password as string);
+  return passwordRegex.test(pprd as string);
 };
 
 export const isValidName = (name: string | undefined | null, maxLength?: number, minLength?: number) => {

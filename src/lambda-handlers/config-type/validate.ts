@@ -3,6 +3,9 @@ import { BelongsTo, _configTypeTableName, getBelongsToGsiPk, getDetailsTablePk }
 import { DbItemConfigType } from "./resource-type";
 
 export const isValidPaymentAccountTypeId = async (pymtAccId: string | null | undefined, userId: string, _logger: LoggerBase) => {
+  if (!pymtAccId) {
+    return false;
+  }
   const confItem = await getConfigItem(pymtAccId, _logger);
   const gsiPk = getBelongsToGsiPk(null, _logger, userId, BelongsTo.PaymentAccountType);
   return confItem?.details.id === pymtAccId && confItem?.details.belongsTo === BelongsTo.PaymentAccountType && gsiPk === confItem.UB_GSI_PK;

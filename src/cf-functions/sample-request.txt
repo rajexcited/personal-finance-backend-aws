@@ -1,0 +1,49 @@
+{
+    request: {
+      method: "GET",
+      uri: "/",
+      querystring: {},
+      headers: {
+        "user-agent": { value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36" },
+        "sec-ch-ua-mobile": { value: "?0" },
+        "cache-control": { value: "no-cache" },
+        host: { value: "dd2hcpj5zpz7k.cloudfront.net" },
+        accept: {
+          value:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,* /*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        },
+        "upgrade-insecure-requests": { value: "1" },
+        "sec-fetch-site": { value: "none" },
+        priority: { value: "u=0, i" },
+        "sec-fetch-dest": { value: "document" },
+        "accept-language": { value: "en-US,en;q=0.9,hi-IN;q=0.8,hi;q=0.7,gu-IN;q=0.6,gu;q=0.5" },
+        "accept-encoding": { value: "gzip, deflate, br, zstd" },
+        pragma: { value: "no-cache" },
+        "sec-ch-ua-platform": { value: '"Windows"' },
+        "sec-fetch-user": { value: "?1" },
+        "sec-ch-ua": { value: '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"' },
+        "sec-fetch-mode": { value: "navigate" },
+      },
+      cookies: {},
+    },
+    version: "1.0",
+    context: {
+      distributionDomainName: "dd2hcpj5zpz7k.cloudfront.net",
+      distributionId: "E2Q4XBNCJ6A08I",
+      eventType: "viewer-request",
+      requestId: "bZ4mjDg_Elg0zclEfud55f9MAC3Z-HvCvfU15xZ67Y_nK08f4O1J8A==",
+    },
+    viewer: { ip: "2601:2c4:4282:73b0:690e:7ddd:ee07:8500" },
+  }
+  
+  ==================================================================================================================================
+  ------------------------                                                                          --------------------------------
+  ==================================================================================================================================
+  body: JSON.stringify({
+    location: newurl,
+    request: request,
+    version: event.version,
+    context: event.context,
+    viewer: event.viewer,
+  })
+

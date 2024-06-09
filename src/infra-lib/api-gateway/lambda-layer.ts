@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { ConstructProps } from "../common";
+import { AwsResourceType, ConstructProps, buildResourceName } from "../common";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 
 export class LambdaLayerConstruct extends Construct {
@@ -9,7 +9,7 @@ export class LambdaLayerConstruct extends Construct {
     super(scope, id);
 
     this.layer = new lambda.LayerVersion(this, "LambdaLayer", {
-      layerVersionName: [props.resourcePrefix, props.environment, "layer"].join("-"),
+      layerVersionName: buildResourceName(["api"], AwsResourceType.LambdaLayer, props),
       compatibleRuntimes: [lambda.Runtime.NODEJS_LATEST],
       // asset path is relative to project
       code: lambda.AssetCode.fromAsset("dist/lambda_layer/"),

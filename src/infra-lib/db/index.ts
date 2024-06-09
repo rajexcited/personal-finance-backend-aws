@@ -17,16 +17,28 @@ export class DBConstruct extends Construct {
   constructor(scope: Construct, id: string, props: ConstructProps) {
     super(scope, id);
 
-    const userDb = new UserDBConstruct(this, "UserDbConstruct", { ...props });
+    const userDb = new UserDBConstruct(this, "UserDbConstruct", {
+      environment: props.environment,
+      resourcePrefix: props.resourcePrefix,
+    });
     this.userTable = userDb.userTable;
 
-    const expenseDb = new ExpenseDBConstruct(this, "ExpenseDbConstruct", { ...props });
+    const expenseDb = new ExpenseDBConstruct(this, "ExpenseDbConstruct", {
+      environment: props.environment,
+      resourcePrefix: props.resourcePrefix,
+    });
     this.expenseTable = expenseDb.expenseTable;
 
-    const pymtAccDb = new PymtAccDBConstruct(this, "PymtAccDbConstruct", { ...props });
+    const pymtAccDb = new PymtAccDBConstruct(this, "PymtAccDbConstruct", {
+      environment: props.environment,
+      resourcePrefix: props.resourcePrefix,
+    });
     this.paymentAccountTable = pymtAccDb.pymtAccTable;
 
-    const cfgTypDb = new ConfigTypeDBConstruct(this, "CfgTypDbConstruct", { ...props });
+    const cfgTypDb = new ConfigTypeDBConstruct(this, "CfgTypDbConstruct", {
+      environment: props.environment,
+      resourcePrefix: props.resourcePrefix,
+    });
     this.configTypeTable = cfgTypDb.cfgTypTable;
   }
 }

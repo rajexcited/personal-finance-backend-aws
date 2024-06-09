@@ -29,5 +29,6 @@ export const renewToken = apiGatewayHandlerWrapper(async (event: APIGatewayProxy
   return {
     accessToken: accessTokenObj.token,
     expiresIn: accessTokenObj.expiresIn(),
+    expiryTime: accessTokenObj.getExpiresAt().toMillis(),
   };
 });

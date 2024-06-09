@@ -1,2 +1,4 @@
 export { EnvironmentName } from "./env-enum";
-export { ConstructProps } from "./props-type";
+export { ConstructProps, AwsResourceType } from "./props-type";
+export { buildResourceName } from "./utils";
+export { ContextInfo, ApigatewayContextInfo, ExpenseReceiptContextInfo, CloudFrontContextInfo } from "./context-type";

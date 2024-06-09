@@ -72,10 +72,10 @@ const validateEvent = (event: APIGatewayProxyEvent, requiredBodyType?: RequestBo
     if (!event.body) {
       throw new ValidationError([{ path: "request", message: "missing request body" }]);
     }
-    if (event.headers["Content-Type"] !== requiredBodyType) {
+    if (event.headers["Content-Type"] !== requiredBodyType && event.headers["content-type"] !== requiredBodyType) {
       throw new ValidationError([{ path: "request", message: "incorrect request body" }]);
     }
-    if (event.headers["Content-Type"] === RequestBodyContentType.JSON) {
+    if (event.headers["Content-Type"] === RequestBodyContentType.JSON || event.headers["content-type"] === RequestBodyContentType.JSON) {
       event.body = atob(event.body);
       if (!utils.getJsonObj(event.body)) {
         throw new ValidationError([{ path: "request", message: "not valid json" }]);

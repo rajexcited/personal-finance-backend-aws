@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { ConstructProps, EnvironmentName } from "../common";
+import { AwsResourceType, ConstructProps, EnvironmentName, buildResourceName } from "../common";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import { DbProps } from "../db/db-prop-type";
@@ -13,6 +13,7 @@ import { SecretStringGenerator } from "aws-cdk-lib/aws-secretsmanager";
 interface TokenAuthorizerProps extends ConstructProps {
   layer: lambda.ILayerVersion;
   userTable: DbProps;
+  restApiPathPrefix: string;
 }
 
 export class TokenAuthorizerConstruct extends Construct {
@@ -41,7 +42,7 @@ export class TokenAuthorizerConstruct extends Construct {
     // https://awscli.amazonaws.com/v2/documentation/api/latest/reference/kms/list-aliases.html#examples
     const tokenSecret = new secretsmanager.Secret(this, "TokenSecret", {
       description: "secret used to sign jwt token",
-      secretName: [props.resourcePrefix, props.environment, "jwt", "secret"].join("-"),
+      secretName: buildResourceName(["jwt"], AwsResourceType.SecretManager, props),
       encryptionKey: kms.Alias.fromAliasName(this, "tokenKms", "alias/aws/secretsmanager"),
       removalPolicy: RemovalPolicy.DESTROY,
       generateSecretString: generateTokenConfig,
@@ -49,7 +50,7 @@ export class TokenAuthorizerConstruct extends Construct {
     this.tokenSecret = tokenSecret;
 
     const tokenSecretLambdaFunction = new lambda.Function(this, "SecretRotationLambda", {
-      functionName: [props.resourcePrefix, props.environment, "token", "secret", "rotation", "func"].join("-"),
+      functionName: buildResourceName(["token", "secret", "rotation"], AwsResourceType.Lambda, props),
       runtime: lambda.Runtime.NODEJS_LATEST,
       handler: "index.secretRotator",
       code: lambda.Code.fromAsset("src/lambda-handlers"),
@@ -65,7 +66,7 @@ export class TokenAuthorizerConstruct extends Construct {
     });
 
     const tokenAuthorizerFunction = new lambda.Function(this, "TokenAuthorizerLambda", {
-      functionName: [props.resourcePrefix, props.environment, "token", "auth", "lambda", "func"].join("-"),
+      functionName: buildResourceName(["token", "auth"], AwsResourceType.Lambda, props),
       runtime: lambda.Runtime.NODEJS_LATEST,
       handler: "index.authorizer",
       // asset path is relative to project
@@ -74,6 +75,7 @@ export class TokenAuthorizerConstruct extends Construct {
       environment: {
         USER_TABLE_NAME: props.userTable.table.name,
         TOKEN_SECRET_ID: tokenSecret.secretName,
+        ROOT_PATH: props.restApiPathPrefix,
         DEFAULT_LOG_LEVEL: props.environment === EnvironmentName.LOCAL ? "debug" : "undefined",
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
@@ -82,9 +84,8 @@ export class TokenAuthorizerConstruct extends Construct {
     props.userTable.table.ref.grantReadData(tokenAuthorizerFunction);
 
     const authorizer = new apigateway.TokenAuthorizer(this, "UserAccessTokenAuthorizer", {
-      authorizerName: [props.resourcePrefix, props.environment, "user", "accesstoken", "authorizer"].join("-"),
+      authorizerName: buildResourceName(["user", "accesstoken"], AwsResourceType.TokenAuthorizer, props),
       handler: tokenAuthorizerFunction,
-      // identitySource: "Authorization",
       validationRegex: "Bearer .+",
       resultsCacheTtl: Duration.minutes(1),
     });

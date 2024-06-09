@@ -1,6 +1,6 @@
 import { Construct } from "constructs";
 import { AttributeType, TableV2, TableClass, ProjectionType, GlobalSecondaryIndexPropsV2 } from "aws-cdk-lib/aws-dynamodb";
-import { ConstructProps, EnvironmentName } from "../common";
+import { ConstructProps, EnvironmentName, buildResourceName, AwsResourceType } from "../common";
 import { RemovalPolicy } from "aws-cdk-lib";
 import { DbProps } from "./db-prop-type";
 
@@ -18,7 +18,7 @@ export class ConfigTypeDBConstruct extends Construct {
     super(scope, id);
 
     const db = new TableV2(this, "ConfigTypeDynamoDb", {
-      tableName: [props.resourcePrefix, props.environment, "cfg", "type", "dynamodb"].join("-"),
+      tableName: buildResourceName(["cfg", "type"], AwsResourceType.Dynamodb, props),
       partitionKey: { name: "PK", type: AttributeType.STRING },
       tableClass: TableClass.STANDARD_INFREQUENT_ACCESS,
       pointInTimeRecovery: props.environment === EnvironmentName.Production,
@@ -26,7 +26,7 @@ export class ConfigTypeDBConstruct extends Construct {
     });
 
     const gsiProp: GlobalSecondaryIndexPropsV2 = {
-      indexName: ["userId", "belongsTo", "index"].join("-"),
+      indexName: buildResourceName(["userId", "belongsTo"], AwsResourceType.GlobalSecondaryIndex),
       partitionKey: { name: "UB_GSI_PK", type: AttributeType.STRING },
       sortKey: { name: "UB_GSI_SK", type: AttributeType.STRING },
       projectionType: ProjectionType.ALL,

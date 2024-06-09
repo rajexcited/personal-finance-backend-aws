@@ -32,6 +32,4 @@ export {
   addUpdateExpense as expenseAddUpdate,
   deleteExpense as expenseDeleteDetails,
   updateExpenseStatus as expenseStatusUpdate,
-  RECEIPT_KEY_PREFIX,
-  RECEIPT_TEMP_KEY_PREFIX,
 } from "./expenses";

@@ -1,11 +1,10 @@
 import { Construct } from "constructs";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import { UserApiConstruct } from "./user-api-gateway";
-import { ConstructProps } from "../common";
+import { AwsResourceType, ConstructProps, buildResourceName, ApigatewayContextInfo, ExpenseReceiptContextInfo } from "../common";
 import { DBConstruct } from "../db";
 import { LambdaLayerConstruct } from "./lambda-layer";
 import { TokenAuthorizerConstruct } from "./authorizer-lambda";
-import { ContextInfo } from "../context-type";
 import { ConfigTypeApiConstruct } from "./config-types-api-gateway";
 import { IBucket } from "aws-cdk-lib/aws-s3";
 import { PymtAccApiConstruct } from "./pymt-acc-api-gateway";
@@ -14,15 +13,19 @@ import { ReceiptS3Construct } from "../receipts-s3";
 
 interface ApiProps extends ConstructProps {
   allDb: DBConstruct;
-  contextInfo: ContextInfo;
+  apiContext: ApigatewayContextInfo;
+  restApiPathPrefix: string;
   configBucket: IBucket;
   receiptS3: ReceiptS3Construct;
+  expenseReceiptContext: ExpenseReceiptContextInfo;
 }
 
 // https://docs.aws.amazon.com/apigateway/latest/developerguide/how-to-set-up-method-using-console.html
 // setup api key to api gateway - so i can control which app can access api gateway and limit the calls / throttling, etc. hence improved costing
 // https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-api-usage-plans.html
 export class ApiConstruct extends Construct {
+  public readonly restApi: apigateway.RestApi;
+
   constructor(scope: Construct, id: string, props: ApiProps) {
     super(scope, id);
 
@@ -32,13 +35,14 @@ export class ApiConstruct extends Construct {
       resourcePrefix: props.resourcePrefix,
       layer: lambdaLayer.layer,
       userTable: props.allDb.userTable,
+      restApiPathPrefix: props.restApiPathPrefix,
     });
 
     const restApi = new apigateway.RestApi(this, "MyFinanceRestApi", {
-      restApiName: [props.resourcePrefix, props.environment, "rest", "api"].join("-"),
+      restApiName: buildResourceName(["backend"], AwsResourceType.RestApi, props),
       binaryMediaTypes: ["*/*"],
       deployOptions: {
-        stageName: props.contextInfo.apiStageName,
+        stageName: props.apiContext.stageName,
         description: "my finance rest apis",
         loggingLevel: apigateway.MethodLoggingLevel.INFO,
         // accessLogDestination: new apigateway.LogGroupLogDestination(
@@ -49,6 +53,12 @@ export class ApiConstruct extends Construct {
         // ),
       },
     });
+    this.restApi = restApi;
+
+    const apiResource = props.restApiPathPrefix
+      .split("/")
+      .filter((path) => path)
+      .reduce((prevRsc, path) => prevRsc.addResource(path), restApi.root);
 
     const userApi = new UserApiConstruct(this, "UserApiConstruct", {
       environment: props.environment,
@@ -61,6 +71,7 @@ export class ApiConstruct extends Construct {
       authorizer: tokenAuthorizer.authorizer,
       tokenSecret: tokenAuthorizer.tokenSecret,
       restApi: restApi,
+      apiResource: apiResource,
     });
 
     const configTypeApi = new ConfigTypeApiConstruct(this, "ConfigTypeApiConstruct", {
@@ -72,6 +83,7 @@ export class ApiConstruct extends Construct {
       layer: lambdaLayer.layer,
       authorizer: tokenAuthorizer.authorizer,
       restApi: restApi,
+      apiResource: apiResource,
     });
 
     const pymtAccApi = new PymtAccApiConstruct(this, "PymtAccApiConstruct", {
@@ -83,6 +95,7 @@ export class ApiConstruct extends Construct {
       layer: lambdaLayer.layer,
       authorizer: tokenAuthorizer.authorizer,
       restApi: restApi,
+      apiResource: apiResource,
     });
 
     const expenseApi = new ExpenseApiConstruct(this, "ExpenseApiConstruct", {
@@ -95,8 +108,9 @@ export class ApiConstruct extends Construct {
       layer: lambdaLayer.layer,
       authorizer: tokenAuthorizer.authorizer,
       restApi: restApi,
+      apiResource: apiResource,
       receiptBucket: props.receiptS3.receiptBucket,
-      receiptDeleteTags: props.receiptS3.deleteTags,
+      expenseReceiptContext: props.expenseReceiptContext,
     });
   }
 }

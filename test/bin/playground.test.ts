@@ -51,6 +51,12 @@ describe("play ground", () => {
   });
 
   test("bcryptjs password", () => {
+    const salt = bcrypt.genSaltSync();
+    console.log("generated salt: ", salt);
+    expect(salt).not.toEqual("");
+  });
+
+  test("bcryptjs password", () => {
     // const salt = bcrypt.genSaltSync();
     const salt = "$2a$10$W/EGvoV3Bl3oqXpnXAhMq.";
     const hash = bcrypt.hashSync("password", salt);

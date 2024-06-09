@@ -46,14 +46,34 @@
     "@aws-cdk/aws-rds:preventRenderingDeprecatedCredentials": true,
     "@aws-cdk/aws-codepipeline-actions:useNewDefaultBranchForCodeCommitSource": true,
     "@aws-cdk/aws-cloudwatch-actions:changeLambdaPermissionLogicalIdForLambdaAction": true,
+
     "local": {
-      "apiStageName": "local-development"
+      "expenseReceipt": {
+        "temporaryKeyPrefix": "temp/",
+        "finalizeReceiptKeyPrefix": "receipts/",
+        "deleteTags": {
+          "delete": "schedule"
+        },
+        "expirationDays": {
+          "finalizeReceipt": 1,
+          "temporaryReceipt": 1
+        }
+      },
+      "apigateway": {
+        "stageName": "local-development"
+      },
+      "cloudfront": {
+        "geoRestriction": {
+          "allowCountryCodes": ["US"]
+        },
+        "pathPrefix": {
+          "ui": "/ui",
+          "errors": "/errors",
+          "restApi": "/api"
+        },
+        "enableWebAcl": true,
+        "homepageUrl": "personal-finance"
+      }
     }
-  },
-  "local": {
-    "apiStageName": "local-development"
-  },
-  "dev": {},
-  "test": {},
-  "prod": {}
+  }
 }

@@ -1,18 +1,16 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { IllegelArgumentError, ValidationError } from "../apigateway";
-import { getLogger, validations, dateutil, LoggerBase, s3utils } from "../utils";
-import { ApiReceiptResource, DbItemExpense, DbItemExpenseItem, DbReceiptDetails } from "./resource-type";
+import { getLogger, validations, dateutil, LoggerBase } from "../utils";
 
 export const _expenseTableName = process.env.EXPENSES_TABLE_NAME as string;
 export const _userIdStatusDateIndex = process.env.EXPENSE_USERID_DATE_GSI_NAME as string;
 export const _expenseReceiptsBucketName = process.env.EXPENSE_RECEIPTS_BUCKET_NAME as string;
+export const _receiptTempKeyPrefix = process.env.RECEIPT_TEMP_KEY_PREFIX as string;
+export const _receiptKeyPrefix = process.env.RECEIPT_KEY_PREFIX as string;
 
 export const _logger = getLogger("expenses");
 
 export const GSI_ATTR_DATE_FORMAT = "YYYY-MM-DD";
-export const RECEIPT_TEMP_KEY_PREFIX = "temp";
-export const RECEIPT_KEY_PREFIX = "receipts";
 
 export enum ErrorMessage {
   INCORRECT_VALUE = "incorrect value",
@@ -154,5 +152,5 @@ export const getValidatedExpenseIdFromPathParam = (event: APIGatewayProxyEvent, 
 };
 
 export const getReceiptPathkey = (receiptId: string, expenseId: string, userId: string) => {
-  return [RECEIPT_KEY_PREFIX, userId, expenseId, receiptId].join("/");
+  return [_receiptKeyPrefix, userId, expenseId, receiptId].join("/");
 };
