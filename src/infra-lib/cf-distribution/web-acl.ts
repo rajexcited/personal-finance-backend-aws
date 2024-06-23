@@ -37,6 +37,15 @@ export class MyWebAclConstructConstruct extends Construct {
         managedRuleGroupStatement: {
           vendorName: "AWS",
           name: "AWSManagedRulesCommonRuleSet",
+          ruleActionOverrides: [
+            {
+              // https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-setting-body-inspection-limit.html
+              name: "SizeRestrictions_BODY",
+              actionToUse: {
+                allow: {},
+              },
+            },
+          ],
         },
       },
       overrideAction: {
