@@ -16,6 +16,7 @@ import {
   SHORTNAME_MAX_LENGTH,
   _logger,
   _pymtAccTableName,
+  _userIdStatusShortnameIndex,
   getDetailsTablePk,
   getUserIdStatusShortnameGsiPk,
   getUserIdStatusShortnameGsiSk,
@@ -26,6 +27,7 @@ import { ApiPaymentAccountResource, DbPaymentAccountDetails, DbItemPymtAcc } fro
 import { v4 as uuidv4 } from "uuid";
 import { isValidAccountIdNum, isValidInstitutionName } from "./validate";
 import { isValidPaymentAccountTypeId } from "../config-type";
+import { GetCommandInput, QueryCommandInput } from "@aws-sdk/lib-dynamodb";
 
 const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("addUpdateDetails", _logger);
@@ -36,7 +38,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   // perform the add or update
   let existingDbItem: DbItemPymtAcc | null = null;
   if (req.id) {
-    const cmdInput = {
+    const cmdInput: GetCommandInput = {
       TableName: _pymtAccTableName,
       Key: { PK: getDetailsTablePk(req.id) },
     };
@@ -46,10 +48,24 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
     if (output.Item) {
       existingDbItem = output.Item as DbItemPymtAcc;
       // validate user access to config details
-      const gsiPkForReq = getUserIdStatusShortnameGsiPk(userId, existingDbItem.details.status);
+      const gsiPkForReq = getUserIdStatusShortnameGsiPk(userId, PymtAccStatus.ENABLE);
       if (gsiPkForReq !== existingDbItem.UP_GSI_PK) {
         // not same user
         throw new UnAuthorizedError("not authorized to update payment type details");
+      }
+    } else {
+      const queryCmdInput: QueryCommandInput = {
+        TableName: _pymtAccTableName,
+        IndexName: _userIdStatusShortnameIndex,
+        KeyConditionExpression: "UP_GSI_PK = :pkv and UP_GSI_SK = :skv",
+        ExpressionAttributeValues: {
+          ":pkv": getUserIdStatusShortnameGsiPk(userId, PymtAccStatus.ENABLE),
+          ":skv": getUserIdStatusShortnameGsiSk(req.shortName),
+        },
+      };
+      const result = await dbutil.queryOnce(queryCmdInput, logger);
+      if (result.Items?.length) {
+        throw new ValidationError([{ path: PymtAccResourcePath.SHORTNAME, message: ErrorMessage.DUPLICATE_VALUE }]);
       }
     }
   }
@@ -72,7 +88,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   const dbItem: DbItemPymtAcc = {
     PK: getDetailsTablePk(pymtAccId),
     UP_GSI_PK: getUserIdStatusShortnameGsiPk(userId, apiToDbDetails.status),
-    UP_GSI_SK: getUserIdStatusShortnameGsiSk(apiToDbDetails.shortName),
+    UP_GSI_SK: getUserIdStatusShortnameGsiSk(req.shortName),
     details: apiToDbDetails,
   };
 

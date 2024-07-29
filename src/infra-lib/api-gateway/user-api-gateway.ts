@@ -8,17 +8,26 @@ import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as kms from "aws-cdk-lib/aws-kms";
 import { Duration, RemovalPolicy } from "aws-cdk-lib";
 import { JSONObject } from "../../lambda-handlers";
-import { DbProps } from "../db";
+import { ConfigDbProps, PymtAccDbProps, UserDbProps } from "../db";
 import { IBucket } from "aws-cdk-lib/aws-s3";
 import { AwsResourceType, EnvironmentName, buildResourceName } from "../common";
 import { BaseApiConstruct } from "./base-api";
 
 interface UserApiProps extends RestApiProps {
-  userTable: DbProps;
-  configTypeTable: DbProps;
-  paymentAccountTable: DbProps;
+  userTable: UserDbProps;
+  configTypeTable: ConfigDbProps;
+  paymentAccountTable: PymtAccDbProps;
   configBucket: IBucket;
   tokenSecret: secretsmanager.Secret;
+}
+
+enum UserLambdaHandler {
+  Login = "index.userLogin",
+  Signup = "index.userSignup",
+  Logout = "index.userLogout",
+  Refresh = "index.userTokenRefresh",
+  GetItem = "index.userDetailsGet",
+  UpdateItem = "index.userDetailsUpdate",
 }
 
 enum ModelId {
@@ -27,14 +36,11 @@ enum ModelId {
 }
 
 export class UserApiConstruct extends BaseApiConstruct {
-  private readonly props: UserApiProps;
-  private modelMap = new Map<ModelId, apigateway.Model>();
   private readonly pSaltSecret: secretsmanager.Secret;
 
   constructor(scope: Construct, id: string, props: UserApiProps) {
-    super(scope, id);
+    super(scope, id, props);
 
-    this.props = props;
     // https://awscli.amazonaws.com/v2/documentation/api/latest/reference/kms/list-aliases.html#examples
     this.pSaltSecret = new secretsmanager.Secret(this, "PSaltSecret", {
       description: "secret used in encryption",
@@ -47,66 +53,62 @@ export class UserApiConstruct extends BaseApiConstruct {
     //  request validator setup
     // https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-method-request-validation.html
     const userLoginResource = userResource.addResource("login");
-    const loginlambdaFunction = this.buildApi(userLoginResource, HttpMethod.POST, "index.userLogin", false, ModelId.UserLoginModel);
+    const loginlambdaFunction = this.buildApi(userLoginResource, HttpMethod.POST, UserLambdaHandler.Login);
     props.userTable.table.ref.grantReadWriteData(loginlambdaFunction);
 
     const userSignupResource = userResource.addResource("signup");
-    const signuplambdaFunction = this.buildApi(userSignupResource, HttpMethod.POST, "index.userSignup", false, ModelId.UserSignupModel);
+    const signuplambdaFunction = this.buildApi(userSignupResource, HttpMethod.POST, UserLambdaHandler.Signup);
     props.userTable.table.ref.grantReadWriteData(signuplambdaFunction);
     props.configTypeTable.table.ref.grantReadWriteData(signuplambdaFunction);
     props.paymentAccountTable.table.ref.grantWriteData(signuplambdaFunction);
 
     const userLogoutResource = userResource.addResource("logout");
-    const logoutlambdaFunction = this.buildApi(userLogoutResource, HttpMethod.POST, "index.userLogout", true);
+    const logoutlambdaFunction = this.buildApi(userLogoutResource, HttpMethod.POST, UserLambdaHandler.Logout);
     props.userTable.table.ref.grantReadWriteData(logoutlambdaFunction);
 
     const userRenewResource = userResource.addResource("refresh");
-    const renewlambdaFunction = this.buildApi(userRenewResource, HttpMethod.POST, "index.userTokenRefresh", true);
+    const renewlambdaFunction = this.buildApi(userRenewResource, HttpMethod.POST, UserLambdaHandler.Refresh);
     props.userTable.table.ref.grantReadWriteData(renewlambdaFunction);
 
     const userDetailsResource = userResource.addResource("details");
-    const getDetailsLambdaFunction = this.buildApi(userDetailsResource, HttpMethod.GET, "index.userDetailsGet", true);
+    const getDetailsLambdaFunction = this.buildApi(userDetailsResource, HttpMethod.GET, UserLambdaHandler.GetItem);
     props.userTable.table.ref.grantReadData(getDetailsLambdaFunction);
 
-    const updateDetailsLambdaFunction = this.buildApi(userDetailsResource, HttpMethod.POST, "index.userDetailsUpdate", true);
+    const updateDetailsLambdaFunction = this.buildApi(userDetailsResource, HttpMethod.POST, UserLambdaHandler.UpdateItem);
     props.userTable.table.ref.grantReadWriteData(updateDetailsLambdaFunction);
   }
 
-  private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: string, applyAuthorize: boolean, modelId?: ModelId) {
-    const useTokenSecret =
-      lambdaHandlerName.includes("userLogin") || lambdaHandlerName.includes("userSignup") || lambdaHandlerName.includes("userTokenRefresh");
+  private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: UserLambdaHandler) {
+    const useTokenSecret = [UserLambdaHandler.Login, UserLambdaHandler.Signup, UserLambdaHandler.Refresh].includes(lambdaHandlerName);
+    const usePsaltSecret = [UserLambdaHandler.Login, UserLambdaHandler.Signup, UserLambdaHandler.UpdateItem].includes(lambdaHandlerName);
 
-    const usePsaltSecret =
-      lambdaHandlerName.includes("userLogin") || lambdaHandlerName.includes("userSignup") || lambdaHandlerName.includes("userDetailsUpdate");
-
+    const props = this.props as UserApiProps;
     const additionalEnvs: JSONObject = {};
     if (useTokenSecret) {
-      additionalEnvs.TOKEN_SECRET_ID = this.props.tokenSecret.secretName;
+      additionalEnvs.TOKEN_SECRET_ID = props.tokenSecret.secretName;
     }
 
     if (usePsaltSecret) {
       additionalEnvs.PSALT_SECRET_ID = this.pSaltSecret.secretName;
     }
 
-    if (lambdaHandlerName.includes("userSignup")) {
-      additionalEnvs.CONFIG_DATA_BUCKET_NAME = this.props.configBucket.bucketName;
-      additionalEnvs.CONFIG_TYPE_TABLE_NAME = this.props.configTypeTable.table.name;
-      additionalEnvs.CONFIG_TYPE_BELONGS_TO_GSI_NAME = this.props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name;
-      additionalEnvs.PAYMENT_ACCOUNT_TABLE_NAME = this.props.paymentAccountTable.table.name;
+    if (lambdaHandlerName === UserLambdaHandler.Signup) {
+      additionalEnvs.CONFIG_DATA_BUCKET_NAME = props.configBucket.bucketName;
+      additionalEnvs.CONFIG_TYPE_TABLE_NAME = props.configTypeTable.table.name;
+      additionalEnvs.CONFIG_TYPE_BELONGS_TO_GSI_NAME = props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name;
+      additionalEnvs.PAYMENT_ACCOUNT_TABLE_NAME = props.paymentAccountTable.table.name;
     }
 
-    const uniqueConstructName = method + lambdaHandlerName.replace("index.", "");
-    const lambdaNameParts = [...lambdaHandlerName.split(".").slice(1), String(method).toLowerCase()];
-    const userLambdaFunction = new lambda.Function(this, `User${uniqueConstructName}Lambda`, {
-      functionName: buildResourceName(lambdaNameParts, AwsResourceType.Lambda, this.props),
+    const userLambdaFunction = new lambda.Function(this, this.getLambdaHandlerId(lambdaHandlerName, method), {
+      functionName: this.getLambdaFunctionName(lambdaHandlerName, method),
       runtime: lambda.Runtime.NODEJS_LATEST,
       handler: lambdaHandlerName,
       // asset path is relative to project
       code: lambda.Code.fromAsset("src/lambda-handlers"),
-      layers: [this.props.layer],
+      layers: [props.layer],
       environment: {
-        USER_TABLE_NAME: this.props.userTable.table.name,
-        USER_EMAIL_GSI_NAME: this.props.userTable.globalSecondaryIndexes.emailIdIndex.name,
+        USER_TABLE_NAME: props.userTable.table.name,
+        USER_EMAIL_GSI_NAME: props.userTable.globalSecondaryIndexes.emailIdIndex.name,
         DEFAULT_LOG_LEVEL: this.props.environment === EnvironmentName.LOCAL ? "debug" : "undefined",
         ...additionalEnvs,
       },
@@ -115,15 +117,15 @@ export class UserApiConstruct extends BaseApiConstruct {
     });
 
     if (useTokenSecret) {
-      this.props.tokenSecret.grantRead(userLambdaFunction);
+      props.tokenSecret.grantRead(userLambdaFunction);
     }
 
     if (usePsaltSecret) {
       this.pSaltSecret.grantRead(userLambdaFunction);
     }
 
-    if (lambdaHandlerName.includes("userSignup")) {
-      this.props.configBucket.grantRead(userLambdaFunction);
+    if (lambdaHandlerName === UserLambdaHandler.Signup) {
+      props.configBucket.grantRead(userLambdaFunction);
     }
 
     const userLambdaIntegration = new apigateway.LambdaIntegration(userLambdaFunction, {
@@ -131,48 +133,31 @@ export class UserApiConstruct extends BaseApiConstruct {
       passthroughBehavior: apigateway.PassthroughBehavior.NEVER,
     });
 
+    const baseMethodOption = this.getRequestMethodOptions(lambdaHandlerName, resource);
+
+    const applyAuthorize = ![UserLambdaHandler.Login, UserLambdaHandler.Signup].includes(lambdaHandlerName);
+
     const userMethod = resource.addMethod(String(method), userLambdaIntegration, {
       authorizationType: this.getAuthorizationType(applyAuthorize),
-      authorizer: applyAuthorize ? this.props.authorizer : undefined,
-      requestModels: this.getRequestModel(modelId),
-      requestValidatorOptions: this.getRequestValidateOptions(modelId),
+      authorizer: applyAuthorize ? props.authorizer : undefined,
+      ...baseMethodOption,
     });
 
     return userLambdaFunction;
   }
 
-  private getRequestModel = (modelId: ModelId | undefined) => {
-    let res: { [param: string]: apigateway.IModel } | undefined = undefined;
-    if (modelId) {
-      res = { "application/json": this.getModel(modelId) };
+  getJsonRequestModel(lambdaHandlerName: string): apigateway.Model | undefined {
+    if (lambdaHandlerName === UserLambdaHandler.Login) {
+      return this.getLoginModel();
     }
-    return res;
-  };
-
-  private getRequestValidateOptions = (modelId: ModelId | undefined) => {
-    let res: apigateway.RequestValidatorOptions | undefined = undefined;
-    if (modelId) {
-      res = { validateRequestBody: true };
+    if (lambdaHandlerName === UserLambdaHandler.Signup) {
+      return this.getSignupModel();
     }
-    return res;
-  };
+    return undefined;
+  }
 
   private getAuthorizationType = (authorize?: boolean) => {
     return !!authorize ? apigateway.AuthorizationType.CUSTOM : apigateway.AuthorizationType.NONE;
-  };
-
-  private getModel = (id: ModelId) => {
-    let model: apigateway.Model | undefined;
-    if (this.modelMap.has(id)) {
-      model = this.modelMap.get(id);
-    } else if (id === ModelId.UserLoginModel) {
-      model = this.getLoginModel();
-    } else if (id === ModelId.UserSignupModel) {
-      model = this.getSignupModel();
-    }
-    if (!model) throw new Error("unknown model id [" + id + "]");
-    this.modelMap.set(id, model);
-    return model;
   };
 
   /**
@@ -181,7 +166,8 @@ export class UserApiConstruct extends BaseApiConstruct {
    * @returns
    */
   private getLoginModel = () => {
-    const userModel: apigateway.Model = this.props.restApi.addModel(ModelId.UserLoginModel, {
+    const props = this.props as RestApiProps;
+    const userModel: apigateway.Model = props.restApi.addModel(ModelId.UserLoginModel, {
       modelName: ModelId.UserLoginModel,
       contentType: "application/json",
       description: "model for user login",
@@ -215,7 +201,8 @@ export class UserApiConstruct extends BaseApiConstruct {
    * @returns
    */
   private getSignupModel = () => {
-    const userModel: apigateway.Model = this.props.restApi.addModel(ModelId.UserSignupModel, {
+    const props = this.props as RestApiProps;
+    const userModel: apigateway.Model = props.restApi.addModel(ModelId.UserSignupModel, {
       modelName: ModelId.UserSignupModel,
       contentType: "application/json",
       description: "model for user signup",

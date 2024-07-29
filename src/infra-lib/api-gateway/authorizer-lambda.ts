@@ -2,7 +2,7 @@ import { Construct } from "constructs";
 import { AwsResourceType, ConstructProps, EnvironmentName, buildResourceName } from "../common";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
-import { DbProps } from "../db/db-prop-type";
+import { UserDbProps } from "../db/db-prop-type";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as kms from "aws-cdk-lib/aws-kms";
 import * as logs from "aws-cdk-lib/aws-logs";
@@ -12,7 +12,7 @@ import { SecretStringGenerator } from "aws-cdk-lib/aws-secretsmanager";
 
 interface TokenAuthorizerProps extends ConstructProps {
   layer: lambda.ILayerVersion;
-  userTable: DbProps;
+  userTable: UserDbProps;
   restApiPathPrefix: string;
 }
 

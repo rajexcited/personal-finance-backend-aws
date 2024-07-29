@@ -1,5 +1,5 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
-import { LoggerBase, getLogger } from "../utils";
+import { LoggerBase, getLogger, validations } from "../utils";
 import { getValidatedUserId } from "../user";
 import { ValidationError } from "../apigateway";
 
@@ -82,4 +82,20 @@ export const getValidatedBelongsTo = (event: APIGatewayProxyEvent, loggerBase: L
 
 export const isBelongsToValid = (belongsTo: BelongsTo | string) => {
   return BelongsTo.ExpenseCategory === belongsTo || BelongsTo.PaymentAccountType === belongsTo || BelongsTo.CurrencyProfile === belongsTo;
+};
+
+export const getValidatedConfigId = (event: APIGatewayProxyEvent, loggerBase: LoggerBase) => {
+  const logger = getLogger("getValidatedBelongsTo", loggerBase);
+  const configId = event.pathParameters?.configId;
+  logger.info("path parameter, configId =", configId);
+
+  if (!configId) {
+    throw new ValidationError([{ path: ConfigResourcePath.ID, message: ErrorMessage.MISSING_VALUE }]);
+  }
+
+  if (!validations.isValidUuid(configId)) {
+    throw new ValidationError([{ path: ConfigResourcePath.ID, message: ErrorMessage.INCORRECT_VALUE }]);
+  }
+
+  return configId;
 };

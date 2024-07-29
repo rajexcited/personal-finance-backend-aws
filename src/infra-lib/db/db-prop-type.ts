@@ -1,6 +1,6 @@
 import { TableV2 } from "aws-cdk-lib/aws-dynamodb";
 
-export interface DbSecondaryIndex {
+interface DbSecondaryIndex {
   name: string;
 }
 
@@ -9,9 +9,26 @@ interface DbTableRef {
   name: string;
 }
 
-export interface DbProps {
+type IndexName = `${string}Index`;
+type GlobalSecondaryIndexes = Record<IndexName, DbSecondaryIndex>;
+
+interface DbProps {
   table: DbTableRef;
-  globalSecondaryIndexes: {
-    [indexName: string]: DbSecondaryIndex;
-  };
+  globalSecondaryIndexes: GlobalSecondaryIndexes;
+}
+
+export interface ConfigDbProps extends DbProps {
+  globalSecondaryIndexes: Pick<GlobalSecondaryIndexes, "userIdBelongsToIndex">;
+}
+
+export interface ExpenseDbProps extends DbProps {
+  globalSecondaryIndexes: Pick<GlobalSecondaryIndexes, "userIdStatusDateIndex">;
+}
+
+export interface PymtAccDbProps extends DbProps {
+  globalSecondaryIndexes: Pick<GlobalSecondaryIndexes, "userIdStatusShortnameIndex">;
+}
+
+export interface UserDbProps extends DbProps {
+  globalSecondaryIndexes: Pick<GlobalSecondaryIndexes, "emailIdIndex">;
 }

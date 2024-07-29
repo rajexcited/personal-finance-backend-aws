@@ -51,6 +51,5 @@ export const isValidPaymentAccount = async (paymentAccountId: string, userId: st
     return false;
   }
   const item = output.Item as DbItemPymtAcc;
-  const gsiPk = getUserIdStatusShortnameGsiPk(userId);
-  return item.UP_GSI_PK.startsWith(gsiPk);
+  return item.UP_GSI_PK.startsWith(`userId#${userId}`);
 };

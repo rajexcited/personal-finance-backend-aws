@@ -1,3 +1,4 @@
+import { camelCase } from "./camelcase";
 import { AwsResourceType, ConstructProps } from "./props-type";
 
 /**
@@ -14,13 +15,7 @@ export const buildResourceName = (nameParts: string[], awsResourceType: AwsResou
   const propsArray = props ? [props.resourcePrefix, props.environment] : [];
   const name = [...propsArray, ...nameParts, awsResourceType].join(sep);
   if (awsResourceType === AwsResourceType.CftOutput) {
-    const sepRegex = new RegExp(sep + "([a-z])", "g");
-    return (
-      name
-        .replace(sepRegex, (g) => g[1].toUpperCase())
-        // remove additional joined seprator chars if any
-        .replace(new RegExp(sep, "g"), "")
-    );
+    return camelCase(name);
   }
   return name;
 };

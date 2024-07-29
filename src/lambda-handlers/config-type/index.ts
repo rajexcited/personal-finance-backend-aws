@@ -1,4 +1,6 @@
-export { getListOfDetails as getConfigTypes, getConfigId } from "./get-details";
+export { getDetails as getConfigTypeDetails, getConfigId } from "./get-details";
+
+export { getListOfDetails as getConfigTypeList } from "./get-list";
 
 export { addUpdateDetails as updateConfigTypes } from "./add-update-details";
 
@@ -11,3 +13,5 @@ export { DbConfigTypeDetails } from "./resource-type";
 export { ConfigStatus, BelongsTo, _configDataBucketName } from "./base-config";
 
 export { isValidExpenseCategoryId, isValidPaymentAccountTypeId } from "./validate";
+
+export { getConfigTypeTags } from "./get-tags";

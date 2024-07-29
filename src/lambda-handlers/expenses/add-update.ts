@@ -17,9 +17,11 @@ import {
   _logger,
   getDetailsTablePk,
   getItemsTablePk,
+  getTagsTablePk,
   getUserIdStatusDateGsiAttribute1,
   getUserIdStatusDateGsiPk,
   getUserIdStatusDateGsiSk,
+  getUserIdStatusTagGsiSk,
 } from "./base-config";
 import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils, validations } from "../utils";
 import { getAuthorizeUser, getValidatedUserId } from "../user";
@@ -42,6 +44,7 @@ import {
   DbExpenseItemDetails,
   DbItemExpense,
   DbItemExpenseItem,
+  DbItemExpenseTags,
   DbReceiptDetails,
 } from "./resource-type";
 import { StopWatch } from "stopwatch-node";
@@ -78,8 +81,9 @@ const addUpdateExpenseHandler = async (event: APIGatewayProxyEvent) => {
   // receipts copy to s3 if required,
   // delete from s3 if required
   const dbReceipts = await updateReceiptsIns3(receiptActions, req, expenseId, authUser.userId, logger);
-  const dbExpense = await putExpense(req, dbItem, dbReceipts, expenseId, authUser.userId, transactWriter, logger);
-  const dbExpenseItems = await putExpenseItem(req, expenseId, dbExpenseItemsIdList, transactWriter, logger);
+  const dbExpense = putExpense(req, dbItem, dbReceipts, expenseId, authUser.userId, transactWriter, logger);
+  const dbExpenseItems = putExpenseItem(req, expenseId, dbExpenseItemsIdList, transactWriter, logger);
+  putExpenseTags(dbExpense, dbExpenseItems, transactWriter, logger);
 
   await transactWriter.executeTransaction();
 
@@ -94,7 +98,7 @@ const addUpdateExpenseHandler = async (event: APIGatewayProxyEvent) => {
 };
 export const addUpdateExpense = apiGatewayHandlerWrapper(addUpdateExpenseHandler, RequestBodyContentType.JSON);
 
-const putExpense = async (
+const putExpense = (
   req: ApiExpenseResource,
   dbItem: DbItemExpense | null,
   dbReceipts: DbReceiptDetails[],
@@ -133,7 +137,7 @@ const putExpense = async (
   return dbItemXpns;
 };
 
-const putExpenseItem = async (
+const putExpenseItem = (
   req: ApiExpenseResource,
   expenseId: string,
   existingExpenseItemsId: string[],
@@ -171,6 +175,31 @@ const putExpenseItem = async (
   return null;
 };
 
+const putExpenseTags = (
+  dbExpense: DbItemExpense,
+  dbExpenseItem: DbItemExpenseItem | null,
+  transactWriter: dbutil.TransactionWriter,
+  _logger: LoggerBase
+) => {
+  const logger = getLogger("putExpenseTags", _logger);
+
+  const tagSet = new Set(dbExpense.details.tags);
+  dbExpenseItem?.details.items.flatMap((item) => item.tags).forEach((tag) => tagSet.add(tag));
+
+  logger.info("size of tags = ", tagSet.size);
+  const dbExpenseTags: DbItemExpenseTags = {
+    PK: getTagsTablePk(dbExpense.details.id),
+    UD_GSI_PK: dbExpense.UD_GSI_PK,
+    UD_GSI_SK: getUserIdStatusTagGsiSk(dbExpense.details.purchasedDate),
+    details: {
+      tags: [...tagSet],
+    },
+  };
+
+  transactWriter.putItems(dbExpenseTags as unknown as JSONObject, _expenseTableName, logger);
+  return dbExpenseTags;
+};
+
 const getExpenseApiResource = async (
   dbExpense: DbItemExpense,
   dbExpenseItems: DbItemExpenseItem | null,
@@ -192,7 +221,7 @@ const getExpenseApiResource = async (
     return resource;
   });
 
-  const apiReceiptPromises = dbExpense.details.receipts.map(async (rct) => {
+  const apiReceiptPromises = dbExpense.details.receipts.map((rct) => {
     const apiRct: ApiReceiptResource = {
       id: rct.id,
       name: rct.name,
@@ -299,7 +328,7 @@ const getValidatedDbItem = async (req: ApiExpenseResource, userId: string, _logg
     if (xpnsOutput.Item) {
       const dbItem = xpnsOutput.Item as DbItemExpense;
       // validate user access to config details
-      const gsiPkForReq = getUserIdStatusDateGsiPk(userId, dbItem.details.status);
+      const gsiPkForReq = getUserIdStatusDateGsiPk(userId, ExpenseStatus.ENABLE);
       if (gsiPkForReq !== dbItem.UD_GSI_PK || dbItem.ExpiresAt !== undefined) {
         // not same user
         logger.warn("gsiPkForReq =", gsiPkForReq, ", dbItem.UD_GSI_PK =", dbItem.UD_GSI_PK, ", dbItem.ExpiresAt =", dbItem.ExpiresAt);

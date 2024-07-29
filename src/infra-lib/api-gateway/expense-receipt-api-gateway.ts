@@ -14,14 +14,10 @@ interface ExpenseReceiptsApiProps extends RestApiProps {
 }
 
 export class ExpenseReceiptsApiConstruct extends BaseApiConstruct {
-  private readonly props: ExpenseReceiptsApiProps;
-
   constructor(scope: Construct, id: string, props: ExpenseReceiptsApiProps) {
-    super(scope, id);
+    super(scope, id, props);
 
-    this.props = props;
-
-    const receiptIdResource = this.props.expenseIdResource.addResource("receipts").addResource("id").addResource("{receiptId}");
+    const receiptIdResource = props.expenseIdResource.addResource("receipts").addResource("id").addResource("{receiptId}");
     this.uploadReceiptApi(receiptIdResource);
     this.downloadReceiptApi(receiptIdResource);
   }
@@ -32,10 +28,11 @@ export class ExpenseReceiptsApiConstruct extends BaseApiConstruct {
       roleName: buildResourceName(["receipt", "download", "apigateway"], AwsResourceType.ExecutionIamRole, this.props),
       description: "s3 integration execution role to download file",
     });
-    this.props.receiptBucket.grantRead(executeRole, this.props.expenseReceiptContext.finalizeReceiptKeyPrefix + "*");
+    const props = this.props as ExpenseReceiptsApiProps;
 
-    const bucket = this.props.receiptBucket.bucketName;
-    const key = this.props.expenseReceiptContext.finalizeReceiptKeyPrefix + "{userId}/{expenseId}/{receiptId}";
+    props.receiptBucket.grantRead(executeRole, props.expenseReceiptContext.finalizeReceiptKeyPrefix + "*");
+    const bucket = props.receiptBucket.bucketName;
+    const key = props.expenseReceiptContext.finalizeReceiptKeyPrefix + "{userId}/{expenseId}/{receiptId}";
 
     // https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-mapping-template-reference.html#context-variable-reference
     const s3integration = new apigateway.AwsIntegration({
@@ -66,12 +63,13 @@ export class ExpenseReceiptsApiConstruct extends BaseApiConstruct {
       },
     });
 
+    const baseMethodOption = this.getRequestMethodOptions(null, resource);
+
     const resourceMethod = resource.addMethod(HttpMethod.GET, s3integration, {
       authorizationType: apigateway.AuthorizationType.CUSTOM,
-      authorizer: this.props.authorizer,
-      requestValidatorOptions: { validateRequestBody: true, validateRequestParameters: true },
-      requestParameters: this.getRequestParameters(resource),
+      authorizer: props.authorizer,
       methodResponses: [{ statusCode: "200" }, { statusCode: "404" }],
+      ...baseMethodOption,
     });
   }
 
@@ -81,10 +79,11 @@ export class ExpenseReceiptsApiConstruct extends BaseApiConstruct {
       roleName: buildResourceName(["receipt", "upload", "apigateway"], AwsResourceType.ExecutionIamRole, this.props),
       description: "s3 integration execution role to upload file",
     });
-    this.props.receiptBucket.grantPut(executeRole, this.props.expenseReceiptContext.temporaryKeyPrefix + "*");
+    const props = this.props as ExpenseReceiptsApiProps;
 
-    const bucket = this.props.receiptBucket.bucketName;
-    const key = this.props.expenseReceiptContext.temporaryKeyPrefix + "{userId}/{expenseId}/{receiptId}";
+    props.receiptBucket.grantPut(executeRole, props.expenseReceiptContext.temporaryKeyPrefix + "*");
+    const bucket = props.receiptBucket.bucketName;
+    const key = props.expenseReceiptContext.temporaryKeyPrefix + "{userId}/{expenseId}/{receiptId}";
 
     // https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-mapping-template-reference.html#context-variable-reference
     const s3integration = new apigateway.AwsIntegration({
@@ -113,12 +112,21 @@ export class ExpenseReceiptsApiConstruct extends BaseApiConstruct {
       },
     });
 
+    const baseMethodOption = this.getRequestMethodOptions(null, resource);
     const resourceMethod = resource.addMethod(HttpMethod.POST, s3integration, {
       authorizationType: apigateway.AuthorizationType.CUSTOM,
-      authorizer: this.props.authorizer,
-      requestValidatorOptions: { validateRequestBody: true, validateRequestParameters: true },
-      requestParameters: this.getRequestParameters(resource),
+      authorizer: props.authorizer,
       methodResponses: [{ statusCode: "200" }, { statusCode: "403" }],
+      ...baseMethodOption,
     });
+  }
+
+  /**
+   * json request is not supported
+   * @param lambdaHandlerName
+   * @returns
+   */
+  getJsonRequestModel(lambdaHandlerName: string): apigateway.Model | undefined {
+    return undefined;
   }
 }

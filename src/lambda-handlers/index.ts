@@ -12,7 +12,9 @@ export { authorizer, secretRotator } from "./auth";
 export { JSONObject, JSONValue } from "./apigateway";
 
 export {
-  getConfigTypes as configTypeDetailsGet,
+  getConfigTypeTags as configTypeTagList,
+  getConfigTypeList as configTypeDetailsList,
+  getConfigTypeDetails as configTypeDetailsGet,
   updateConfigTypes as configTypeDetailsAddUpdate,
   deleteConfigType as configTypeDelete,
   updateConfigTypeStatus as configTypeStatusUpdate,
@@ -20,13 +22,17 @@ export {
 } from "./config-type";
 
 export {
-  getPaymentAccounts as pymtAccList,
+  getPaymentAccountTags as pymtAccTagList,
+  getPaymentAccountList as pymtAccList,
+  getPaymentAccount as pymtAccGet,
   updatePaymentAccount as pymtAccDetailsAddUpdate,
   deletePaymentAccount as pymtAccDelete,
   updatePaymentAccountStatus as pymtAccStatusUpdate,
 } from "./pymt-acc";
 
 export {
+  getExpenseCount as expenseCount,
+  getExpenseTags as expenseTagList,
   getExpenseList as expenseList,
   getExpeseDetails as expenseGetDetails,
   addUpdateExpense as expenseAddUpdate,

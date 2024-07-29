@@ -1,5 +1,5 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
-import { JSONObject, UnAuthorizedError, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
+import { JSONObject, NotFoundError, UnAuthorizedError, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
 import {
   ErrorMessage,
   PymtAccResourcePath,
@@ -8,8 +8,9 @@ import {
   _pymtAccTableName,
   getDetailsTablePk,
   getUserIdStatusShortnameGsiPk,
+  getValidatedPymtAccId,
 } from "./base-config";
-import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils, validations } from "../utils";
+import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils } from "../utils";
 import { getAuthorizeUser, getValidatedUserId } from "../user";
 import { ApiPaymentAccountResource, DbItemPymtAcc } from "./resource-type";
 
@@ -72,11 +73,18 @@ export const updateStatus = async (userId: string, pymtAccId: string, status: Py
   logger.info("retrieved db result output");
 
   const dbItem = getOutput.Item as DbItemPymtAcc;
+  if (!dbItem) {
+    throw new NotFoundError("db item not exists");
+  }
   // validate user access to config details
   const gsiPkForReq = getUserIdStatusShortnameGsiPk(userId, dbItem.details.status);
   if (gsiPkForReq !== dbItem.UP_GSI_PK) {
     // not same user
     throw new UnAuthorizedError("not authorized to update status of payment account");
+  }
+
+  if (dbItem.details.status === status) {
+    throw new ValidationError([{ path: PymtAccResourcePath.STATUS, message: ErrorMessage.INCORRECT_VALUE }]);
   }
 
   const auditDetails = utils.updateAuditDetails(dbItem.details.auditDetails, userId);
@@ -95,26 +103,10 @@ export const updateStatus = async (userId: string, pymtAccId: string, status: Py
     TableName: _pymtAccTableName,
     Item: updateDbItem,
   };
-  const updatedOutput = await dbutil.putItem(putCmdInput, logger);
+  await dbutil.putItem(putCmdInput, logger);
 
   logger.info("updated status for payment account");
   return updateDbItem.details;
-};
-
-const getValidatedPymtAccId = (event: APIGatewayProxyEvent, loggerBase: LoggerBase) => {
-  const logger = getLogger("getValidatedBelongsTo", loggerBase);
-  const pymtAccId = event.pathParameters?.pymtAccId;
-  logger.info("path parameter, pymtAccId =", pymtAccId);
-
-  if (!pymtAccId) {
-    throw new ValidationError([{ path: PymtAccResourcePath.ID, message: ErrorMessage.MISSING_VALUE }]);
-  }
-
-  if (!validations.isValidUuid(pymtAccId)) {
-    throw new ValidationError([{ path: PymtAccResourcePath.ID, message: ErrorMessage.INCORRECT_VALUE }]);
-  }
-
-  return pymtAccId;
 };
 
 const getValidatedPymtAccStatusFromPath = (event: APIGatewayProxyEvent, loggerBase: LoggerBase) => {

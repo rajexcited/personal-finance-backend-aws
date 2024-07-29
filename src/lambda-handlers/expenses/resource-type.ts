@@ -18,6 +18,15 @@ export interface DbItemExpenseItem {
   details: DbExpenseItemsDetails;
 }
 
+export interface DbItemExpenseTags {
+  PK: string;
+  UD_GSI_PK: string;
+  UD_GSI_SK: string;
+  // ttl value in seconds
+  ExpiresAt?: number;
+  details: DbTagDetails;
+}
+
 export interface DbExpenseDetailsBase {
   id: string;
   billName: string;
@@ -34,7 +43,10 @@ export interface DbExpenseDetails extends DbExpenseDetailsBase {
   receipts: DbReceiptDetails[];
   status: ExpenseStatus;
   auditDetails: AuditDetailsType;
-  deletedTimestamp?: string;
+}
+
+export interface DbTagDetails {
+  tags: string[];
 }
 
 export enum ReceiptContentType {
@@ -83,5 +95,4 @@ export interface ApiExpenseResource extends ApiExpenseResourceBase {
   status?: ExpenseStatus;
   auditDetails?: AuditDetailsType;
   expenseItems?: ApiExpenseItemResource[];
-  deletedTimestamp?: string;
 }

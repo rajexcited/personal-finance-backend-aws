@@ -39,6 +39,7 @@ export enum ExpenseResourcePath {
   EXPENSE_ITEMS = "expenseItems",
   PAGE_MONTHS = "pageMonths",
   PAGE_COUNT = "pageCount",
+  PURCHASE_YEAR = "purchasedYear",
 }
 
 export enum ExpenseStatus {
@@ -61,6 +62,10 @@ export const getItemsTablePk = (expenseId: string) => {
   return `expenseId#${expenseId}#items`;
 };
 
+export const getTagsTablePk = (expenseId: string) => {
+  return `expenseId#${expenseId}#tags`;
+};
+
 export const getExpenseIdFromTablePk = (pk: string) => {
   const parts = pk.split("#");
   if (parts.length === 3 && parts[0] === "expenseId" && validations.isValidUuid(parts[1])) {
@@ -69,8 +74,14 @@ export const getExpenseIdFromTablePk = (pk: string) => {
   throw new IllegelArgumentError(`provided PK [${pk}] is not correct format`);
 };
 
-export const getYearMonthTablePk = (year: number, month: number) => {
-  return `year#${year}#month#${month}`;
+export const getUserIdStatusTagGsiSk = (purchaseDate: string | number) => {
+  let year: number;
+  if (typeof purchaseDate === "string") {
+    year = dateutil.parseTimestamp(purchaseDate).getFullYear();
+  } else {
+    year = purchaseDate;
+  }
+  return `purchasedYear#${year}`;
 };
 
 export const getUserIdStatusDateGsiPk = (userId: string, status: ExpenseStatus) => {

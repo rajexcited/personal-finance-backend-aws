@@ -370,7 +370,7 @@ export class TransactionWriter {
   /**
    * updateItems
    */
-  public updateItems(updateItems: TransactionUpdateItem | TransactionUpdateItem[], baseLogger?: LoggerBase) {
+  public updateItemAttributes(updateItems: TransactionUpdateItem | TransactionUpdateItem[], baseLogger?: LoggerBase) {
     const logger = getLogger("updateItems", baseLogger || this.logger);
     const itemsUpdate = Array.isArray(updateItems) ? updateItems : [updateItems];
     itemsUpdate.forEach((it) => {

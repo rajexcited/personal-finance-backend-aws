@@ -17,7 +17,7 @@ const _logger = getLogger("utils");
  */
 export const updateAuditDetails = (auditDetails: AuditDetailsType | null | undefined, userId: string) => {
   const logger = getLogger("updateAuditDetails", _logger);
-  if (!userId || !validations.isValidUuid(userId)) {
+  if (!validations.isValidUuid(userId)) {
     return null;
   }
   logger.debug("auditDetails", auditDetails, "userId", userId);

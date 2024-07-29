@@ -2,7 +2,7 @@ import { Construct } from "constructs";
 import { AttributeType, TableV2, TableClass, ProjectionType, GlobalSecondaryIndexPropsV2 } from "aws-cdk-lib/aws-dynamodb";
 import { ConstructProps, EnvironmentName, buildResourceName, AwsResourceType } from "../common";
 import { RemovalPolicy } from "aws-cdk-lib";
-import { DbProps } from "./db-prop-type";
+import { ConfigDbProps } from "./db-prop-type";
 
 /**
  * Dynamodb to manage user's config type
@@ -12,7 +12,7 @@ import { DbProps } from "./db-prop-type";
  *
  */
 export class ConfigTypeDBConstruct extends Construct {
-  public readonly cfgTypTable: DbProps;
+  public readonly cfgTypTable: ConfigDbProps;
 
   constructor(scope: Construct, id: string, props: ConstructProps) {
     super(scope, id);

@@ -48,8 +48,18 @@ const ConfigTypeUriAuthConfigList: RoleAuthorizeConfigType[] = [
     role: [AuthRole.ADMIN, AuthRole.PRIMARY],
   },
   {
+    apiPath: "/config/types/belongs-to/expense-category/tags",
+    method: MethodType.GET,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
     apiPath: "/config/types/belongs-to/expense-category",
     method: MethodType.POST,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
+    apiPath: "/config/types/belongs-to/expense-category/id/*",
+    method: MethodType.GET,
     role: [AuthRole.ADMIN, AuthRole.PRIMARY],
   },
   {
@@ -73,8 +83,18 @@ const ConfigTypeUriAuthConfigList: RoleAuthorizeConfigType[] = [
     role: [AuthRole.ADMIN, AuthRole.PRIMARY],
   },
   {
+    apiPath: "/config/types/belongs-to/pymt-account-type/tags",
+    method: MethodType.GET,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
     apiPath: "/config/types/belongs-to/pymt-account-type",
     method: MethodType.POST,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
+    apiPath: "/config/types/belongs-to/pymt-account-type/id/*",
+    method: MethodType.GET,
     role: [AuthRole.ADMIN, AuthRole.PRIMARY],
   },
   {
@@ -121,6 +141,11 @@ const PymtAccUriAuthConfigList: RoleAuthorizeConfigType[] = [
     role: [AuthRole.ADMIN, AuthRole.PRIMARY],
   },
   {
+    apiPath: "/payment/accounts/tags",
+    method: MethodType.GET,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
     apiPath: "/payment/accounts",
     method: MethodType.POST,
     role: [AuthRole.ADMIN, AuthRole.PRIMARY],
@@ -128,6 +153,11 @@ const PymtAccUriAuthConfigList: RoleAuthorizeConfigType[] = [
   {
     apiPath: "/payment/accounts/id/*",
     method: MethodType.DELETE,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
+    apiPath: "/payment/accounts/id/*",
+    method: MethodType.GET,
     role: [AuthRole.ADMIN, AuthRole.PRIMARY],
   },
   {
@@ -144,7 +174,12 @@ const ExpenseUriAuthConfigList: RoleAuthorizeConfigType[] = [
     role: [AuthRole.ADMIN, AuthRole.PRIMARY],
   },
   {
-    apiPath: "/expenses/deleted",
+    apiPath: "/expenses/tags",
+    method: MethodType.GET,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
+    apiPath: "/expenses/count",
     method: MethodType.GET,
     role: [AuthRole.ADMIN, AuthRole.PRIMARY],
   },

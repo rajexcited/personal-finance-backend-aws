@@ -2,7 +2,7 @@ import { Construct } from "constructs";
 import { AttributeType, TableV2, TableClass, ProjectionType, GlobalSecondaryIndexPropsV2 } from "aws-cdk-lib/aws-dynamodb";
 import { ConstructProps, EnvironmentName, buildResourceName, AwsResourceType } from "../common";
 import { RemovalPolicy } from "aws-cdk-lib";
-import { DbProps } from "./db-prop-type";
+import { PymtAccDbProps } from "./db-prop-type";
 
 /**
  * Dynamodb to manage user's Payment account
@@ -12,7 +12,7 @@ import { DbProps } from "./db-prop-type";
  *
  */
 export class PymtAccDBConstruct extends Construct {
-  public readonly pymtAccTable: DbProps;
+  public readonly pymtAccTable: PymtAccDbProps;
 
   constructor(scope: Construct, id: string, props: ConstructProps) {
     super(scope, id);

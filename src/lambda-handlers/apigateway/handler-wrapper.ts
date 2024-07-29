@@ -89,7 +89,7 @@ export const convertToCreatedResponse = (result: JSONValue) => {
 };
 
 const convertToAPIGatewayEventResult = (result: JSONValue | APIGatewayProxyResult, statusCode?: HTTP_STATUS_CODE | null): APIGatewayProxyResult => {
-  if (!result) {
+  if (result === null || result === undefined || result === "") {
     return {
       statusCode: Number(HTTP_STATUS_CODE.EMPTY_RESPONSE_CONTENT),
       body: "",

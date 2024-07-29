@@ -19,7 +19,21 @@ import { ApiExpenseResource, ApiReceiptResource, DbItemExpense } from "./resourc
 import * as datetime from "date-and-time";
 
 const MONTHS_PER_PAGE = 3;
-const MAX_PAGE_SIZE_COUNT = 50;
+const MAX_PAGE_SIZE_COUNT = 100;
+const MAX_PAGE_SIZE_MONTHS = 12;
+
+export const getExpenseCount = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
+  const logger = getLogger("getExpenseCount", _logger);
+  const pageNoParam = getValidatedPageNumberPathParam(event, logger);
+  const statusParam = getValidatedStatusPathParam(event, logger);
+  const pageMonthsParam = getValidatedPageMonthsPathParam(event, statusParam, logger);
+
+  const authUser = getAuthorizeUser(event);
+  const maxPossibleDeletedCount = 999999;
+  const expenseIds = await getListOfExpenseIds(authUser.userId, statusParam, pageNoParam, pageMonthsParam, maxPossibleDeletedCount, logger);
+
+  return expenseIds.size;
+});
 
 export const getExpenseList = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("getExpenseList", _logger);
@@ -58,7 +72,6 @@ export const getExpenseList = apiGatewayHandlerWrapper(async (event: APIGatewayP
       description: details.description,
       tags: details.tags,
       auditDetails: auditDetails,
-      deletedTimestamp: details.deletedTimestamp,
     };
     return resource;
   });
@@ -118,9 +131,12 @@ const getListOfExpenseIds = async (
     expenseItems = await getListByPageCount(userId, status, pageNo, pageCount, logger);
   }
 
+  // const isDeleted = (item:DbItemExpense) => (status === ExpenseStatus.DELETED && typeof item.ExpiresAt === "number" && item.ExpiresAt)
+  // const isNotDeleted = (item:DbItemExpense) => (status !== ExpenseStatus.DELETED && !item.ExpiresAt && typeof item.ExpiresAt !== "number")
+
   const expenseIds = new Set<string>();
   expenseItems
-    .filter((item) => typeof item.ExpiresAt !== "number")
+    // .filter((item) => (isDeleted(item) ||  isNotDeleted(item)))
     .forEach((item) => {
       expenseIds.add(getExpenseIdFromTablePk(item.PK));
     });
@@ -278,6 +294,9 @@ const getValidatedPageMonthsPathParam = (event: APIGatewayProxyEvent, status: Ex
   }
   if (!pageMonths && (pageCount || status === ExpenseStatus.DELETED)) {
     return null;
+  }
+  if (pageMonthsNum > MAX_PAGE_SIZE_MONTHS) {
+    throw new ValidationError([{ path: ExpenseResourcePath.PAGE_MONTHS, message: ErrorMessage.LIMIT_EXCEEDED }]);
   }
   return pageMonthsNum;
 };

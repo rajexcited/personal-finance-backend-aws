@@ -1,4 +1,6 @@
-import { getLogger } from "../utils";
+import { APIGatewayProxyEvent } from "aws-lambda";
+import { AuditDetailsType, LoggerBase, getLogger, validations, dateutil } from "../utils";
+import { InvalidError, ValidationError } from "../apigateway";
 
 export const _pymtAccTableName = process.env.PAYMENT_ACCOUNT_TABLE_NAME as string;
 export const _userIdStatusShortnameIndex = process.env.PAYMENT_ACCOUNT_USERID_GSI_NAME as string;
@@ -14,6 +16,7 @@ export enum ErrorMessage {
   INCORRECT_FORMAT = "incorrect format",
   MISSING_VALUE = "missing value",
   LIMIT_EXCEEDED = "allowed items in list is exceeeded limit",
+  DUPLICATE_VALUE = "duplicate value is not allowed",
 }
 
 export enum PymtAccResourcePath {
@@ -26,6 +29,8 @@ export enum PymtAccResourcePath {
   ACCOUNT_ID_NAME = "accountIdNum",
   INSTITUTION_NAME = "institutionName",
   TYPE_ID = "typeId",
+  PAGE_NO = "pageNo",
+  PAGE_COUNT = "pageCount",
 }
 
 export enum PymtAccStatus {
@@ -37,16 +42,26 @@ export const getDetailsTablePk = (paymentAccountId: string) => {
   return `pymtAccId#${paymentAccountId}`;
 };
 
-export const getUserIdStatusShortnameGsiPk = (userId: string, status?: PymtAccStatus) => {
-  if (status) {
-    return `userId#${userId}#status#${status}`;
-  }
-  return `userId#${userId}#status`;
+export const getUserIdStatusShortnameGsiPk = (userId: string, status: PymtAccStatus) => {
+  return `userId#${userId}#status#${status}`;
 };
 
 export const getUserIdStatusShortnameGsiSk = (shortName: string) => {
-  const spaceReplacer = "`";
-  const regex = new RegExp("\\s", "g");
+  return `shortName#${shortName}`;
+};
 
-  return `shortname#${shortName.replace(regex, spaceReplacer)}`;
+export const getValidatedPymtAccId = (event: APIGatewayProxyEvent, loggerBase: LoggerBase) => {
+  const logger = getLogger("getValidatedPymtAccId", loggerBase);
+  const pymtAccId = event.pathParameters?.pymtAccId;
+  logger.info("path parameter, pymtAccId =", pymtAccId);
+
+  if (!pymtAccId) {
+    throw new ValidationError([{ path: PymtAccResourcePath.ID, message: ErrorMessage.MISSING_VALUE }]);
+  }
+
+  if (!validations.isValidUuid(pymtAccId)) {
+    throw new ValidationError([{ path: PymtAccResourcePath.ID, message: ErrorMessage.INCORRECT_VALUE }]);
+  }
+
+  return pymtAccId;
 };

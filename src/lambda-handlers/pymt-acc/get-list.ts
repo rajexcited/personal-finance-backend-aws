@@ -1,15 +1,24 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
-import { JSONArray, apiGatewayHandlerWrapper } from "../apigateway";
+import { JSONArray, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
 import { LoggerBase, compareutil, dbutil, getLogger, utils } from "../utils";
-import { PymtAccStatus, _logger, _pymtAccTableName, _userIdStatusShortnameIndex, getUserIdStatusShortnameGsiPk } from "./base-config";
+import {
+  ErrorMessage,
+  PymtAccResourcePath,
+  PymtAccStatus,
+  _logger,
+  _pymtAccTableName,
+  _userIdStatusShortnameIndex,
+  getUserIdStatusShortnameGsiPk,
+} from "./base-config";
 import { getAuthorizeUser, getValidatedUserId } from "../user";
 import { ApiPaymentAccountResource, DbItemPymtAcc } from "./resource-type";
 
-export const getPaymentAccounts = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
-  const logger = getLogger("getPaymentAccounts", _logger);
+export const getPaymentAccountList = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
+  const logger = getLogger("getPaymentAccountList", _logger);
   const userId = getValidatedUserId(event);
+  const statusParam = getValidatedStatusPathParam(event, logger);
 
-  const pymtAccounts = await getListOfDetails(userId, PymtAccStatus.ENABLE, logger);
+  const pymtAccounts = await getListOfDetails(userId, statusParam, logger);
   const resourcePromises = pymtAccounts.map(async (details) => {
     const auditDetails = await utils.parseAuditDetails(details.auditDetails, userId, getAuthorizeUser(event));
     logger.debug("userId", userId, "auditDetails", auditDetails);
@@ -39,7 +48,7 @@ const getListOfDetails = async (userId: string, status: PymtAccStatus, _logger: 
   const items = await dbutil.queryAll<DbItemPymtAcc>(logger, {
     TableName: _pymtAccTableName,
     IndexName: _userIdStatusShortnameIndex,
-    KeyConditionExpression: `UP_GSI_PK = :pkv`,
+    KeyConditionExpression: "UP_GSI_PK = :pkv",
     ExpressionAttributeValues: {
       ":pkv": getUserIdStatusShortnameGsiPk(userId, status),
     },
@@ -64,4 +73,20 @@ const sortCompareFn = (item1: ApiPaymentAccountResource, item2: ApiPaymentAccoun
   if (nameCompareResult !== 0) return nameCompareResult;
 
   return 0;
+};
+
+const getValidatedStatusPathParam = (event: APIGatewayProxyEvent, _logger: LoggerBase) => {
+  const logger = getLogger("getValidatedStatus", _logger);
+  const status = event.queryStringParameters?.status;
+  logger.info("query parameter, status =", status);
+
+  if (!status) {
+    return PymtAccStatus.ENABLE;
+  }
+
+  if (status !== PymtAccStatus.DELETED && status !== PymtAccStatus.ENABLE) {
+    throw new ValidationError([{ path: PymtAccResourcePath.STATUS, message: ErrorMessage.INCORRECT_VALUE }]);
+  }
+
+  return status as PymtAccStatus;
 };
