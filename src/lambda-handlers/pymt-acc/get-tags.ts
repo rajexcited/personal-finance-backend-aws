@@ -17,7 +17,7 @@ export const getPaymentAccountTags = apiGatewayHandlerWrapper(async (event: APIG
   const items = await dbutil.queryAll<DbItemPymtAcc>(logger, {
     TableName: _pymtAccTableName,
     IndexName: _userIdStatusShortnameIndex,
-    KeyConditionExpression: `UB_GSI_PK = :pkv`,
+    KeyConditionExpression: `UP_GSI_PK = :pkv`,
     ExpressionAttributeValues: {
       ":pkv": getUserIdStatusShortnameGsiPk(userId, PymtAccStatus.ENABLE),
     },

@@ -82,7 +82,7 @@ export const validateExpenseItems = async (
   const logger = getLogger("validateExpenseItems", _logger);
 
   const invalidExpItms = expenseItems.filter((ei) => {
-    if (ei.id && !validations.isValidUuid(ei.id)) return true;
+    // if (ei.id && !validations.isValidUuid(ei.id)) return true;
     if (ei.amount && !isValidAmount(ei.amount)) return true;
     if (ei.description && !validations.isValidDescription(ei.description)) return true;
     if (!isValidBillName(ei.billName)) return true;

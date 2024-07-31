@@ -56,8 +56,8 @@ export class ExpenseApiConstruct extends BaseApiConstruct {
     };
     const expenseCountResource = expensesResource.addResource("count");
     const getCountLambdaFunction = this.buildApi(expenseCountResource, HttpMethod.GET, ExpenseLambdaHandler.GetCount, getCountRequestQueryParams);
-    props.userTable.table.ref.grantReadData(getListLambdaFunction);
-    props.expenseTable.table.ref.grantReadData(getListLambdaFunction);
+    props.userTable.table.ref.grantReadData(getCountLambdaFunction);
+    props.expenseTable.table.ref.grantReadData(getCountLambdaFunction);
 
     const addUpdateDetailsLambdaFunction = this.buildApi(expensesResource, HttpMethod.POST, ExpenseLambdaHandler.AddUpdate);
     props.userTable.table.ref.grantReadData(addUpdateDetailsLambdaFunction);
