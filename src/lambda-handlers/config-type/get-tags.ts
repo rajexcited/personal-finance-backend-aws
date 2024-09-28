@@ -1,8 +1,8 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
-import { NotFoundError, apiGatewayHandlerWrapper } from "../apigateway";
+import { apiGatewayHandlerWrapper } from "../apigateway";
 import { getLogger, dbutil } from "../utils";
 import { DbItemConfigType } from "./resource-type";
-import { _logger, _configTypeTableName, _belongsToGsiName, BelongsTo, getValidatedBelongsTo, getBelongsToGsiPk } from "./base-config";
+import { _logger, _configTypeTableName, _belongsToGsiName, getValidatedBelongsTo, getBelongsToGsiPk } from "./base-config";
 
 /**
  * DynamoDB code example
@@ -12,9 +12,9 @@ export const getConfigTypeTags = apiGatewayHandlerWrapper(async (event: APIGatew
   const logger = getLogger("getConfigTypeTags", _logger);
 
   const belongsTo = getValidatedBelongsTo(event, logger);
-  if (belongsTo !== BelongsTo.ExpenseCategory && belongsTo !== BelongsTo.PaymentAccountType) {
-    throw new NotFoundError("invalida belongs to provided [" + belongsTo + "]");
-  }
+  // if (isBelongsToValid(belongsTo)) {
+  //   throw new NotFoundError("invalida belongs to provided [" + belongsTo + "]");
+  // }
 
   // https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.ProjectionExpressions.html
   const items = await dbutil.queryAll<DbItemConfigType>(logger, {

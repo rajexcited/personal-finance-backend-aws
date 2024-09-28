@@ -8,7 +8,7 @@ import {
   apiGatewayHandlerWrapper,
   convertToCreatedResponse,
 } from "../apigateway";
-import { getAuthorizeUser, getValidatedUserId } from "../user";
+import { getAuthorizeUser } from "../user";
 import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils, validations } from "../utils";
 import {
   CONFIG_DESCRIPTION_MAX_LENGTH,
@@ -37,7 +37,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   const belongsTo = getValidatedBelongsTo(event, logger);
 
   const req = await getValidatedRequestForUpdateDetails(event, logger);
-  const userId = getValidatedUserId(event);
+  const authUser = getAuthorizeUser(event);
   // find db record if any.
   // perform the add or update
   let existingDbItem: DbItemConfigType | null = null;
@@ -52,14 +52,14 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
     if (output.Item) {
       existingDbItem = output.Item as DbItemConfigType;
       // validate user access to config details
-      const gsiPkForReq = getBelongsToGsiPk(null, logger, userId, belongsTo);
+      const gsiPkForReq = getBelongsToGsiPk(null, logger, authUser.userId, belongsTo);
       if (gsiPkForReq !== existingDbItem.UB_GSI_PK) {
         // not same user
         throw new UnAuthorizedError("not authorized to update config type details");
       }
     }
   }
-  const auditDetails = utils.updateAuditDetails(existingDbItem?.details.auditDetails, userId);
+  const auditDetails = utils.updateAuditDetailsFailIfNotExists(existingDbItem?.details.auditDetails, authUser);
   const configId = existingDbItem?.details.id || uuidv4();
 
   const apiToDbDetails: DbConfigTypeDetails = {
@@ -88,7 +88,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   const updateResult = await dbutil.putItem(cmdInput, logger);
   logger.debug("Result updated");
 
-  const apiAuditDetails = await utils.parseAuditDetails(apiToDbDetails.auditDetails, userId, getAuthorizeUser(event));
+  const apiAuditDetails = await utils.parseAuditDetails(apiToDbDetails.auditDetails, authUser.userId, authUser);
   let currencyCountryResource: JSONObject = {};
   if (belongsTo === BelongsTo.CurrencyProfile) {
     logger.info("special type of belongsTo,", belongsTo, ". so adding additional details to response");

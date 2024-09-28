@@ -1,6 +1,5 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import {
-  InvalidField,
   JSONObject,
   RequestBodyContentType,
   UnAuthorizedError,
@@ -8,50 +7,51 @@ import {
   apiGatewayHandlerWrapper,
   convertToCreatedResponse,
 } from "../apigateway";
-import {
-  ErrorMessage,
-  ExpenseResourcePath,
-  ExpenseStatus,
-  _expenseReceiptsBucketName,
-  _expenseTableName,
-  _logger,
-  getDetailsTablePk,
-  getItemsTablePk,
-  getTagsTablePk,
-  getUserIdStatusDateGsiAttribute1,
-  getUserIdStatusDateGsiPk,
-  getUserIdStatusDateGsiSk,
-  getUserIdStatusTagGsiSk,
-} from "./base-config";
-import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils, validations } from "../utils";
-import { getAuthorizeUser, getValidatedUserId } from "../user";
+import { LoggerBase, dbutil, getLogger, utils } from "../utils";
+import { AuthorizeUser, getAuthorizeUser } from "../user";
 import { v4 as uuidv4 } from "uuid";
-import {
-  isValidAmount,
-  isValidBillName,
-  isValidPurchaseDate,
-  areValidReceipts,
-  validateExpenseCategory,
-  validateExpenseItems,
-  validatePaymentAccount,
-  validateTags,
-} from "./validate";
-import {
-  ApiExpenseItemResource,
-  ApiExpenseResource,
-  ApiReceiptResource,
-  DbExpenseDetails,
-  DbExpenseItemDetails,
-  DbItemExpense,
-  DbItemExpenseItem,
-  DbItemExpenseTags,
-  DbReceiptDetails,
-} from "./resource-type";
 import { StopWatch } from "stopwatch-node";
-import { getReceiptActions, updateReceiptsIns3 } from "./receipt-details";
+import { getReceiptActions, updateReceiptsIns3 } from "../receipts";
+import { ApiResourceExpense, ErrorMessage, ExpenseRequestResourcePath, getValidatedBelongsToPathParam } from "./api-resource";
+import {
+  DbDetailsType,
+  DbItemExpense,
+  DbTagsType,
+  ExpenseRecordType,
+  ExpenseTableName,
+  getGsiAttrDetailsBelongsTo,
+  getGsiPkDetails,
+  getGsiPkExpenseTags,
+  getTablePkExpenseTags,
+} from "./db-config";
+import { ExpenseStatus, ExpenseBelongsTo } from "./base-config";
+import {
+  addDbPurchaseTransactions,
+  ApiResourcePurchaseDetails,
+  retrieveDbPurchaseDetails,
+  getGsiSkPurchaseDate,
+  getValidatedRequestToUpdatePurchaseDetails,
+  DbDetailsPurchase,
+} from "./purchase";
+import {
+  getValidatedRequestToUpdateRefundDetails,
+  ApiResourceRefundDetails,
+  DbDetailsRefund,
+  retrieveDbRefundDetails,
+  addDbRefundTransactions,
+} from "./refund";
+import {
+  ApiResourceIncomeDetails,
+  getValidatedRequestToUpdateIncomeDetails,
+  addDbIncomeTransactions,
+  retrieveDbIncomeDetails,
+  DbDetailsIncome,
+} from "./income";
 
-const addUpdateExpenseHandler = async (event: APIGatewayProxyEvent) => {
-  const logger = getLogger("addUpdateExpense", _logger);
+const rootLogger = getLogger("purchase.add-update");
+
+const addUpdateHandler = async (event: APIGatewayProxyEvent) => {
+  const logger = getLogger("handler", rootLogger);
 
   const req = await getValidatedRequestForUpdateDetails(event, logger);
   const authUser = getAuthorizeUser(event);
@@ -59,7 +59,7 @@ const addUpdateExpenseHandler = async (event: APIGatewayProxyEvent) => {
 
   // find db record if any.
   const dbItem = await getValidatedDbItem(req, authUser.userId, logger);
-  const expenseId = dbItem?.details.id || uuidv4();
+  const purchaseId = dbItem?.details.id || uuidv4();
   /**
    * for update expense,
    *
@@ -70,25 +70,54 @@ const addUpdateExpenseHandler = async (event: APIGatewayProxyEvent) => {
    *
    * For add expense, all receipts goes to temp path, so validate and copy to s3
    */
-  const receiptActions = await getReceiptActions(req, dbItem, authUser.userId, logger);
+  const receiptActions = await getReceiptActions(req, dbItem?.details.receipts, authUser.userId, logger);
   if (!receiptActions) {
-    throw new ValidationError([{ path: ExpenseResourcePath.RECEIPTS, message: ErrorMessage.INCORRECT_VALUE }]);
+    throw new ValidationError([{ path: ExpenseRequestResourcePath.RECEIPTS, message: ErrorMessage.INCORRECT_VALUE }]);
   }
-  const dbExpenseItemsIdList = await getDbExpenseItemsIdList(dbItem, logger);
 
   const transactWriter = new dbutil.TransactionWriter(logger);
   // before db update for expense
   // receipts copy to s3 if required,
   // delete from s3 if required
-  const dbReceipts = await updateReceiptsIns3(receiptActions, req, expenseId, authUser.userId, logger);
-  const dbExpense = putExpense(req, dbItem, dbReceipts, expenseId, authUser.userId, transactWriter, logger);
-  const dbExpenseItems = putExpenseItem(req, expenseId, dbExpenseItemsIdList, transactWriter, logger);
-  putExpenseTags(dbExpense, dbExpenseItems, transactWriter, logger);
+  const dbReceipts = await updateReceiptsIns3(receiptActions, req, purchaseId, authUser.userId, logger);
+
+  let apiResource;
+  if (req.belongsTo === ExpenseBelongsTo.Purchase) {
+    apiResource = await addDbPurchaseTransactions(
+      req,
+      dbItem as DbItemExpense<DbDetailsPurchase>,
+      dbReceipts,
+      purchaseId,
+      authUser,
+      transactWriter,
+      logger
+    );
+  } else if (req.belongsTo === ExpenseBelongsTo.Refund) {
+    apiResource = await addDbRefundTransactions(
+      req,
+      dbItem as DbItemExpense<DbDetailsRefund>,
+      dbReceipts,
+      purchaseId,
+      authUser,
+      transactWriter,
+      logger
+    );
+  } else if (req.belongsTo === ExpenseBelongsTo.Income) {
+    apiResource = await addDbIncomeTransactions(
+      req,
+      dbItem as DbItemExpense<DbDetailsIncome>,
+      dbReceipts,
+      purchaseId,
+      authUser,
+      transactWriter,
+      logger
+    );
+  }
+  if (apiResource) {
+    await putExpenseTags(apiResource, dbItem, authUser, transactWriter, logger);
+  }
 
   await transactWriter.executeTransaction();
-
-  const auditDetails = await utils.parseAuditDetails(dbExpense.details.auditDetails, authUser.userId, authUser);
-  const apiResource = await getExpenseApiResource(dbExpense, dbExpenseItems, auditDetails, logger);
 
   const result = apiResource as unknown as JSONObject;
   if (!dbItem) {
@@ -96,160 +125,66 @@ const addUpdateExpenseHandler = async (event: APIGatewayProxyEvent) => {
   }
   return result;
 };
-export const addUpdateExpense = apiGatewayHandlerWrapper(addUpdateExpenseHandler, RequestBodyContentType.JSON);
 
-const putExpense = (
-  req: ApiExpenseResource,
-  dbItem: DbItemExpense | null,
-  dbReceipts: DbReceiptDetails[],
-  expenseId: string,
-  userId: string,
-  transactWriter: dbutil.TransactionWriter,
-  _logger: LoggerBase
-) => {
-  const logger = getLogger("putExpense", _logger);
-  const auditDetails = utils.updateAuditDetails(dbItem?.details.auditDetails, userId) as AuditDetailsType;
+export const addUpdateDetails = apiGatewayHandlerWrapper(addUpdateHandler, RequestBodyContentType.JSON);
 
-  const apiToDbDetails: DbExpenseDetails = {
-    id: expenseId,
-    billName: req.billName,
-    purchasedDate: req.purchasedDate,
-    verifiedTimestamp: req.verifiedTimestamp,
-    status: ExpenseStatus.ENABLE,
-    amount: req.amount,
-    expenseCategoryId: req.expenseCategoryId,
-    paymentAccountId: req.paymentAccountId,
-    receipts: dbReceipts,
-    description: req.description,
-    tags: req.tags,
-    auditDetails: auditDetails,
-  };
-
-  const dbItemXpns: DbItemExpense = {
-    PK: getDetailsTablePk(expenseId),
-    UD_GSI_PK: getUserIdStatusDateGsiPk(userId, apiToDbDetails.status),
-    UD_GSI_SK: getUserIdStatusDateGsiSk(auditDetails?.updatedOn as string, logger) as string,
-    UD_GSI_ATTR1: getUserIdStatusDateGsiAttribute1(apiToDbDetails.purchasedDate, logger) as string,
-    details: apiToDbDetails,
-  };
-
-  transactWriter.putItems(dbItemXpns as unknown as JSONObject, _expenseTableName, logger);
-  return dbItemXpns;
-};
-
-const putExpenseItem = (
-  req: ApiExpenseResource,
-  expenseId: string,
-  existingExpenseItemsId: string[],
-  transactWriter: dbutil.TransactionWriter,
-  _logger: LoggerBase
-) => {
-  const logger = getLogger("putExpenseItem", _logger);
-  if (req.expenseItems && req.expenseItems.length > 0) {
-    const expenseItems = req.expenseItems.map((ei) => {
-      const isIdExist = existingExpenseItemsId.includes(ei.id as string);
-      const expenseItem: DbExpenseItemDetails = {
-        id: isIdExist ? (ei.id as string) : uuidv4(),
-        billName: ei.billName,
-        tags: ei.tags,
-        amount: ei.amount,
-        description: ei.description,
-        expenseCategoryId: ei.expenseCategoryId,
-      };
-      return expenseItem;
-    });
-
-    const dbItemXpnsItems: DbItemExpenseItem = {
-      PK: getItemsTablePk(expenseId),
-      details: {
-        expenseId,
-        items: expenseItems,
-      },
-    };
-    transactWriter.putItems(dbItemXpnsItems as unknown as JSONObject, _expenseTableName, logger);
-    return dbItemXpnsItems;
-  } else if (existingExpenseItemsId.length > 0) {
-    const itemsPk = getItemsTablePk(expenseId);
-    transactWriter.deleteItems(null, itemsPk, _expenseTableName, logger);
-  }
-  return null;
-};
-
-const putExpenseTags = (
-  dbExpense: DbItemExpense,
-  dbExpenseItem: DbItemExpenseItem | null,
+const putExpenseTags = async (
+  apiResource: ApiResourceExpense,
+  existingDbExpense: DbItemExpense<DbDetailsType> | null,
+  authUser: AuthorizeUser,
   transactWriter: dbutil.TransactionWriter,
   _logger: LoggerBase
 ) => {
   const logger = getLogger("putExpenseTags", _logger);
 
-  const tagSet = new Set(dbExpense.details.tags);
-  dbExpenseItem?.details.items.flatMap((item) => item.tags).forEach((tag) => tagSet.add(tag));
+  const newTagSet = new Set(apiResource.tags);
+  if (apiResource.belongsTo === ExpenseBelongsTo.Purchase) {
+    const purchaseResource = apiResource as ApiResourcePurchaseDetails;
+    purchaseResource.items.flatMap((item) => item.tags).forEach(newTagSet.add);
+  }
+  logger.info("size of new tags = ", newTagSet.size);
 
-  logger.info("size of tags = ", tagSet.size);
-  const dbExpenseTags: DbItemExpenseTags = {
-    PK: getTagsTablePk(dbExpense.details.id),
-    UD_GSI_PK: dbExpense.UD_GSI_PK,
-    UD_GSI_SK: getUserIdStatusTagGsiSk(dbExpense.details.purchasedDate),
+  // skipping db call if no tags to add / update
+  if (newTagSet.size === 0 && !existingDbExpense) {
+    return null;
+  }
+  const existingExpenseDbTags = await getExistingDbPurchaseTags(existingDbExpense?.details.id, apiResource.belongsTo, logger);
+
+  // find difference from old tags to new updating tags. if not found any, skipping db call
+  const shouldUpdateWithNewTags =
+    existingExpenseDbTags?.tags.length === newTagSet.size ? !!existingExpenseDbTags.tags.find((tg) => !newTagSet.has(tg)) : true;
+  if (!shouldUpdateWithNewTags) {
+    return null;
+  }
+
+  let expenseDate;
+  if (apiResource.belongsTo === ExpenseBelongsTo.Purchase) {
+    expenseDate = (apiResource as ApiResourcePurchaseDetails).purchaseDate;
+  } else if (apiResource.belongsTo === ExpenseBelongsTo.Income) {
+    expenseDate = (apiResource as ApiResourceIncomeDetails).incomeDate;
+  } else if (apiResource.belongsTo === ExpenseBelongsTo.Refund) {
+    expenseDate = (apiResource as ApiResourceRefundDetails).refundDate;
+  } else if (apiResource.belongsTo === ExpenseBelongsTo.Investment) {
+    expenseDate = (apiResource as ApiResourceIncomeDetails).incomeDate;
+  }
+
+  const auditDetails = utils.updateAuditDetailsFailIfNotExists(existingExpenseDbTags?.auditDetails, authUser);
+  const dbExpenseTags: DbItemExpense<DbTagsType> = {
+    PK: getTablePkExpenseTags(apiResource.id, apiResource.belongsTo, logger),
+    US_GSI_PK: getGsiPkExpenseTags(authUser.userId, ExpenseStatus.ENABLE, apiResource.belongsTo, logger),
+    US_GSI_SK: getGsiSkPurchaseDate(expenseDate, logger),
+    US_GSI_BELONGSTO: getGsiAttrDetailsBelongsTo(apiResource.belongsTo, logger),
     details: {
-      tags: [...tagSet],
+      id: apiResource.id,
+      belongsTo: apiResource.belongsTo,
+      recordType: ExpenseRecordType.Tags,
+      auditDetails: auditDetails,
+      tags: [...newTagSet],
     },
   };
 
-  transactWriter.putItems(dbExpenseTags as unknown as JSONObject, _expenseTableName, logger);
+  transactWriter.putItems(dbExpenseTags as unknown as JSONObject, ExpenseTableName, logger);
   return dbExpenseTags;
-};
-
-const getExpenseApiResource = async (
-  dbExpense: DbItemExpense,
-  dbExpenseItems: DbItemExpenseItem | null,
-  resourceAuditDetails: AuditDetailsType,
-  _logger: LoggerBase
-) => {
-  const logger = getLogger("getExpenseApiResource", _logger);
-
-  const apiItems: ApiExpenseItemResource[] = (dbExpenseItems?.details.items || []).map((item) => {
-    const resource: ApiExpenseItemResource = {
-      id: item.id,
-      billName: item.billName,
-      amount: item.amount,
-      description: item.description,
-      expenseCategoryId: item.expenseCategoryId,
-      tags: item.tags,
-    };
-
-    return resource;
-  });
-
-  const apiReceiptPromises = dbExpense.details.receipts.map((rct) => {
-    const apiRct: ApiReceiptResource = {
-      id: rct.id,
-      name: rct.name,
-      size: rct.size,
-      contentType: rct.contentType,
-    };
-    return apiRct;
-  });
-  const apiReceipts = await Promise.all(apiReceiptPromises);
-
-  const apiResource: ApiExpenseResource = {
-    id: dbExpense.details.id,
-    billName: dbExpense.details.billName,
-    purchasedDate: dbExpense.details.purchasedDate,
-    verifiedTimestamp: dbExpense.details.verifiedTimestamp,
-    amount: dbExpense.details.amount,
-    description: dbExpense.details.description,
-    expenseCategoryId: dbExpense.details.expenseCategoryId,
-    paymentAccountId: dbExpense.details.paymentAccountId,
-    status: dbExpense.details.status,
-    receipts: apiReceipts,
-    tags: dbExpense.details.tags,
-    auditDetails: resourceAuditDetails,
-    expenseItems: apiItems,
-  };
-
-  logger.info("apiResource =", apiResource);
-  return apiResource;
 };
 
 const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, _logger: LoggerBase) => {
@@ -259,101 +194,86 @@ const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, 
   try {
     sw.start();
 
-    const req: ApiExpenseResource | null = utils.getJsonObj(event.body as string);
-    logger.info("request =", req);
-
-    if (!req) {
-      throw new ValidationError([{ path: ExpenseResourcePath.REQUEST, message: ErrorMessage.MISSING_VALUE }]);
+    const belongsToParam = getValidatedBelongsToPathParam(event, logger);
+    if (belongsToParam === ExpenseBelongsTo.Purchase) {
+      const req = await getValidatedRequestToUpdatePurchaseDetails(event, logger);
+      req.belongsTo = belongsToParam;
+      return req;
+    }
+    if (belongsToParam === ExpenseBelongsTo.Income) {
+      const req = await getValidatedRequestToUpdateIncomeDetails(event, logger);
+      req.belongsTo = belongsToParam;
+      return req;
+    }
+    if (belongsToParam === ExpenseBelongsTo.Refund) {
+      const req = await getValidatedRequestToUpdateRefundDetails(event, logger);
+      req.belongsTo = belongsToParam;
+      return req;
+    }
+    if (belongsToParam === ExpenseBelongsTo.Investment) {
+      // return getValidatedRequestToUpdateInvestmentDetails(event, logger);
     }
 
-    const userId = getValidatedUserId(event);
-    const invalidFields: InvalidField[] = [];
-    if (req.status && req.status !== ExpenseStatus.ENABLE) {
-      invalidFields.push({ path: ExpenseResourcePath.STATUS, message: ErrorMessage.INCORRECT_VALUE });
-    }
-    if (!isValidBillName(req.billName)) {
-      const msg = req.billName ? ErrorMessage.INCORRECT_FORMAT : ErrorMessage.MISSING_VALUE;
-      invalidFields.push({ path: ExpenseResourcePath.BILLNAME, message: msg });
-    }
-    if (req.amount && !isValidAmount(req.amount)) {
-      invalidFields.push({ path: ExpenseResourcePath.AMOUNT, message: ErrorMessage.INCORRECT_FORMAT });
-    }
-    if (req.description && !validations.isValidDescription(req.description)) {
-      invalidFields.push({ path: ExpenseResourcePath.DESCRIPTION, message: ErrorMessage.INCORRECT_FORMAT });
-    }
-    if (req.id && !validations.isValidUuid(req.id)) {
-      invalidFields.push({ path: ExpenseResourcePath.ID, message: ErrorMessage.INCORRECT_FORMAT });
-    }
-    if (!isValidPurchaseDate(req.purchasedDate)) {
-      const err = req.purchasedDate ? ErrorMessage.INCORRECT_FORMAT : ErrorMessage.MISSING_VALUE;
-      invalidFields.push({ path: ExpenseResourcePath.PURCHASE_DATE, message: err });
-    }
-    if (req.verifiedTimestamp && !validations.isValidDate(req.verifiedTimestamp, logger)) {
-      invalidFields.push({ path: ExpenseResourcePath.VERIFIED_TIMESTAMP, message: ErrorMessage.INCORRECT_FORMAT });
-    }
-    req.receipts = req.receipts || [];
-    if (!areValidReceipts(req.receipts, req.id, logger)) {
-      invalidFields.push({ path: ExpenseResourcePath.RECEIPTS, message: ErrorMessage.INCORRECT_VALUE });
-    }
-    req.expenseItems = req.expenseItems || [];
-
-    await validatePaymentAccount(req, invalidFields, userId, logger);
-    await validateExpenseCategory(req, invalidFields, userId, logger);
-    validateTags(req, invalidFields, logger);
-    await validateExpenseItems(req.expenseItems, invalidFields, userId, logger);
-
-    logger.info("invalidFields =", invalidFields);
-    if (invalidFields.length > 0) {
-      throw new ValidationError(invalidFields);
-    }
-
-    return req;
+    throw new ValidationError([{ path: ExpenseRequestResourcePath.REQUEST, message: ErrorMessage.MISSING_VALUE }]);
   } finally {
     sw.stop();
     logger.info("stopwatch summary: ", sw.shortSummary());
   }
 };
 
-const getValidatedDbItem = async (req: ApiExpenseResource, userId: string, _logger: LoggerBase) => {
+const getValidatedDbItem = async (req: ApiResourceExpense, userId: string, _logger: LoggerBase) => {
   const logger = getLogger("getValidatedDbItem", _logger);
-  if (req.id) {
-    // is it eligible for update?
-    const cmdInput = {
-      TableName: _expenseTableName,
-      Key: { PK: getDetailsTablePk(req.id) },
-    };
-    const xpnsOutput = await dbutil.getItem(cmdInput, logger);
-
-    logger.info("retrieved expense from DB");
-    if (xpnsOutput.Item) {
-      const dbItem = xpnsOutput.Item as DbItemExpense;
-      // validate user access to config details
-      const gsiPkForReq = getUserIdStatusDateGsiPk(userId, ExpenseStatus.ENABLE);
-      if (gsiPkForReq !== dbItem.UD_GSI_PK || dbItem.ExpiresAt !== undefined) {
-        // not same user
-        logger.warn("gsiPkForReq =", gsiPkForReq, ", dbItem.UD_GSI_PK =", dbItem.UD_GSI_PK, ", dbItem.ExpiresAt =", dbItem.ExpiresAt);
-        throw new UnAuthorizedError("not authorized to update expense details");
-      }
-      return dbItem;
-    }
+  let dbExpense = null;
+  if (req.belongsTo === ExpenseBelongsTo.Purchase) {
+    dbExpense = await retrieveDbPurchaseDetails(req.id, logger);
+  } else if (req.belongsTo === ExpenseBelongsTo.Income) {
+    dbExpense = await retrieveDbIncomeDetails(req.id, logger);
+  } else if (req.belongsTo === ExpenseBelongsTo.Refund) {
+    dbExpense = await retrieveDbRefundDetails(req.id, logger);
   }
-  return null;
+
+  if (!dbExpense) {
+    return null;
+  }
+  // is it eligible for update?
+  // validate user access to config details
+  const gsiPkForReq = getGsiPkDetails(userId, ExpenseStatus.ENABLE, logger);
+  if (gsiPkForReq !== dbExpense.US_GSI_PK) {
+    // not same user
+    logger.warn("gsiPkForReq =", gsiPkForReq, ", dbItem.US_GSI_PK =", dbExpense.US_GSI_PK);
+    throw new UnAuthorizedError("not authorized to update expense details");
+  }
+
+  if (dbExpense.ExpiresAt !== undefined) {
+    logger.warn("getting deleted. dbExpense.ExpiresAt =", dbExpense.ExpiresAt);
+    throw new UnAuthorizedError("not authorized to update purchase details");
+  }
+
+  if (dbExpense.details.status !== ExpenseStatus.ENABLE) {
+    logger.warn("expense not enabled. dbExpense.details.status =", dbExpense.details.status);
+    throw new UnAuthorizedError("not authorized to update disabled or deleted expense details");
+  }
+  return dbExpense;
 };
 
-const getDbExpenseItemsIdList = async (dbExpenseItem: DbItemExpense | null, _logger: LoggerBase) => {
-  const logger = getLogger("getExistingExpenseItemsId", _logger);
-  if (!dbExpenseItem?.details.id) {
-    return [];
+const getExistingDbPurchaseTags = async (existingDbPurchaseId: string | null | undefined, belongsTo: ExpenseBelongsTo, _logger: LoggerBase) => {
+  const logger = getLogger("getDbPurchaseTags", _logger);
+  if (!existingDbPurchaseId) {
+    return null;
   }
-  const expenseId = dbExpenseItem.details.id;
+
   const cmdInput = {
-    TableName: _expenseTableName,
-    Key: { PK: getItemsTablePk(expenseId) },
+    TableName: ExpenseTableName,
+    Key: { PK: getTablePkExpenseTags(existingDbPurchaseId, belongsTo, logger) },
   };
-  const xpnsItmsOutput = await dbutil.getItem(cmdInput, logger);
+  const prchTagsOutput = await dbutil.getItem(cmdInput, logger);
 
-  logger.info("retrieved expense items from DB");
-  const dbItemXpnsItems = xpnsItmsOutput.Item as DbItemExpenseItem | null;
+  logger.info("retrieved purchase tags from DB");
+  const dbPurchaseTags = prchTagsOutput.Item as DbItemExpense<DbTagsType> | null;
 
-  return dbItemXpnsItems?.details.items.map((xpnsItem) => xpnsItem.id) || [];
+  if (!dbPurchaseTags) {
+    return null;
+  }
+
+  return dbPurchaseTags.details;
 };

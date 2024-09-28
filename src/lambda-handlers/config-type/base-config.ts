@@ -43,9 +43,12 @@ export enum ConfigStatus {
 }
 
 export enum BelongsTo {
-  ExpenseCategory = "expense-category",
+  PurchaseType = "purchase-type",
   PaymentAccountType = "pymt-account-type",
   CurrencyProfile = "currency-profile",
+  IncomeType = "income-type",
+  RefundReason = "refund-reason",
+  InvestmentType = "investment-type",
 }
 
 export const getBelongsToGsiPk = (event: APIGatewayProxyEvent | null, loggerBase: LoggerBase, userId?: string, belongsTo?: BelongsTo) => {
@@ -81,7 +84,15 @@ export const getValidatedBelongsTo = (event: APIGatewayProxyEvent, loggerBase: L
 };
 
 export const isBelongsToValid = (belongsTo: BelongsTo | string) => {
-  return BelongsTo.ExpenseCategory === belongsTo || BelongsTo.PaymentAccountType === belongsTo || BelongsTo.CurrencyProfile === belongsTo;
+  return Object.values(BelongsTo).includes(belongsTo as BelongsTo);
+  // return (
+  //   BelongsTo.PaymentAccountType === belongsTo ||
+  //   BelongsTo.CurrencyProfile === belongsTo ||
+  //   BelongsTo.InvestmentType === belongsTo ||
+  //   BelongsTo.PurchaseType === belongsTo ||
+  //   BelongsTo.IncomeType === belongsTo ||
+  //   BelongsTo.RefundReason === belongsTo
+  // );
 };
 
 export const getValidatedConfigId = (event: APIGatewayProxyEvent, loggerBase: LoggerBase) => {

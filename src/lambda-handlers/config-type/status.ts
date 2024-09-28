@@ -1,6 +1,6 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { JSONObject, NotFoundError, UnAuthorizedError, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
-import { getAuthorizeUser, getValidatedUserId } from "../user";
+import { AuthorizeUser, getAuthorizeUser, getValidatedUserId } from "../user";
 import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils } from "../utils";
 import {
   ConfigResourcePath,
@@ -21,13 +21,13 @@ import { ApiConfigTypeResource, DbItemConfigType } from "./resource-type";
 export const deleteDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("deleteDetails", _logger);
   const belongsTo = getValidatedBelongsTo(event, logger);
-  const userId = getValidatedUserId(event);
+  const authUser = getAuthorizeUser(event);
   const configId = getValidatedConfigId(event, logger);
-  await validateDeleteConfig(belongsTo, userId, ConfigStatus.DELETED, logger);
+  await validateDeleteConfig(belongsTo, authUser.userId, ConfigStatus.DELETED, logger);
 
-  const details = await updateStatus(belongsTo, userId, configId, ConfigStatus.DELETED);
+  const details = await updateStatus(belongsTo, authUser, configId, ConfigStatus.DELETED);
 
-  const auditDetails = await utils.parseAuditDetails(details.auditDetails, userId, getAuthorizeUser(event));
+  const auditDetails = await utils.parseAuditDetails(details.auditDetails, authUser.userId, getAuthorizeUser(event));
   const apiResource: ApiConfigTypeResource = {
     id: details.id,
     name: details.name,
@@ -46,13 +46,13 @@ export const deleteDetails = apiGatewayHandlerWrapper(async (event: APIGatewayPr
 export const updateStatusDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("updateStatusDetails", _logger);
   const belongsTo = getValidatedBelongsTo(event, logger);
-  const userId = getValidatedUserId(event);
+  const authUser = getAuthorizeUser(event);
   const configId = getValidatedConfigId(event, logger);
   const configStatus = getValidatedConfigStatusFromPath(event, logger);
-  await validateDeleteConfig(belongsTo, userId, configStatus, logger);
+  await validateDeleteConfig(belongsTo, authUser.userId, configStatus, logger);
 
-  const details = await updateStatus(belongsTo, userId, configId, configStatus);
-  const auditDetails = await utils.parseAuditDetails(details.auditDetails, userId, getAuthorizeUser(event));
+  const details = await updateStatus(belongsTo, authUser, configId, configStatus);
+  const auditDetails = await utils.parseAuditDetails(details.auditDetails, authUser.userId, getAuthorizeUser(event));
   const apiResource: ApiConfigTypeResource = {
     id: details.id,
     name: details.name,
@@ -68,7 +68,7 @@ export const updateStatusDetails = apiGatewayHandlerWrapper(async (event: APIGat
   return apiResource as unknown as JSONObject;
 });
 
-export const updateStatus = async (belongsTo: BelongsTo, userId: string, configId: string, status: ConfigStatus) => {
+export const updateStatus = async (belongsTo: BelongsTo, authUser: AuthorizeUser, configId: string, status: ConfigStatus) => {
   const logger = getLogger("updateStatus", _logger);
 
   logger.info("request, belongsTo =", belongsTo, ", configId =", configId, ", status =", status);
@@ -84,7 +84,7 @@ export const updateStatus = async (belongsTo: BelongsTo, userId: string, configI
     throw new NotFoundError("db item not found");
   }
   // validate user access to config details
-  const gsiPkForReq = getBelongsToGsiPk(null, logger, userId, belongsTo);
+  const gsiPkForReq = getBelongsToGsiPk(null, logger, authUser.userId, belongsTo);
   if (gsiPkForReq !== dbItem.UB_GSI_PK) {
     // not same user
     throw new UnAuthorizedError("not authorized to delete config type details");
@@ -93,14 +93,14 @@ export const updateStatus = async (belongsTo: BelongsTo, userId: string, configI
     throw new ValidationError([{ path: ConfigResourcePath.STATUS, message: ErrorMessage.INCORRECT_VALUE }]);
   }
 
-  const auditDetails = utils.updateAuditDetails(dbItem.details.auditDetails, userId);
+  const auditDetails = utils.updateAuditDetailsFailIfNotExists(dbItem.details.auditDetails, authUser);
   const updateDbItem: DbItemConfigType = {
     PK: getDetailsTablePk(configId),
-    UB_GSI_PK: getBelongsToGsiPk(null, logger, userId, belongsTo),
+    UB_GSI_PK: getBelongsToGsiPk(null, logger, authUser.userId, belongsTo),
     UB_GSI_SK: getBelongsToGsiSk(status),
     details: {
       ...dbItem.details,
-      auditDetails: auditDetails as AuditDetailsType,
+      auditDetails: auditDetails,
       status: status,
     },
   };

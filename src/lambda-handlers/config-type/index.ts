@@ -12,6 +12,6 @@ export { DbConfigTypeDetails } from "./resource-type";
 
 export { ConfigStatus, BelongsTo, _configDataBucketName } from "./base-config";
 
-export { isValidExpenseCategoryId, isValidPaymentAccountTypeId } from "./validate";
+export { isConfigIdExists } from "./validate";
 
 export { getConfigTypeTags } from "./get-tags";

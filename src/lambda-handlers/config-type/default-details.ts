@@ -1,4 +1,5 @@
 import { JSONObject, ValidationError } from "../apigateway";
+import { AuthorizeUser } from "../user";
 import { dbutil, getLogger, utils, validations } from "../utils";
 import {
   CONFIG_DESCRIPTION_MAX_LENGTH,
@@ -26,7 +27,7 @@ export interface DefaultConfigData {
 export const createDefaultDetails = async (
   details: DefaultConfigData[],
   belongsTo: BelongsTo,
-  userId: string,
+  authUser: AuthorizeUser,
   transactionWriter: dbutil.TransactionWriter
 ) => {
   const logger = getLogger("createDefaultDetails", _logger);
@@ -47,10 +48,7 @@ export const createDefaultDetails = async (
     throw new ValidationError([{ path: ConfigResourcePath.REQUEST, message: ErrorMessage.INCORRECT_FORMAT }]);
   }
 
-  const auditDetails = utils.updateAuditDetails(null, userId);
-  if (!auditDetails) {
-    throw new Error("invalid auditDetails");
-  }
+  const auditDetails = utils.updateAuditDetailsFailIfNotExists(null, authUser);
   const items = details.map((detail) => {
     const itemDetail: DbConfigTypeDetails = {
       id: uuidv4(),
@@ -65,7 +63,7 @@ export const createDefaultDetails = async (
     const item: DbItemConfigType = {
       details: itemDetail,
       PK: getDetailsTablePk(itemDetail.id),
-      UB_GSI_PK: getBelongsToGsiPk(null, logger, userId, belongsTo),
+      UB_GSI_PK: getBelongsToGsiPk(null, logger, authUser.userId, belongsTo),
       UB_GSI_SK: getBelongsToGsiSk(ConfigStatus.ENABLE),
     };
     return item;
