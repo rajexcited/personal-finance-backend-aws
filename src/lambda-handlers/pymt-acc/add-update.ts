@@ -26,14 +26,14 @@ import { getAuthorizeUser, getValidatedUserId } from "../user";
 import { ApiPaymentAccountResource, DbPaymentAccountDetails, DbItemPymtAcc } from "./resource-type";
 import { v4 as uuidv4 } from "uuid";
 import { isValidAccountIdNum, isValidInstitutionName } from "./validate";
-import { isValidPaymentAccountTypeId } from "../config-type";
+import { BelongsTo, isConfigIdExists } from "../config-type";
 import { GetCommandInput, QueryCommandInput } from "@aws-sdk/lib-dynamodb";
 
 const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("addUpdateDetails", _logger);
 
   const req = await getValidatedRequestForUpdateDetails(event, logger);
-  const userId = getValidatedUserId(event);
+  const authUser = getAuthorizeUser(event);
   // find db record if any.
   // perform the add or update
   let existingDbItem: DbItemPymtAcc | null = null;
@@ -48,7 +48,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
     if (output.Item) {
       existingDbItem = output.Item as DbItemPymtAcc;
       // validate user access to config details
-      const gsiPkForReq = getUserIdStatusShortnameGsiPk(userId, PymtAccStatus.ENABLE);
+      const gsiPkForReq = getUserIdStatusShortnameGsiPk(authUser.userId, PymtAccStatus.ENABLE);
       if (gsiPkForReq !== existingDbItem.UP_GSI_PK) {
         // not same user
         throw new UnAuthorizedError("not authorized to update payment type details");
@@ -59,7 +59,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
         IndexName: _userIdStatusShortnameIndex,
         KeyConditionExpression: "UP_GSI_PK = :pkv and UP_GSI_SK = :skv",
         ExpressionAttributeValues: {
-          ":pkv": getUserIdStatusShortnameGsiPk(userId, PymtAccStatus.ENABLE),
+          ":pkv": getUserIdStatusShortnameGsiPk(authUser.userId, PymtAccStatus.ENABLE),
           ":skv": getUserIdStatusShortnameGsiSk(req.shortName),
         },
       };
@@ -71,7 +71,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   }
 
   const pymtAccId = existingDbItem?.details.id || uuidv4();
-  const auditDetails = utils.updateAuditDetails(existingDbItem?.details.auditDetails, userId);
+  const auditDetails = utils.updateAuditDetailsFailIfNotExists(existingDbItem?.details.auditDetails, authUser);
 
   const apiToDbDetails: DbPaymentAccountDetails = {
     id: pymtAccId,
@@ -82,12 +82,12 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
     description: req.description,
     tags: req.tags,
     typeId: req.typeId,
-    auditDetails: auditDetails as AuditDetailsType,
+    auditDetails: auditDetails,
   };
 
   const dbItem: DbItemPymtAcc = {
     PK: getDetailsTablePk(pymtAccId),
-    UP_GSI_PK: getUserIdStatusShortnameGsiPk(userId, apiToDbDetails.status),
+    UP_GSI_PK: getUserIdStatusShortnameGsiPk(authUser.userId, apiToDbDetails.status),
     UP_GSI_SK: getUserIdStatusShortnameGsiSk(req.shortName),
     details: apiToDbDetails,
   };
@@ -99,7 +99,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   const updateResult = await dbutil.putItem(cmdInput, logger);
   logger.debug("Result updated");
 
-  const apiAuditDetails = await utils.parseAuditDetails(apiToDbDetails.auditDetails, userId, getAuthorizeUser(event));
+  const apiAuditDetails = await utils.parseAuditDetails(apiToDbDetails.auditDetails, authUser.userId, getAuthorizeUser(event));
 
   const resource: ApiPaymentAccountResource = {
     ...req,
@@ -146,7 +146,7 @@ const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, 
     invalidFields.push({ path: PymtAccResourcePath.INSTITUTION_NAME, message: ErrorMessage.INCORRECT_FORMAT });
   }
   const userId = getValidatedUserId(event);
-  const isValidPymtAccId = await isValidPaymentAccountTypeId(req.typeId, userId, logger);
+  const isValidPymtAccId = await isConfigIdExists(req.typeId, BelongsTo.PaymentAccountType, userId, logger);
   if (!isValidPymtAccId) {
     invalidFields.push({ path: PymtAccResourcePath.TYPE_ID, message: ErrorMessage.INCORRECT_VALUE });
   }

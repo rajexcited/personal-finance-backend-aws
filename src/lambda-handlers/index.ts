@@ -2,6 +2,7 @@ export {
   getUserDetails as userDetailsGet,
   renewToken as userTokenRefresh,
   updateUserDetails as userDetailsUpdate,
+  deleteUserDetails as userDetailsDelete,
   userLogin,
   userLogout,
   userSignup,
@@ -31,11 +32,11 @@ export {
 } from "./pymt-acc";
 
 export {
-  getExpenseCount as expenseCount,
-  getExpenseTags as expenseTagList,
-  getExpenseList as expenseList,
-  getExpeseDetails as expenseGetDetails,
-  addUpdateExpense as expenseAddUpdate,
-  deleteExpense as expenseDeleteDetails,
-  updateExpenseStatus as expenseStatusUpdate,
+  getExpenseList as expenseListGet,
+  getExpenseCount as expenseCountGet,
+  getExpenseTagList as expenseTagListGet,
+  getExpenseDetails as expenseDetailsGet,
+  addUpdateDetails as expenseDetailsAddUpdate,
+  deleteExpenseDetails as expenseDetailsDelete,
+  // updateStatus as expenseStatusUpdate,
 } from "./expenses";

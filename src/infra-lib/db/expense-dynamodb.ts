@@ -17,8 +17,8 @@ export class ExpenseDBConstruct extends Construct {
   constructor(scope: Construct, id: string, props: ConstructProps) {
     super(scope, id);
 
-    const db = new TableV2(this, "ExpenseDynamoDb", {
-      tableName: buildResourceName(["expenses"], AwsResourceType.Dynamodb, props),
+    const db = new TableV2(this, "ExpenseTableDynamoDb", {
+      tableName: buildResourceName(["expense"], AwsResourceType.Dynamodb, props),
       partitionKey: { name: "PK", type: AttributeType.STRING },
       tableClass: TableClass.STANDARD_INFREQUENT_ACCESS,
       pointInTimeRecovery: props.environment === EnvironmentName.Production,
@@ -27,11 +27,11 @@ export class ExpenseDBConstruct extends Construct {
     });
 
     const gsiProp: GlobalSecondaryIndexPropsV2 = {
-      indexName: buildResourceName(["userId", "status", "date"], AwsResourceType.GlobalSecondaryIndex),
-      partitionKey: { name: "UD_GSI_PK", type: AttributeType.STRING },
-      sortKey: { name: "UD_GSI_SK", type: AttributeType.STRING },
+      indexName: buildResourceName(["userId", "status"], AwsResourceType.GlobalSecondaryIndex),
+      partitionKey: { name: "US_GSI_PK", type: AttributeType.STRING },
+      sortKey: { name: "US_GSI_SK", type: AttributeType.STRING },
       projectionType: ProjectionType.INCLUDE,
-      nonKeyAttributes: ["UD_GSI_ATTR1"],
+      nonKeyAttributes: ["US_GSI_BELONGSTO"],
     };
     db.addGlobalSecondaryIndex(gsiProp);
 
@@ -41,7 +41,7 @@ export class ExpenseDBConstruct extends Construct {
         name: db.tableName,
       },
       globalSecondaryIndexes: {
-        userIdStatusDateIndex: {
+        userIdStatusIndex: {
           name: gsiProp.indexName,
         },
       },

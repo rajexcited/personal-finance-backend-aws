@@ -7,6 +7,6 @@ export { addUpdateDetails as updatePaymentAccount } from "./add-update";
 
 export { deletePaymentAccount, updatePaymentAccountStatus } from "./status";
 
-export { isValidPaymentAccount } from "./validate";
+export { isPaymentAccountExists } from "./validate";
 
 export { getPaymentAccountTags } from "./get-tags";

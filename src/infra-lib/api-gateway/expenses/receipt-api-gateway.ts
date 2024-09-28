@@ -1,38 +1,41 @@
 import { Construct } from "constructs";
-import { RestApiProps } from "./construct-type";
+import { RestApiProps } from "../construct-type";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import { HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
-import { BaseApiConstruct } from "./base-api";
+import { BaseApiConstruct } from "../base-api";
 import { IBucket } from "aws-cdk-lib/aws-s3";
 import * as iam from "aws-cdk-lib/aws-iam";
-import { AwsResourceType, buildResourceName, ExpenseReceiptContextInfo } from "../common";
+import { AwsResourceType, buildResourceName, ExpenseReceiptContextInfo } from "../../common";
 
-interface ExpenseReceiptsApiProps extends RestApiProps {
+interface ReceiptsApiProps extends RestApiProps {
   receiptBucket: IBucket;
-  expenseIdResource: apigateway.Resource;
-  expenseReceiptContext: ExpenseReceiptContextInfo;
+  resource: apigateway.Resource;
+  receiptContext: ExpenseReceiptContextInfo;
 }
 
-export class ExpenseReceiptsApiConstruct extends BaseApiConstruct {
-  constructor(scope: Construct, id: string, props: ExpenseReceiptsApiProps) {
+export class ReceiptsApiConstruct extends BaseApiConstruct {
+  constructor(scope: Construct, id: string, props: ReceiptsApiProps) {
     super(scope, id, props);
 
-    const receiptIdResource = props.expenseIdResource.addResource("receipts").addResource("id").addResource("{receiptId}");
+    const receiptIdResource = props.resource.addResource("receipts").addResource("id").addResource("{receiptId}");
     this.uploadReceiptApi(receiptIdResource);
     this.downloadReceiptApi(receiptIdResource);
   }
 
   private downloadReceiptApi(resource: apigateway.Resource) {
+    const props = this.props as ReceiptsApiProps;
+
     const executeRole = new iam.Role(this, "downloadReceiptApiGatewayRole", {
       assumedBy: new iam.ServicePrincipal("apigateway.amazonaws.com"),
       roleName: buildResourceName(["receipt", "download", "apigateway"], AwsResourceType.ExecutionIamRole, this.props),
       description: "s3 integration execution role to download file",
     });
-    const props = this.props as ExpenseReceiptsApiProps;
 
-    props.receiptBucket.grantRead(executeRole, props.expenseReceiptContext.finalizeReceiptKeyPrefix + "*");
+    const finalizeReceiptKeyPrefix = props.receiptContext.finalizeReceiptKeyPrefix;
+    // const finalizeReceiptKeyPrefix = props.receiptContext.finalizeReceiptKeyPrefix + props.prefix + "/";
+    props.receiptBucket.grantRead(executeRole, finalizeReceiptKeyPrefix + "*");
     const bucket = props.receiptBucket.bucketName;
-    const key = props.expenseReceiptContext.finalizeReceiptKeyPrefix + "{userId}/{expenseId}/{receiptId}";
+    const key = finalizeReceiptKeyPrefix + "{belongsTo}/{userId}/{expenseId}/{receiptId}";
 
     // https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-mapping-template-reference.html#context-variable-reference
     const s3integration = new apigateway.AwsIntegration({
@@ -45,6 +48,7 @@ export class ExpenseReceiptsApiConstruct extends BaseApiConstruct {
         requestParameters: {
           "integration.request.path.receiptId": "method.request.path.receiptId",
           "integration.request.path.expenseId": "method.request.path.expenseId",
+          "integration.request.path.belongsTo": "method.request.path.belongsTo",
           "integration.request.path.userId": "context.authorizer.principalId",
         },
         integrationResponses: [
@@ -74,16 +78,19 @@ export class ExpenseReceiptsApiConstruct extends BaseApiConstruct {
   }
 
   private uploadReceiptApi(resource: apigateway.Resource) {
+    const props = this.props as ReceiptsApiProps;
+
     const executeRole = new iam.Role(this, "uploadReceiptApiGatewayRole", {
       assumedBy: new iam.ServicePrincipal("apigateway.amazonaws.com"),
       roleName: buildResourceName(["receipt", "upload", "apigateway"], AwsResourceType.ExecutionIamRole, this.props),
       description: "s3 integration execution role to upload file",
     });
-    const props = this.props as ExpenseReceiptsApiProps;
 
-    props.receiptBucket.grantPut(executeRole, props.expenseReceiptContext.temporaryKeyPrefix + "*");
+    const tempKeyPrefix = props.receiptContext.temporaryKeyPrefix;
+    // const tempKeyPrefix = props.receiptContext.temporaryKeyPrefix + props.prefix + "/";
+    props.receiptBucket.grantPut(executeRole, tempKeyPrefix + "*");
     const bucket = props.receiptBucket.bucketName;
-    const key = props.expenseReceiptContext.temporaryKeyPrefix + "{userId}/{expenseId}/{receiptId}";
+    const key = tempKeyPrefix + "{belongsTo}/{userId}/{expenseId}/{receiptName}";
 
     // https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-mapping-template-reference.html#context-variable-reference
     const s3integration = new apigateway.AwsIntegration({
@@ -96,6 +103,7 @@ export class ExpenseReceiptsApiConstruct extends BaseApiConstruct {
         requestParameters: {
           "integration.request.path.receiptId": "method.request.path.receiptId",
           "integration.request.path.expenseId": "method.request.path.expenseId",
+          "integration.request.path.belongsTo": "method.request.path.belongsTo",
           "integration.request.path.userId": "context.authorizer.principalId",
         },
         integrationResponses: [

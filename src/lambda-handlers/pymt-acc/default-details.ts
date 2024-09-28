@@ -14,8 +14,9 @@ import {
 import { DbPaymentAccountDetails, DbItemPymtAcc, DefaultPaymentAccounts } from "./resource-type";
 import { v4 as uuidv4 } from "uuid";
 import { isValidAccountIdNum, isValidInstitutionName } from "./validate";
+import { AuthorizeUser } from "../user";
 
-export const createDetails = async (details: DefaultPaymentAccounts[], userId: string, transactionWriter: dbutil.TransactionWriter) => {
+export const createDetails = async (details: DefaultPaymentAccounts[], authUser: AuthorizeUser, transactionWriter: dbutil.TransactionWriter) => {
   const logger = getLogger("createDetails", _logger);
   logger.info("details", details);
 
@@ -28,7 +29,7 @@ export const createDetails = async (details: DefaultPaymentAccounts[], userId: s
     if (!validations.areTagsValid(item.tags)) return true;
 
     if (!validations.isValidUuid(item.typeName)) {
-      const typeId = await getConfigId(item.typeName, userId, BelongsTo.PaymentAccountType, logger);
+      const typeId = await getConfigId(item.typeName, authUser.userId, BelongsTo.PaymentAccountType, logger);
       if (!typeId) return true;
     }
 
@@ -45,17 +46,15 @@ export const createDetails = async (details: DefaultPaymentAccounts[], userId: s
     throw new Error("invalid payment account data");
   }
 
-  const auditDetails = utils.updateAuditDetails(null, userId);
-  if (!auditDetails) {
-    throw new MissingError("invalid auditDetails");
-  }
+  const auditDetails = utils.updateAuditDetailsFailIfNotExists(null, authUser);
+
   const invalidTypeNames: string[] = [];
   const itemPromises = details.map(async (detail) => {
     let typeId;
     if (validations.isValidUuid(detail.typeName)) {
       typeId = detail.typeName;
     } else {
-      typeId = await getConfigId(detail.typeName, userId, BelongsTo.PaymentAccountType, logger);
+      typeId = await getConfigId(detail.typeName, authUser.userId, BelongsTo.PaymentAccountType, logger);
     }
 
     const itemDetail: DbPaymentAccountDetails = {
@@ -72,7 +71,7 @@ export const createDetails = async (details: DefaultPaymentAccounts[], userId: s
 
     const item: DbItemPymtAcc = {
       PK: getDetailsTablePk(itemDetail.id),
-      UP_GSI_PK: getUserIdStatusShortnameGsiPk(userId, itemDetail.status),
+      UP_GSI_PK: getUserIdStatusShortnameGsiPk(authUser.userId, itemDetail.status),
       UP_GSI_SK: getUserIdStatusShortnameGsiSk(itemDetail.shortName),
       details: itemDetail,
     };

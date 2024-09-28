@@ -2,6 +2,7 @@ import { Construct } from "constructs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import { Duration, RemovalPolicy } from "aws-cdk-lib";
 import { ConstructProps, EnvironmentName, buildResourceName, AwsResourceType, ExpenseReceiptContextInfo } from "./common";
+import { parsedDuration } from "./common/utils";
 
 const ONE_MONTH = 30;
 const HALF_YEAR = 6 * ONE_MONTH;
@@ -22,7 +23,7 @@ export class ReceiptS3Construct extends Construct {
       removalPolicy: props.environment === EnvironmentName.Production ? RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE : RemovalPolicy.DESTROY,
       lifecycleRules: [
         {
-          expiration: Duration.days(props.expenseReceiptContext.expirationDays.temporaryReceipt),
+          expiration: parsedDuration(props.expenseReceiptContext.expiration.temporaryReceipt),
           prefix: props.expenseReceiptContext.temporaryKeyPrefix,
           abortIncompleteMultipartUploadAfter: Duration.days(1),
         },
@@ -31,7 +32,7 @@ export class ReceiptS3Construct extends Construct {
           transitions: [
             {
               storageClass: s3.StorageClass.INTELLIGENT_TIERING,
-              transitionAfter: Duration.days(30),
+              transitionAfter: Duration.days(ONE_MONTH),
             },
             {
               storageClass: s3.StorageClass.GLACIER_INSTANT_RETRIEVAL,
@@ -45,7 +46,7 @@ export class ReceiptS3Construct extends Construct {
         },
         {
           prefix: props.expenseReceiptContext.finalizeReceiptKeyPrefix,
-          expiration: Duration.days(props.expenseReceiptContext.expirationDays.finalizeReceipt),
+          expiration: parsedDuration(props.expenseReceiptContext.expiration.finalizeReceipt),
           tagFilters: { ...props.expenseReceiptContext.deleteTags },
         },
       ],

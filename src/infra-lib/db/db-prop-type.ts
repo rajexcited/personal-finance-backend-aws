@@ -22,7 +22,7 @@ export interface ConfigDbProps extends DbProps {
 }
 
 export interface ExpenseDbProps extends DbProps {
-  globalSecondaryIndexes: Pick<GlobalSecondaryIndexes, "userIdStatusDateIndex">;
+  globalSecondaryIndexes: Pick<GlobalSecondaryIndexes, "userIdStatusIndex">;
 }
 
 export interface PymtAccDbProps extends DbProps {

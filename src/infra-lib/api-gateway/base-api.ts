@@ -3,6 +3,8 @@ import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import { AwsResourceType, ConstructProps, buildResourceName, camelCase } from "../common";
 import { HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 
+export const getTagsRequestQueryParams = { year: false };
+
 export abstract class BaseApiConstruct extends Construct {
   protected readonly props: ConstructProps;
 

@@ -8,7 +8,7 @@ import { TokenAuthorizerConstruct } from "./authorizer-lambda";
 import { ConfigTypeApiConstruct } from "./config-types-api-gateway";
 import { IBucket } from "aws-cdk-lib/aws-s3";
 import { PymtAccApiConstruct } from "./pymt-acc-api-gateway";
-import { ExpenseApiConstruct } from "./expenses-api-gateway";
+import { ExpenseApiConstruct } from "./expenses";
 import { ReceiptS3Construct } from "../receipts-s3";
 
 interface ApiProps extends ConstructProps {
@@ -72,6 +72,7 @@ export class ApiConstruct extends Construct {
       tokenSecret: tokenAuthorizer.tokenSecret,
       restApi: restApi,
       apiResource: apiResource,
+      deleteExpiration: props.apiContext.deleteUserExpiration,
     });
 
     const configTypeApi = new ConfigTypeApiConstruct(this, "ConfigTypeApiConstruct", {
@@ -101,16 +102,13 @@ export class ApiConstruct extends Construct {
     const expenseApi = new ExpenseApiConstruct(this, "ExpenseApiConstruct", {
       environment: props.environment,
       resourcePrefix: props.resourcePrefix,
-      userTable: props.allDb.userTable,
-      configTypeTable: props.allDb.configTypeTable,
-      pymtAccTable: props.allDb.paymentAccountTable,
-      expenseTable: props.allDb.expenseTable,
       layer: lambdaLayer.layer,
       authorizer: tokenAuthorizer.authorizer,
       restApi: restApi,
       apiResource: apiResource,
-      receiptBucket: props.receiptS3.receiptBucket,
+      allDb: props.allDb,
       expenseReceiptContext: props.expenseReceiptContext,
+      receiptBucket: props.receiptS3.receiptBucket,
     });
   }
 }

@@ -1,97 +1,55 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { JSONObject, NotFoundError, UnAuthorizedError, apiGatewayHandlerWrapper } from "../apigateway";
-import { dbutil, getLogger, utils } from "../utils";
-import {
-  _expenseTableName,
-  _logger,
-  getDetailsTablePk,
-  getItemsTablePk,
-  getUserIdStatusDateGsiPk,
-  getValidatedExpenseIdFromPathParam,
-} from "./base-config";
+import { getLogger, LoggerBase } from "../utils";
 import { getAuthorizeUser } from "../user";
-import { ApiExpenseItemResource, ApiExpenseResource, ApiReceiptResource, DbItemExpense, DbItemExpenseItem } from "./resource-type";
+import { DbDetailsType, DbItemExpense } from "./db-config";
+import { getValidatedBelongsToPathParam, getValidatedExpenseIdPathParam } from "./api-resource";
+import { validateExpenseAuthorization } from "./db-config/details";
+import { retrieveDbPurchaseToApiResource } from "./purchase";
+import { ExpenseBelongsTo } from "./base-config";
+import { retrieveDbIncomeToApiResource } from "./income";
+import { retrieveDbRefundToApiResource } from "./refund";
 
-export const getExpeseDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
-  const logger = getLogger("getExpenseDetails", _logger);
+const rootLogger = getLogger("expense.get-details");
 
-  const expenseId = getValidatedExpenseIdFromPathParam(event, logger);
+export const getExpenseDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
+  const logger = getLogger("handler", rootLogger);
+
   const authUser = getAuthorizeUser(event);
+  const expenseId = getValidatedExpenseIdPathParam(event, logger);
+  const belongsToParam = getValidatedBelongsToPathParam(event, logger);
 
-  const itemKeys = [{ PK: getDetailsTablePk(expenseId) }, { PK: getItemsTablePk(expenseId) }];
-  const xpnsRecords = await dbutil.batchGet<DbItemExpense | DbItemExpenseItem>(itemKeys, _expenseTableName, logger);
-  logger.info("retrieved expense from DB");
-
-  const xpns = xpnsRecords.find(isDBItemExpenseDetails) as DbItemExpense | undefined;
-  // filtering by expiredAt attribute so we don't scheduled delete item
-  const xpnsItems = xpnsRecords.find((item) => isDBItemExpenseItems(item) && typeof item.ExpiresAt !== "number") as DbItemExpenseItem | undefined;
-
-  if (!xpns) {
-    throw new NotFoundError("expense details is not found in db");
+  let apiResourceExpense, dbDetails;
+  if (belongsToParam === ExpenseBelongsTo.Purchase) {
+    const result = await retrieveDbPurchaseToApiResource(expenseId, authUser, logger);
+    apiResourceExpense = result.apiResource;
+    dbDetails = result.expenseDetails;
+  } else if (belongsToParam === ExpenseBelongsTo.Income) {
+    const result = await retrieveDbIncomeToApiResource(expenseId, authUser, logger);
+    apiResourceExpense = result.apiResource;
+    dbDetails = result.expenseDetails;
+  } else if (belongsToParam === ExpenseBelongsTo.Refund) {
+    const result = await retrieveDbRefundToApiResource(expenseId, authUser, logger);
+    apiResourceExpense = result.apiResource;
+    dbDetails = result.expenseDetails;
   }
 
-  // validate user access to config details
-  const gsiPkForReq = getUserIdStatusDateGsiPk(authUser.userId, xpns.details.status);
-  if (gsiPkForReq !== xpns.UD_GSI_PK || xpns.ExpiresAt !== undefined) {
-    // not same user
-    logger.warn("gsiPkForReq =", gsiPkForReq, ", dbItem.UD_GSI_PK =", xpns.UD_GSI_PK, ", dbItem.ExpiresAt =", xpns.ExpiresAt);
-    throw new UnAuthorizedError("not authorized to get expense details");
+  if (!dbDetails) {
+    throw new NotFoundError("expense details not found in db");
   }
+  if (!apiResourceExpense) {
+    throw new NotFoundError("api resource not found");
+  }
+  validateDeletedExpense(dbDetails, logger);
 
-  const expenseItems = xpnsItems?.details.items.map((item) => {
-    const xpns: ApiExpenseItemResource = {
-      id: item.id,
-      billName: item.billName,
-      amount: item.amount,
-      description: item.description,
-      expenseCategoryId: item.expenseCategoryId,
-      tags: item.tags,
-    };
-    return xpns;
-  });
-  const auditDetails = await utils.parseAuditDetails(xpns.details.auditDetails, authUser.userId, authUser);
+  validateExpenseAuthorization(dbDetails, authUser, logger);
 
-  const apiReceipts = xpns.details.receipts.map((dbReceipt) => {
-    const apiReceipt: ApiReceiptResource = {
-      id: dbReceipt.id,
-      name: dbReceipt.name,
-      contentType: dbReceipt.contentType,
-      size: dbReceipt.size,
-    };
-    return apiReceipt;
-  });
-
-  const resource: ApiExpenseResource = {
-    id: xpns.details.id,
-    billName: xpns.details.billName,
-    amount: xpns.details.amount,
-    expenseCategoryId: xpns.details.expenseCategoryId,
-    purchasedDate: xpns.details.purchasedDate,
-    verifiedTimestamp: xpns.details.verifiedTimestamp,
-    paymentAccountId: xpns.details.paymentAccountId,
-    receipts: apiReceipts,
-    status: xpns.details.status,
-    description: xpns.details.description,
-    tags: xpns.details.tags,
-    auditDetails: auditDetails,
-    expenseItems: expenseItems || [],
-  };
-
-  return resource as unknown as JSONObject;
+  return apiResourceExpense as unknown as JSONObject;
 });
 
-const isDBItemExpenseDetails = (item: any) => {
-  if (typeof item === "object" && "UD_GSI_PK" in item) {
-    const dbItem = item as DbItemExpense;
-    return dbItem.PK === getDetailsTablePk(dbItem.details?.id);
+const validateDeletedExpense = async (expenseDetails: DbItemExpense<DbDetailsType>, logger: LoggerBase) => {
+  if (expenseDetails.ExpiresAt !== undefined) {
+    logger.warn("expense is mark for deletion. ExpiresAt =", expenseDetails.ExpiresAt);
+    throw new UnAuthorizedError("expense is deleted");
   }
-  return false;
-};
-
-const isDBItemExpenseItems = (item: any) => {
-  if (typeof item === "object" && !("UD_GSI_PK" in item)) {
-    const dbItem = item as DbItemExpenseItem;
-    return dbItem.PK === getItemsTablePk(dbItem.details?.expenseId);
-  }
-  return false;
 };

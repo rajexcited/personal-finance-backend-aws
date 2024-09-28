@@ -1,75 +1,121 @@
-import { APIGatewayProxyEvent } from "aws-lambda";
-import { NotFoundError, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
-import { getLogger, dbutil, LoggerBase } from "../utils";
-import { DbItemExpenseTags } from "./resource-type";
+import { getLogger, dbutil, LoggerBase, dateutil } from "../utils";
+import { AuthorizeUser, getAuthorizeUser } from "../user";
+import { ExpenseBelongsTo, ExpenseStatus } from "./base-config";
 import {
-  _logger,
-  _expenseTableName,
-  _userIdStatusDateIndex,
-  ExpenseStatus,
-  getUserIdStatusDateGsiPk,
-  getUserIdStatusTagGsiSk,
-  ErrorMessage,
-  ExpenseResourcePath,
-} from "./base-config";
-import { getValidatedUserId } from "../user";
+  DbItemExpense,
+  DbTagsType,
+  ExpenseTableName,
+  getGsiAttrDetailsBelongsTo,
+  getGsiPkExpenseTags,
+  getGsiSkDetailsExpenseDate,
+  UserIdStatusIndex,
+} from "./db-config";
+import { apiGatewayHandlerWrapper } from "../apigateway";
+import { APIGatewayProxyEvent } from "aws-lambda";
+import { getValidatedBelongsToPathParam, getValidatedExpenseYearQueryParam } from "./api-resource";
+
+const rootLogger = getLogger("expense.get-tag-list");
+
+export const getExpenseTagList = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
+  const logger = getLogger("handler", rootLogger);
+
+  const yearsParam = getValidatedExpenseYearQueryParam(event, logger);
+  const belongsToParam = getValidatedBelongsToPathParam(event, logger);
+
+  const authUser = getAuthorizeUser(event);
+
+  const tagList = await getExpenseTags(yearsParam, belongsToParam, authUser, logger);
+
+  return tagList;
+});
 
 /**
  * DynamoDB code example
  * https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/dynamodb-example-dynamodb-utilities.html
  */
-export const getExpenseTags = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
+const getExpenseTags = async (years: number[], belongsTo: ExpenseBelongsTo, authUser: AuthorizeUser, _logger: LoggerBase) => {
   const logger = getLogger("getExpenseTags", _logger);
 
-  const userId = getValidatedUserId(event);
-  const purchasedYears = getValidatedPurchasedYearPathParam(event, logger);
+  /**
+   * [2020,2018].sort()
+   *  >>  [{s:2018,e:2018},{s:2020,e:2020}]
+   *
+   * [2016,2015,2018].sort()
+   *  >>  [{s:2015,e:2016},{s:2018,e:2018}]
+   *
+   * [2023].sort()
+   *  >>  [{s:2023,e:2023}]
+   *
+   * [2019,2020,2018].sort()
+   *  >>  [{s:2018,e:2020}]
+   *
+   */
+  type RangeYearType = Record<"startYear" | "endYear", number>;
+  const rangeYears: RangeYearType[] = [];
 
-  const tagsEnabledByYearsPromises = purchasedYears.map((purchasedYear) => getExpenseTagList(userId, ExpenseStatus.ENABLE, purchasedYear, logger));
+  const yearsSet = new Set(years);
+  const sortedRangeYears = [...yearsSet].sort().reduce((accry, curr) => {
+    const popry = accry.pop();
+    let newry: RangeYearType | undefined = undefined;
 
-  const currentYear = new Date().getFullYear();
-  let tagsDeletedPromise: Promise<string[]>;
-  if (purchasedYears.includes(currentYear)) {
-    tagsDeletedPromise = getExpenseTagList(userId, ExpenseStatus.DELETED, currentYear, logger);
-  } else {
-    tagsDeletedPromise = Promise.resolve([]);
-  }
-  const tagsByYears = await Promise.all([...tagsEnabledByYearsPromises, tagsDeletedPromise]);
-  logger.info("retrieved [", tagsByYears.length, "] expenses =", tagsByYears);
-  const tagList = tagsByYears.flat();
-  const tagSet = new Set(tagList);
+    if (popry === undefined) {
+      newry = {
+        startYear: curr,
+        endYear: curr,
+      };
+    } else {
+      if (curr > popry.startYear && curr - 1 === popry.endYear) {
+        popry.endYear = curr;
+      } else {
+        newry = {
+          startYear: curr,
+          endYear: curr,
+        };
+      }
+    }
+    if (popry) {
+      accry.push(popry);
+    }
+    if (newry) {
+      accry.push(newry);
+    }
 
-  logger.info("retrieved tag size =", tagList.length, ", unique value size =", tagSet.size);
+    return accry;
+  }, rangeYears);
+
+  const tagsPromises = sortedRangeYears.map((range) => queryExpenseTags(range.startYear, range.endYear, belongsTo, authUser.userId, logger));
+
+  const tagsListOfList = await Promise.all(tagsPromises);
+
+  const tagSet = new Set<string>(tagsListOfList.flat());
+
+  logger.info("retrieved unique tag size =", tagSet.size);
   return [...tagSet];
-});
-
-const getExpenseTagList = async (userId: string, status: ExpenseStatus, purchasedYear: number, _logger: LoggerBase) => {
-  const logger = getLogger("getExpenseTagList", _logger);
-  const dbItemTags = await dbutil.queryAll<DbItemExpenseTags>(logger, {
-    TableName: _expenseTableName,
-    IndexName: _userIdStatusDateIndex,
-    KeyConditionExpression: "UD_GSI_PK = :gpkv and UD_GSI_SK = :gskv",
-    ExpressionAttributeValues: {
-      ":gpkv": getUserIdStatusDateGsiPk(userId, status),
-      ":gskv": getUserIdStatusTagGsiSk(purchasedYear),
-    },
-  });
-  logger.info("retrieved [", dbItemTags.length, "] expenses with status =", status, ", purchasedYear =", purchasedYear);
-  return dbItemTags.flatMap((item) => item.details.tags);
 };
 
-const getValidatedPurchasedYearPathParam = (event: APIGatewayProxyEvent, _logger: LoggerBase) => {
-  const logger = getLogger("getValidatedPurchasedYear", _logger);
-  const purchasedYears = event.multiValueQueryStringParameters?.purchasedYear;
-  logger.info("query parameter, purchasedYear =", purchasedYears);
+const queryExpenseTags = async (startYear: number, endYear: number, belongsTo: ExpenseBelongsTo, userId: string, _logger: LoggerBase) => {
+  const logger = getLogger("queryExpenseTags", _logger);
+  const searchStartDate = dateutil.parseTimestamp("01-01-" + startYear, "MM-DD-YYYY", logger);
+  const searchEndDate = dateutil.parseTimestamp("12-31-" + endYear, "MM-DD-YYYY", logger);
 
-  if (!purchasedYears) {
-    throw new NotFoundError("purchased date not provided");
-  }
+  const promises = [ExpenseStatus.ENABLE, ExpenseStatus.DISABLE].map(async (status) => {
+    const dbItemTags = await dbutil.queryAll<DbItemExpense<DbTagsType>>(logger, {
+      TableName: ExpenseTableName,
+      IndexName: UserIdStatusIndex,
+      KeyConditionExpression: "US_GSI_PK = :gpkv and US_GSI_SK BETWEEN :gskv1 and :gskv2",
+      FilterExpression: "US_GSI_BELONGSTO = :gbtv",
+      ExpressionAttributeValues: {
+        ":gpkv": getGsiPkExpenseTags(userId, ExpenseStatus.ENABLE, belongsTo, logger),
+        ":gskv1": getGsiSkDetailsExpenseDate(searchStartDate, logger),
+        ":gskv2": getGsiSkDetailsExpenseDate(searchEndDate, logger),
+        ":gbtv": getGsiAttrDetailsBelongsTo(belongsTo, logger),
+      },
+    });
 
-  const invalidParamValue = purchasedYears.map((yr) => isNaN(Number(yr))).find((nan) => nan);
-  if (invalidParamValue) {
-    throw new ValidationError([{ path: ExpenseResourcePath.PURCHASE_YEAR, message: ErrorMessage.INCORRECT_VALUE }]);
-  }
+    logger.info("retrieved [", dbItemTags.length, "] expense tags with status =", status, ", startYear =", startYear, ", endYear =", endYear);
+    return dbItemTags.flatMap((itemTag) => itemTag.details.tags);
+  });
 
-  return purchasedYears.map((yr) => Number(yr));
+  const listOfList = await Promise.all(promises);
+  return listOfList.flat();
 };

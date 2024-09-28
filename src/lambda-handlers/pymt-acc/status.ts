@@ -11,17 +11,17 @@ import {
   getValidatedPymtAccId,
 } from "./base-config";
 import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils } from "../utils";
-import { getAuthorizeUser, getValidatedUserId } from "../user";
+import { AuthorizeUser, getAuthorizeUser, getValidatedUserId } from "../user";
 import { ApiPaymentAccountResource, DbItemPymtAcc } from "./resource-type";
 
 export const deletePaymentAccount = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("deletePaymentAccount", _logger);
 
-  const userId = getValidatedUserId(event);
+  const authUser = getAuthorizeUser(event);
   const pymtAccId = getValidatedPymtAccId(event, logger);
 
-  const details = await updateStatus(userId, pymtAccId, PymtAccStatus.DELETED);
-  const auditDetails = await utils.parseAuditDetails(details.auditDetails, userId, getAuthorizeUser(event));
+  const details = await updateStatus(authUser, pymtAccId, PymtAccStatus.DELETED);
+  const auditDetails = await utils.parseAuditDetails(details.auditDetails, authUser.userId, getAuthorizeUser(event));
   const apiResource: ApiPaymentAccountResource = {
     id: details.id,
     shortName: details.shortName,
@@ -40,12 +40,12 @@ export const deletePaymentAccount = apiGatewayHandlerWrapper(async (event: APIGa
 export const updatePaymentAccountStatus = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("updatePaymentAccountStatus", _logger);
 
-  const userId = getValidatedUserId(event);
+  const authUser = getAuthorizeUser(event);
   const pymtAccId = getValidatedPymtAccId(event, logger);
   const pymtAccStatus = getValidatedPymtAccStatusFromPath(event, logger);
 
-  const details = await updateStatus(userId, pymtAccId, pymtAccStatus);
-  const auditDetails = await utils.parseAuditDetails(details.auditDetails, userId, getAuthorizeUser(event));
+  const details = await updateStatus(authUser, pymtAccId, pymtAccStatus);
+  const auditDetails = await utils.parseAuditDetails(details.auditDetails, authUser.userId, getAuthorizeUser(event));
   const apiResource: ApiPaymentAccountResource = {
     id: details.id,
     shortName: details.shortName,
@@ -61,7 +61,7 @@ export const updatePaymentAccountStatus = apiGatewayHandlerWrapper(async (event:
   return apiResource as unknown as JSONObject;
 });
 
-export const updateStatus = async (userId: string, pymtAccId: string, status: PymtAccStatus) => {
+export const updateStatus = async (authUser: AuthorizeUser, pymtAccId: string, status: PymtAccStatus) => {
   const logger = getLogger("updateStatus", _logger);
 
   logger.info("request, pymtAccId =", pymtAccId, ", status =", status);
@@ -77,7 +77,7 @@ export const updateStatus = async (userId: string, pymtAccId: string, status: Py
     throw new NotFoundError("db item not exists");
   }
   // validate user access to config details
-  const gsiPkForReq = getUserIdStatusShortnameGsiPk(userId, dbItem.details.status);
+  const gsiPkForReq = getUserIdStatusShortnameGsiPk(authUser.userId, dbItem.details.status);
   if (gsiPkForReq !== dbItem.UP_GSI_PK) {
     // not same user
     throw new UnAuthorizedError("not authorized to update status of payment account");
@@ -87,10 +87,10 @@ export const updateStatus = async (userId: string, pymtAccId: string, status: Py
     throw new ValidationError([{ path: PymtAccResourcePath.STATUS, message: ErrorMessage.INCORRECT_VALUE }]);
   }
 
-  const auditDetails = utils.updateAuditDetails(dbItem.details.auditDetails, userId);
+  const auditDetails = utils.updateAuditDetailsFailIfNotExists(dbItem.details.auditDetails, authUser);
   const updateDbItem: DbItemPymtAcc = {
     PK: getDetailsTablePk(pymtAccId),
-    UP_GSI_PK: getUserIdStatusShortnameGsiPk(userId, status),
+    UP_GSI_PK: getUserIdStatusShortnameGsiPk(authUser.userId, status),
     UP_GSI_SK: dbItem.UP_GSI_SK,
     details: {
       ...dbItem.details,

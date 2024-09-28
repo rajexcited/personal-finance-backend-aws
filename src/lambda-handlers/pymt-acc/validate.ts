@@ -35,9 +35,9 @@ export const isValidInstitutionName = (institutionName: string | undefined | nul
  * @param _logger
  * @returns true if valid otherwise false
  */
-export const isValidPaymentAccount = async (paymentAccountId: string, userId: string, _logger: LoggerBase) => {
-  const logger = getLogger("isValidPaymentAccount", _logger);
-  if (!validations.isValidUuid(paymentAccountId)) {
+export const isPaymentAccountExists = async (paymentAccountId: string | undefined, userId: string, _logger: LoggerBase) => {
+  const logger = getLogger("isPaymentAccountExists", _logger);
+  if (!validations.isValidUuid(paymentAccountId) || !paymentAccountId) {
     return false;
   }
   const getCmdInput: GetCommandInput = {

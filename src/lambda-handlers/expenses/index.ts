@@ -1,9 +1,11 @@
-export { getExpenseList, getExpenseCount } from "./get-list";
+export { getExpenseList } from "./get-list";
 
-export { getExpeseDetails } from "./get-details";
+export { getExpenseCount } from "./get-count";
 
-export { addUpdateExpense } from "./add-update";
+export { getExpenseTagList } from "./get-tags";
 
-export { deleteExpense, updateExpenseStatus } from "./status";
+export { getExpenseDetails } from "./get-details";
 
-export { getExpenseTags } from "./get-tags";
+export { addUpdateDetails } from "./add-update";
+
+export { deleteExpenseDetails } from "./status";
