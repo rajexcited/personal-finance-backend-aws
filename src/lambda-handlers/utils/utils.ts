@@ -4,6 +4,7 @@ import { getLogger } from "./logger";
 import * as validations from "./validations";
 import { formatTimestamp } from "./date-util";
 import { AuthRole } from "../common";
+import { InvalidError } from "../apigateway";
 
 const _logger = getLogger("utils");
 
@@ -15,7 +16,7 @@ const _logger = getLogger("utils");
  * @param auditDetails assuming the audit details are retrieved from api
  * @param userDetails the user details are used for audit detail update
  */
-export const updateAuditDetails = (auditDetails: AuditDetailsType | null | undefined, userId: string) => {
+const updateAuditDetails = (auditDetails: AuditDetailsType | null | undefined, userId: string) => {
   const logger = getLogger("updateAuditDetails", _logger);
   if (!validations.isValidUuid(userId)) {
     return null;
@@ -136,4 +137,12 @@ export const getJsonObj = <TResult>(jsonstr: string) => {
     logger.info("error parsing JSON string", err);
   }
   return null;
+};
+
+export const updateAuditDetailsFailIfNotExists = (auditDetails: AuditDetailsType | null | undefined, authUser: AuthorizeUser) => {
+  const dbAuditDetails = updateAuditDetails(auditDetails, authUser.userId);
+  if (!dbAuditDetails) {
+    throw new InvalidError("auditDetails is null");
+  }
+  return dbAuditDetails;
 };

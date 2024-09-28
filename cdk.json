@@ -54,13 +54,14 @@
         "deleteTags": {
           "delete": "schedule"
         },
-        "expirationDays": {
-          "finalizeReceipt": 1,
-          "temporaryReceipt": 1
+        "expiration": {
+          "finalizeReceipt": "1day",
+          "temporaryReceipt": "1day"
         }
       },
       "apigateway": {
-        "stageName": "local-development"
+        "stageName": "local-development",
+        "deleteUserExpiration": "1hour"
       },
       "cloudfront": {
         "geoRestriction": {
