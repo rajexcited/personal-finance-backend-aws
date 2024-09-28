@@ -4,6 +4,9 @@ import { _logger } from "./base-config";
 
 const __logger = getLogger("dateutil", _logger);
 
+export const addMonths = datetime.addMonths;
+export const addSeconds = datetime.addSeconds;
+
 const DEFAULT_FORMAT_PATTERN = "MM-DD-YYYY HH:mm:ss.SSS Z";
 export const parseTimestamp = (timestampStr: string, formatPattern?: string | null, baseLogger?: LoggerBase | null): Date => {
   const logger = getLogger("parseTimestamp", __logger, baseLogger);

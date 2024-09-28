@@ -12,6 +12,7 @@ import { ConfigDbProps, PymtAccDbProps, UserDbProps } from "../db";
 import { IBucket } from "aws-cdk-lib/aws-s3";
 import { AwsResourceType, EnvironmentName, buildResourceName } from "../common";
 import { BaseApiConstruct } from "./base-api";
+import { parsedDuration } from "../common/utils";
 
 interface UserApiProps extends RestApiProps {
   userTable: UserDbProps;
@@ -19,6 +20,7 @@ interface UserApiProps extends RestApiProps {
   paymentAccountTable: PymtAccDbProps;
   configBucket: IBucket;
   tokenSecret: secretsmanager.Secret;
+  deleteExpiration: string;
 }
 
 enum UserLambdaHandler {
@@ -26,8 +28,9 @@ enum UserLambdaHandler {
   Signup = "index.userSignup",
   Logout = "index.userLogout",
   Refresh = "index.userTokenRefresh",
-  GetItem = "index.userDetailsGet",
-  UpdateItem = "index.userDetailsUpdate",
+  GetDetails = "index.userDetailsGet",
+  UpdateDetails = "index.userDetailsUpdate",
+  DeleteDetails = "index.userDetailsDelete",
 }
 
 enum ModelId {
@@ -71,16 +74,24 @@ export class UserApiConstruct extends BaseApiConstruct {
     props.userTable.table.ref.grantReadWriteData(renewlambdaFunction);
 
     const userDetailsResource = userResource.addResource("details");
-    const getDetailsLambdaFunction = this.buildApi(userDetailsResource, HttpMethod.GET, UserLambdaHandler.GetItem);
+    const getDetailsLambdaFunction = this.buildApi(userDetailsResource, HttpMethod.GET, UserLambdaHandler.GetDetails);
     props.userTable.table.ref.grantReadData(getDetailsLambdaFunction);
 
-    const updateDetailsLambdaFunction = this.buildApi(userDetailsResource, HttpMethod.POST, UserLambdaHandler.UpdateItem);
+    const updateDetailsLambdaFunction = this.buildApi(userDetailsResource, HttpMethod.POST, UserLambdaHandler.UpdateDetails);
     props.userTable.table.ref.grantReadWriteData(updateDetailsLambdaFunction);
+
+    const deleteDetailsLambdaFunction = this.buildApi(userDetailsResource, HttpMethod.DELETE, UserLambdaHandler.DeleteDetails);
+    props.userTable.table.ref.grantReadWriteData(deleteDetailsLambdaFunction);
   }
 
   private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: UserLambdaHandler) {
     const useTokenSecret = [UserLambdaHandler.Login, UserLambdaHandler.Signup, UserLambdaHandler.Refresh].includes(lambdaHandlerName);
-    const usePsaltSecret = [UserLambdaHandler.Login, UserLambdaHandler.Signup, UserLambdaHandler.UpdateItem].includes(lambdaHandlerName);
+    const usePsaltSecret = [
+      UserLambdaHandler.Login,
+      UserLambdaHandler.Signup,
+      UserLambdaHandler.UpdateDetails,
+      UserLambdaHandler.DeleteDetails,
+    ].includes(lambdaHandlerName);
 
     const props = this.props as UserApiProps;
     const additionalEnvs: JSONObject = {};
@@ -97,6 +108,10 @@ export class UserApiConstruct extends BaseApiConstruct {
       additionalEnvs.CONFIG_TYPE_TABLE_NAME = props.configTypeTable.table.name;
       additionalEnvs.CONFIG_TYPE_BELONGS_TO_GSI_NAME = props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name;
       additionalEnvs.PAYMENT_ACCOUNT_TABLE_NAME = props.paymentAccountTable.table.name;
+    }
+
+    if (lambdaHandlerName === UserLambdaHandler.DeleteDetails) {
+      additionalEnvs.DELETE_USER_EXPIRES_IN_SEC = parsedDuration(props.deleteExpiration).toSeconds().toString();
     }
 
     const userLambdaFunction = new lambda.Function(this, this.getLambdaHandlerId(lambdaHandlerName, method), {

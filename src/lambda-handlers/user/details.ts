@@ -1,7 +1,7 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
-import { InvalidField, RequestBodyContentType, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
-import { utils, validations, AuditDetailsType, getLogger, LoggerBase, dbutil } from "../utils";
-import { DbUserDetails, ApiUserResource, DbItemUser } from "./resource-type";
+import { InvalidError, InvalidField, JSONObject, RequestBodyContentType, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
+import { utils, validations, getLogger, LoggerBase, dbutil, dateutil } from "../utils";
+import { DbUserDetails, ApiUserResource, DbItemUser, DbUserStatus, ApiUserAccountStatus } from "./resource-type";
 import { encrypt, verify } from "./pcrypt";
 import {
   ErrorMessage,
@@ -9,6 +9,7 @@ import {
   _logger,
   _userEmailGsiName,
   _userTableName,
+  getAuthorizeUser,
   getDetailsTablePk,
   getEmailGsiPk,
   getValidatedUserId,
@@ -19,6 +20,8 @@ const userDetailsMemoryCache = caching("memory", {
   max: 5,
   ttl: 5 * 60 * 1000,
 });
+
+const DELETE_USER_EXPIRES_IN_SEC = Number(process.env.DELETE_USER_EXPIRES_IN_SEC);
 
 export const getDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("getDetails", _logger);
@@ -33,21 +36,22 @@ export const getDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxy
     throw new ValidationError([{ message: ErrorMessage.UNKNOWN_USER, path: UserResourcePath.USER }]);
   }
   const dbDetails: DbUserDetails = output.Item.details;
-  const result = {
+  const result: ApiUserResource = {
     firstName: dbDetails.firstName,
     lastName: dbDetails.lastName,
     emailId: dbDetails.emailId,
+    status: convertUserStatusDbtoApi(dbDetails),
   };
-  return result;
+  return result as unknown as JSONObject;
 });
 
 const updateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("updateDetails", _logger);
-  const userId = getValidatedUserId(event);
+  const authUser = getAuthorizeUser(event);
   const req = getValidatedRequestForUpdateDetails(event, logger);
   const getCmdInput = {
     TableName: _userTableName,
-    Key: { PK: getDetailsTablePk(userId) },
+    Key: { PK: getDetailsTablePk(authUser.userId) },
   };
   const output = await dbutil.getItem(getCmdInput, logger);
   logger.info("getUserDetails", output);
@@ -68,7 +72,7 @@ const updateDetailsHandler = async (event: APIGatewayProxyEvent) => {
       lastName: dbDetails.lastName,
       emailId: dbDetails.emailId,
       phash: await encrypt(req.newPassword as string),
-      auditDetails: utils.updateAuditDetails(dbDetails.auditDetails, dbDetails.id) as AuditDetailsType,
+      auditDetails: utils.updateAuditDetailsFailIfNotExists(dbDetails.auditDetails, authUser),
       status: dbDetails.status,
     };
   } else {
@@ -78,13 +82,13 @@ const updateDetailsHandler = async (event: APIGatewayProxyEvent) => {
       lastName: req.lastName as string,
       emailId: dbDetails.emailId,
       phash: dbDetails.phash,
-      auditDetails: utils.updateAuditDetails(dbDetails.auditDetails, dbDetails.id) as AuditDetailsType,
+      auditDetails: utils.updateAuditDetailsFailIfNotExists(dbDetails.auditDetails, authUser),
       status: dbDetails.status,
     };
   }
 
   const dbItem: DbItemUser = {
-    PK: getDetailsTablePk(userId),
+    PK: getDetailsTablePk(authUser.userId),
     E_GSI_PK: getEmailGsiPk(dbDetails.emailId),
     details: apiToDbDetails,
   };
@@ -97,6 +101,51 @@ const updateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   return null;
 };
 export const updateDetails = apiGatewayHandlerWrapper(updateDetailsHandler, RequestBodyContentType.JSON);
+
+export const deleteDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
+  const logger = getLogger("deleteDetails", _logger);
+  const authUser = getAuthorizeUser(event);
+  const { emailIdHeader, passwordHeader } = getValidatedRequestHeaders(event, logger);
+
+  const cmdInput = {
+    TableName: _userTableName,
+    Key: { PK: getDetailsTablePk(authUser.userId) },
+  };
+  const output = await dbutil.getItem(cmdInput, logger);
+  logger.info("retrieved user item result");
+  if (!output.Item) {
+    throw new ValidationError([{ message: ErrorMessage.UNKNOWN_USER, path: UserResourcePath.USER }]);
+  }
+  const dbItem = output.Item as DbItemUser;
+  const isPasswordValid = await verify(passwordHeader, dbItem.details.phash);
+  if (!isPasswordValid || dbItem.details.emailId !== emailIdHeader) {
+    throw new ValidationError([{ path: UserResourcePath.REQUEST, message: ErrorMessage.INCORRECT_VALUE }]);
+  }
+
+  const dbAuditDetails = utils.updateAuditDetailsFailIfNotExists(dbItem.details.auditDetails, authUser);
+  const deleteGracefulTimeInSec = Math.ceil(dateutil.addSeconds(new Date(), DELETE_USER_EXPIRES_IN_SEC + 1).getTime() / 1000);
+  const deletingDbItem: DbItemUser = {
+    PK: dbItem.PK,
+    E_GSI_PK: dbItem.E_GSI_PK,
+    ExpiresAt: deleteGracefulTimeInSec,
+    details: {
+      ...dbItem.details,
+      status: DbUserStatus.DELETE_USER,
+      auditDetails: dbAuditDetails,
+    },
+  };
+
+  const deleteResult = await dbutil.putItem({ TableName: _userTableName, Item: deletingDbItem }, logger);
+  logger.debug("user is marked for deletion");
+
+  const deleteResponse: ApiUserResource = {
+    emailId: deletingDbItem.details.emailId,
+    firstName: deletingDbItem.details.firstName,
+    lastName: deletingDbItem.details.lastName,
+    status: ApiUserAccountStatus.DELETED_USER,
+  };
+  return deleteResponse as unknown as JSONObject;
+});
 
 /**
  * Retrieve json body from event and validate resouc for update details.
@@ -177,4 +226,45 @@ export const getUserDetailsById = async (userId: string) => {
     } as DbUserDetails;
   });
   return await detailsPromise;
+};
+
+const convertUserStatusDbtoApi = (dbDetails: DbUserDetails) => {
+  let apiStatus;
+  switch (dbDetails.status) {
+    case DbUserStatus.ACTIVE_USER:
+      apiStatus = ApiUserAccountStatus.ACTIVE_USER;
+      break;
+    case DbUserStatus.INACTIVE_USER:
+      apiStatus = ApiUserAccountStatus.DEACTIVATED_USER;
+      break;
+    case DbUserStatus.DELETE_USER:
+      apiStatus = ApiUserAccountStatus.DELETED_USER;
+      break;
+    default:
+      throw new InvalidError("incorrect db user status, value = [" + dbDetails.status + "]");
+  }
+  return apiStatus;
+};
+
+const getValidatedRequestHeaders = (event: APIGatewayProxyEvent, loggerBase: LoggerBase) => {
+  const logger = getLogger("validateRequest", loggerBase);
+  const emailIdHeader = event.headers.emailId as string;
+  const passwordHeader = event.headers.password as string;
+
+  const invalidFields: InvalidField[] = [];
+  if (!validations.isValidEmail(emailIdHeader)) {
+    const error = emailIdHeader ? ErrorMessage.INCORRECT_VALUE : ErrorMessage.MISSING_VALUE;
+    invalidFields.push({ path: UserResourcePath.EMAILID, message: error });
+  }
+  if (!validations.isValidPassword(passwordHeader)) {
+    const error = passwordHeader ? ErrorMessage.INCORRECT_VALUE : ErrorMessage.MISSING_VALUE;
+    invalidFields.push({ path: UserResourcePath.PASSWORD, message: error });
+  }
+
+  logger.info("invalidFields", invalidFields);
+  if (invalidFields.length > 0) {
+    throw new ValidationError(invalidFields);
+  }
+
+  return { emailIdHeader, passwordHeader };
 };

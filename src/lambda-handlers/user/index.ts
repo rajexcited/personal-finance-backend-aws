@@ -1,4 +1,4 @@
-export { getDetails as getUserDetails, updateDetails as updateUserDetails, getUserDetailsById } from "./details";
+export { getDetails as getUserDetails, updateDetails as updateUserDetails, getUserDetailsById, deleteDetails as deleteUserDetails } from "./details";
 
 export { login as userLogin, logout as userLogout } from "./login-logout";
 

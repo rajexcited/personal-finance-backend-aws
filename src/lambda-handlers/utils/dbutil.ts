@@ -125,7 +125,7 @@ export const queryOnce = async (input: QueryCommandInput, _logger: LoggerBase) =
 export const batchGet = async <T>(itemsKeys: Record<string, NativeAttributeValue>[], tableName: string, loggerBase: LoggerBase) => {
   const stopwatch = new StopWatch("batchGet");
   const logger = getLogger("batchGet", loggerBase);
-  const counter = 1;
+  let counter = 1;
   const itemResponse: T[] = [];
   try {
     let itemsToGet: Record<string, NativeAttributeValue>[] = [...itemsKeys];
@@ -155,6 +155,7 @@ export const batchGet = async <T>(itemsKeys: Record<string, NativeAttributeValue
         throw err;
       }
       stopwatch.stop();
+      counter++;
     }
   } finally {
     if (stopwatch.isRunning()) stopwatch.stop();

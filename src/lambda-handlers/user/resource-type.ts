@@ -4,6 +4,8 @@ import { AuthRole } from "../common";
 export interface DbItemUser {
   PK: string;
   E_GSI_PK: string;
+  // ttl value in seconds
+  ExpiresAt?: number;
   details: DbUserDetails;
 }
 export interface DbItemToken {
@@ -20,6 +22,12 @@ export interface DbUserTokenDetails {
   iat: number;
 }
 
+export enum DbUserStatus {
+  ACTIVE_USER = "active",
+  INACTIVE_USER = "inactive",
+  DELETE_USER = "deleted",
+}
+
 export interface DbUserDetails {
   id: string;
   firstName: string;
@@ -27,7 +35,13 @@ export interface DbUserDetails {
   emailId: string;
   auditDetails: AuditDetailsType;
   phash: string;
-  status: "active" | "inactive" | "deleted";
+  status: DbUserStatus;
+}
+
+export enum ApiUserAccountStatus {
+  ACTIVE_USER = "active-user",
+  DELETED_USER = "deleted-user",
+  DEACTIVATED_USER = "deactive-user",
 }
 
 export interface ApiUserResource {
@@ -37,6 +51,7 @@ export interface ApiUserResource {
   password?: string;
   newPassword?: string;
   countryCode?: string;
+  status: ApiUserAccountStatus;
 }
 
 export class AuthorizeUser {

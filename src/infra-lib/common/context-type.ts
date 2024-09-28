@@ -2,14 +2,15 @@ export interface ExpenseReceiptContextInfo {
   temporaryKeyPrefix: string;
   finalizeReceiptKeyPrefix: string;
   deleteTags: Record<string, string>;
-  expirationDays: {
-    finalizeReceipt: number;
-    temporaryReceipt: number;
+  expiration: {
+    finalizeReceipt: string;
+    temporaryReceipt: string;
   };
 }
 
 export interface ApigatewayContextInfo {
   stageName: string;
+  deleteUserExpiration: string;
 }
 
 interface CfPathPrefixContextInfo {

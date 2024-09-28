@@ -39,8 +39,9 @@ export const isValidDate = (date: Date | string | number | null | undefined, _lo
   const logger = getLogger("isValidDate", __logger, _logger);
   let dupdate: Date;
   logger.info("param date =", date, ", param dateFormat =", dateFormat);
-  if (date instanceof Date && dateFormat) {
-    throw new Error("dateformat cannot be applied to given date instance");
+
+  if (typeof date !== "string" && dateFormat) {
+    throw new Error("dateFormat cannot be applied to given date instance");
   }
 
   if (typeof date === "string") {
