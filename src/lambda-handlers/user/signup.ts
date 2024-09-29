@@ -9,8 +9,9 @@ import {
   InvalidField,
   NotFoundError,
   convertToCreatedResponse,
+  MissingError,
 } from "../apigateway";
-import { getLogger, utils, AuditDetailsType, LoggerBase, validations, dbutil, s3utils } from "../utils";
+import { getLogger, utils, LoggerBase, validations, dbutil, s3utils } from "../utils";
 import {
   _logger as userLogger,
   _userTableName,
@@ -22,7 +23,7 @@ import {
   ErrorMessage,
 } from "./base-config";
 import { encrypt } from "./pcrypt";
-import { DbUserDetails, DbItemUser, DbItemToken, ApiUserResource } from "./resource-type";
+import { DbUserDetails, DbItemUser, DbItemToken, ApiUserResource, AuthorizeUser, DbUserStatus } from "./resource-type";
 import { BelongsTo, DbConfigTypeDetails, DefaultConfigData, _configDataBucketName, addDefaultConfigTypes } from "../config-type";
 import { DefaultPaymentAccounts } from "../pymt-acc/resource-type";
 import { JSONObject } from "../apigateway";
@@ -45,7 +46,11 @@ const signupHandler = async (event: APIGatewayProxyEvent) => {
 
     const phash = await encrypt(req.password as string);
     const userId = uuidv4();
-    const auditDetails = utils.updateAuditDetails(null, userId) as AuditDetailsType;
+    const primaryUser: AuthorizeUser = {
+      role: AuthRole.PRIMARY,
+      userId: userId,
+    };
+    const auditDetails = utils.updateAuditDetailsFailIfNotExists(null, primaryUser);
     const apiToDbDetails: DbUserDetails = {
       id: userId,
       emailId: req.emailId as string,
@@ -53,7 +58,7 @@ const signupHandler = async (event: APIGatewayProxyEvent) => {
       lastName: req.lastName as string,
       phash: phash,
       auditDetails: auditDetails,
-      status: "active",
+      status: DbUserStatus.ACTIVE_USER,
     };
     const dbDetailItem: DbItemUser = {
       PK: getDetailsTablePk(apiToDbDetails.id),
@@ -66,10 +71,10 @@ const signupHandler = async (event: APIGatewayProxyEvent) => {
     logger.info("dbDetailItem to be updated", dbDetailItem, "summary", stopwatch.shortSummary());
 
     // init config
-    const confInit = await initUserConfigurations(apiToDbDetails.id, req.countryCode as string, stopwatch, transactionWriter);
+    const confInit = await initUserConfigurations(primaryUser, req.countryCode as string, stopwatch, transactionWriter);
     // init payment account
-    stopwatch.start("payment-account");
-    const pymtAccounts = await initPaymentAccount(apiToDbDetails.id, confInit, transactionWriter);
+    stopwatch.start("payment-accounts");
+    const pymtAccounts = await initPaymentAccount(primaryUser, confInit, transactionWriter);
     stopwatch.stop();
 
     stopwatch.start("addingNewUser");
@@ -161,40 +166,54 @@ const getValidatedRequestForSignup = async (event: APIGatewayProxyEvent, loggerB
  *
  * @param userDetails
  */
-const initUserConfigurations = async (userId: string, countryCode: string, stopwatch: StopWatch, transactionWriter: dbutil.TransactionWriter) => {
+const initUserConfigurations = async (
+  authUser: AuthorizeUser,
+  countryCode: string,
+  stopwatch: StopWatch,
+  transactionWriter: dbutil.TransactionWriter
+) => {
   const logger = getLogger("initUserConfigurations", _logger);
-  // create default expense categories
-  stopwatch.start(BelongsTo.ExpenseCategory);
-  const xpnsCtgr = await addDefaultConfig("default-expense-categories.json", BelongsTo.ExpenseCategory, userId, logger, transactionWriter);
+  const confInit: Partial<Record<BelongsTo, DbConfigTypeDetails[]>> = {};
+
+  // create default configs
+  stopwatch.start(BelongsTo.PurchaseType);
+  const prchTyps = await addDefaultConfig(BelongsTo.PurchaseType, authUser, logger, transactionWriter);
+  confInit[BelongsTo.PurchaseType] = prchTyps;
   stopwatch.stop();
-  // create default payment account types
+  //
   stopwatch.start(BelongsTo.PaymentAccountType);
-  const pymtAccTyp = await addDefaultConfig("default-payment-account-types.json", BelongsTo.PaymentAccountType, userId, logger, transactionWriter);
+  const pymtAccTyps = await addDefaultConfig(BelongsTo.PaymentAccountType, authUser, logger, transactionWriter);
+  confInit[BelongsTo.PaymentAccountType] = pymtAccTyps;
+  stopwatch.stop();
+  //
+  stopwatch.start(BelongsTo.IncomeType);
+  const incomeTyps = await addDefaultConfig(BelongsTo.IncomeType, authUser, logger, transactionWriter);
+  confInit[BelongsTo.IncomeType] = incomeTyps;
+  stopwatch.stop();
+  //
+  stopwatch.start(BelongsTo.RefundReason);
+  const refundRsns = await addDefaultConfig(BelongsTo.RefundReason, authUser, logger, transactionWriter);
+  confInit[BelongsTo.RefundReason] = refundRsns;
   stopwatch.stop();
   // create default currency profiles
   stopwatch.start(BelongsTo.CurrencyProfile);
-  const currPrf = await addCurrencyConfig(countryCode, userId, logger, transactionWriter);
+  const currPrf = await addCurrencyConfig(countryCode, authUser, logger, transactionWriter);
+  confInit[BelongsTo.CurrencyProfile] = currPrf;
   stopwatch.stop();
   logger.info("all config types are added to new user");
-  const confInitEntries = [
-    [BelongsTo.ExpenseCategory, xpnsCtgr],
-    [BelongsTo.PaymentAccountType, pymtAccTyp],
-    [BelongsTo.CurrencyProfile, currPrf],
-  ];
 
-  const confInit = Object.fromEntries(confInitEntries);
-  return confInit as Record<BelongsTo, DbConfigTypeDetails[]>;
+  return confInit;
 };
 
 const addDefaultConfig = async (
-  s3Key: string,
   belongsTo: BelongsTo,
-  userId: string,
+  authUser: AuthorizeUser,
   baseLogger: LoggerBase,
   transactionWriter: dbutil.TransactionWriter
 ) => {
   const logger = getLogger(belongsTo, baseLogger);
 
+  const s3Key = `default/${belongsTo}.json`;
   const configData = await s3utils.getJsonObjectFromS3<DefaultConfigData[]>(_configDataBucketName, s3Key, logger);
   if (configData) {
     let filteredData = configData;
@@ -206,73 +225,80 @@ const addDefaultConfig = async (
       filteredData.map((d) => d.name)
     );
     // create
-    const configs = await addDefaultConfigTypes(filteredData, belongsTo, userId, transactionWriter);
+    const configs = await addDefaultConfigTypes(filteredData, belongsTo, authUser, transactionWriter);
     logger.info(belongsTo + " config types are added to user");
     return configs;
   }
   return [];
 };
 
-const addCurrencyConfig = async (countryCode: string, userId: string, baseLogger: LoggerBase, transactionWriter: dbutil.TransactionWriter) => {
+const addCurrencyConfig = async (
+  countryCode: string,
+  authUser: AuthorizeUser,
+  baseLogger: LoggerBase,
+  transactionWriter: dbutil.TransactionWriter
+) => {
   const belongsTo = BelongsTo.CurrencyProfile;
   const logger = getLogger(belongsTo, baseLogger);
 
   const currencyConfigData = await getCurrencyByCountry(logger);
   const matchingCurrencyProfile = currencyConfigData.find((currencyCfg) => currencyCfg.country.code === countryCode);
 
-  if (matchingCurrencyProfile) {
-    logger.info("matchingCurrencyProfile", matchingCurrencyProfile);
-    // create
-    const configData: DefaultConfigData = {
-      name: matchingCurrencyProfile.country.code,
-      value: matchingCurrencyProfile.currency.code,
-      tags: [],
-      description: `currency profile for country, ${matchingCurrencyProfile.country.name} and currency, ${matchingCurrencyProfile.currency.name}`,
-    };
-    const configs = await addDefaultConfigTypes([configData], belongsTo, userId, transactionWriter);
-    logger.info(belongsTo + " config types are added to user");
-    return configs;
+  if (!matchingCurrencyProfile) {
+    throw new MissingError("currency profile for given country code[" + countryCode + "] not found.");
   }
-  return [];
+
+  logger.info("matchingCurrencyProfile", matchingCurrencyProfile);
+  // create
+  const configData: DefaultConfigData = {
+    name: matchingCurrencyProfile.country.code,
+    value: matchingCurrencyProfile.currency.code,
+    tags: [],
+    description: `currency profile for country, ${matchingCurrencyProfile.country.name} and currency, ${matchingCurrencyProfile.currency.name}`,
+  };
+
+  const configs = await addDefaultConfigTypes([configData], belongsTo, authUser, transactionWriter);
+  logger.info(belongsTo + " config types are added to user");
+  return configs;
 };
 
 const initPaymentAccount = async (
-  userId: string,
-  confInit: Record<BelongsTo, DbConfigTypeDetails[]>,
+  authUser: AuthorizeUser,
+  confInit: Partial<Record<BelongsTo, DbConfigTypeDetails[]>>,
   transactionWriter: dbutil.TransactionWriter
 ) => {
   // add default payment accounts
   const logger = getLogger("initPaymentAccount", _logger);
 
-  const s3Key = "default-payment-accounts.json";
+  const s3Key = "default/payment-accounts.json";
 
   const pymtAccs = await s3utils.getJsonObjectFromS3<DefaultPaymentAccounts[]>(_configDataBucketName, s3Key, logger);
-  if (pymtAccs) {
-    logger.info(
-      "pymtAccs.length",
-      pymtAccs.length,
-      "payment Account shortNames",
-      pymtAccs.map((p) => p.shortName)
-    );
-    const pymtAccTyp = confInit[BelongsTo.PaymentAccountType];
-    const missingTypeNames: string[] = [];
-    pymtAccs.forEach((pa) => {
-      const paymentAccountTypeId = pymtAccTyp.find((pat) => pat.name === pa.typeName)?.id;
-      if (!paymentAccountTypeId) {
-        missingTypeNames.push(pa.typeName);
-      } else {
-        pa.typeName = paymentAccountTypeId;
-      }
-    });
-    if (missingTypeNames.length) {
-      throw new NotFoundError(`payment account types [${missingTypeNames.join(", ")}] are missing`);
-    }
-    // create
-    const pymtAccounts = await addDefaultPymtAccounts(pymtAccs, userId, transactionWriter);
-    logger.info("Payment Accounts are added to user");
-    return pymtAccounts;
+  const pymtAccTyp = confInit[BelongsTo.PaymentAccountType];
+  if (!pymtAccs || !pymtAccTyp) {
+    throw new MissingError("payment accounts or payment account types not exist");
   }
-  return [];
+  logger.info(
+    "pymtAccs.length",
+    pymtAccs.length,
+    "payment Account shortNames",
+    pymtAccs.map((p) => p.shortName)
+  );
+  const missingTypeNames: string[] = [];
+  pymtAccs.forEach((pa) => {
+    const paymentAccountTypeId = pymtAccTyp.find((pat) => pat.name === pa.typeName)?.id;
+    if (!paymentAccountTypeId) {
+      missingTypeNames.push(pa.typeName);
+    } else {
+      pa.typeName = paymentAccountTypeId;
+    }
+  });
+  if (missingTypeNames.length) {
+    throw new NotFoundError(`payment account types [${missingTypeNames.join(", ")}] are missing`);
+  }
+  // create
+  const pymtAccounts = await addDefaultPymtAccounts(pymtAccs, authUser, transactionWriter);
+  logger.info("Payment Accounts are added to user");
+  return pymtAccounts;
 };
 
 const isValidCountryCode = async (countryCode: string | null | undefined) => {

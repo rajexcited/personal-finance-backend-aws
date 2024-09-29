@@ -64,6 +64,7 @@ export class UserApiConstruct extends BaseApiConstruct {
     props.userTable.table.ref.grantReadWriteData(signuplambdaFunction);
     props.configTypeTable.table.ref.grantReadWriteData(signuplambdaFunction);
     props.paymentAccountTable.table.ref.grantWriteData(signuplambdaFunction);
+    props.configBucket.grantRead(signuplambdaFunction);
 
     const userLogoutResource = userResource.addResource("logout");
     const logoutlambdaFunction = this.buildApi(userLogoutResource, HttpMethod.POST, UserLambdaHandler.Logout);
@@ -137,10 +138,6 @@ export class UserApiConstruct extends BaseApiConstruct {
 
     if (usePsaltSecret) {
       this.pSaltSecret.grantRead(userLambdaFunction);
-    }
-
-    if (lambdaHandlerName === UserLambdaHandler.Signup) {
-      props.configBucket.grantRead(userLambdaFunction);
     }
 
     const userLambdaIntegration = new apigateway.LambdaIntegration(userLambdaFunction, {

@@ -36,12 +36,6 @@
     "description": "for future earnings and improve skills. \n investing for future earnings, profits, retirement plans, insurances, cds, etc."
   },
   {
-    "name": "income",
-    "value": "income",
-    "tags": ["earning", "necessary"],
-    "description": "all incoming money. cashback from credit card or some other kind of rebate, applied as REFUND. And use same category of billing. Otherwise treat it as discount and add to earning category. \n salary, interest earned, passive income, profit, loss (negative earning), rebate, credit card cashback etc."
-  },
-  {
     "name": "maintenance",
     "value": "maintenance",
     "tags": ["spending", "necessary"],
