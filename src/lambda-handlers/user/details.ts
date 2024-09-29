@@ -248,7 +248,7 @@ const convertUserStatusDbtoApi = (dbDetails: DbUserDetails) => {
 
 const getValidatedRequestHeaders = (event: APIGatewayProxyEvent, loggerBase: LoggerBase) => {
   const logger = getLogger("validateRequest", loggerBase);
-  const emailIdHeader = event.headers.emailId as string;
+  const emailIdHeader = event.headers.emailid as string;
   const passwordHeader = event.headers.password as string;
 
   const invalidFields: InvalidField[] = [];
