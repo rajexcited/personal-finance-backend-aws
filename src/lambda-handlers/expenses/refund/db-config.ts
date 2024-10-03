@@ -24,6 +24,7 @@ export interface DbDetailsRefund extends DbDetailsType {
   belongsTo: ExpenseBelongsTo.Refund;
   purchaseId?: string;
   reasonId: string;
+  personIds: string[];
 }
 
 export const getTablePkDetails = (refundId: string, _logger: LoggerBase) => {

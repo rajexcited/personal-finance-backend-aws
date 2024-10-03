@@ -55,6 +55,7 @@ const putDbIncome = (
     auditDetails: auditDetails,
     belongsTo: ExpenseBelongsTo.Income,
     recordType: ExpenseRecordType.Details,
+    personIds: req.personIds,
   };
 
   const dbItemPrch: DbItemExpense<DbDetailsIncome> = {

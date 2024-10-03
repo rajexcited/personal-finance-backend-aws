@@ -108,7 +108,7 @@ export class ConfigTypeApiConstruct extends BaseApiConstruct {
 
   getJsonRequestModel(lambdaHandlerName: string) {
     if (lambdaHandlerName === ConfigTypeLambdaHandler.AddUpdate) {
-      return this.getAddUpdateDetailModel();
+      // return this.getAddUpdateDetailModel();
     }
     return undefined;
   }

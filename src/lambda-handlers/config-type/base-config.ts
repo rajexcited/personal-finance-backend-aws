@@ -49,6 +49,7 @@ export enum BelongsTo {
   IncomeType = "income-type",
   RefundReason = "refund-reason",
   InvestmentType = "investment-type",
+  SharePerson = "share-person",
 }
 
 export const getBelongsToGsiPk = (event: APIGatewayProxyEvent | null, loggerBase: LoggerBase, userId?: string, belongsTo?: BelongsTo) => {

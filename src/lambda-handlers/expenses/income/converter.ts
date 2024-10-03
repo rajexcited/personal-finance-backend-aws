@@ -30,6 +30,7 @@ export const convertIncomeDbToApiResource = async (dbDetails: DbDetailsIncome, a
     verifiedTimestamp: dbDetails.verifiedTimestamp,
     receipts: apiReceipts,
     auditDetails: auditDetails,
+    personIds: dbDetails.personIds,
   };
 
   return apiResource;

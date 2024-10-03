@@ -62,6 +62,7 @@ const putDbRefund = (
     belongsTo: ExpenseBelongsTo.Refund,
     recordType: ExpenseRecordType.Details,
     purchaseId: req.purchaseId,
+    personIds: req.personIds,
   };
 
   const dbItemRfd: DbItemExpense<DbDetailsRefund> = {

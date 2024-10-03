@@ -22,6 +22,7 @@ export interface DbDetailsIncome extends DbDetailsType {
   receipts: DbDetailsReceipt[];
   belongsTo: ExpenseBelongsTo.Income;
   incomeTypeId: string;
+  personIds: string[];
 }
 
 export const getTablePkDetails = (incomeId: string, _logger: LoggerBase) => {

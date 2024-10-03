@@ -10,7 +10,7 @@ import { PurchaseRequestResourcePath } from "./error";
 import { getValidatedRequestToUpdateExpenseDetails } from "../../api-resource/request-body";
 
 export const getValidatedRequestToUpdatePurchaseDetails = async (event: APIGatewayProxyEvent, logger: LoggerBase) => {
-  const req = getValidatedRequestToUpdateExpenseDetails(event, logger) as ApiResourcePurchaseDetails;
+  const req = (await getValidatedRequestToUpdateExpenseDetails(event, logger)) as ApiResourcePurchaseDetails;
 
   const userId = getValidatedUserId(event);
   const invalidFields: InvalidField[] = [];

@@ -109,7 +109,7 @@ export class PymtAccApiConstruct extends BaseApiConstruct {
 
   getJsonRequestModel(lambdaHandlerName: string) {
     if (lambdaHandlerName === PaymentAccountLambdaHandler.AddUpdate) {
-      return this.getAddUpdateDetailModel();
+      // return this.getAddUpdateDetailModel();
     }
     return undefined;
   }

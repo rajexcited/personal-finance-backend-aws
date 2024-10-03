@@ -15,4 +15,5 @@ export enum ExpenseRequestResourcePath {
   VERIFIED_TIMESTAMP = "verifiedTimestamp",
   RECEIPTS = "receipts",
   STATUS = "status",
+  SHARE_PERSON = "sharePerson",
 }

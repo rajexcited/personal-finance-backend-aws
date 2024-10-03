@@ -10,7 +10,7 @@ import { IncomeRequestResourcePath } from "./error";
 import { getValidatedRequestToUpdateExpenseDetails } from "../../api-resource/request-body";
 
 export const getValidatedRequestToUpdateIncomeDetails = async (event: APIGatewayProxyEvent, logger: LoggerBase) => {
-  const req = getValidatedRequestToUpdateExpenseDetails(event, logger) as ApiResourceIncomeDetails;
+  const req = (await getValidatedRequestToUpdateExpenseDetails(event, logger)) as ApiResourceIncomeDetails;
 
   const userId = getValidatedUserId(event);
   const invalidFields: InvalidField[] = [];

@@ -198,6 +198,44 @@ const InvestmentTypeConfigUriAuthConfigList: RoleAuthorizeConfigType[] = [
   },
 ];
 
+const SharePersonConfigUriAuthConfigList: RoleAuthorizeConfigType[] = [
+  {
+    apiPath: "/config/types/belongs-to/share-person",
+    method: MethodType.GET,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
+    apiPath: "/config/types/belongs-to/share-person/tags",
+    method: MethodType.GET,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
+    apiPath: "/config/types/belongs-to/share-person",
+    method: MethodType.POST,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
+    apiPath: "/config/types/belongs-to/share-person/id/*",
+    method: MethodType.GET,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
+    apiPath: "/config/types/belongs-to/share-person/id/*",
+    method: MethodType.DELETE,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
+    apiPath: "/config/types/belongs-to/share-person/id/*/status/enable",
+    method: MethodType.POST,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
+    apiPath: "/config/types/belongs-to/share-person/id/*/status/disable",
+    method: MethodType.POST,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+];
+
 const PymtAccountTypeConfigUriAuthConfigList: RoleAuthorizeConfigType[] = [
   {
     apiPath: "/config/types/belongs-to/pymt-account-type",
@@ -264,6 +302,7 @@ const ConfigTypeUriAuthConfigList: RoleAuthorizeConfigType[] = [
   ...IncomeTypeConfigUriAuthConfigList,
   ...RefundReasonConfigUriAuthConfigList,
   ...InvestmentTypeConfigUriAuthConfigList,
+  ...SharePersonConfigUriAuthConfigList,
   ...PymtAccountTypeConfigUriAuthConfigList,
   ...CurrencyProfileConfigUriAuthConfigList,
 ];

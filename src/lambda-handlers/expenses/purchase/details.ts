@@ -68,6 +68,7 @@ const putDbPurchase = (
     auditDetails: auditDetails,
     belongsTo: ExpenseBelongsTo.Purchase,
     recordType: ExpenseRecordType.Details,
+    personIds: req.personIds,
   };
 
   const dbItemPrch: DbItemExpense<DbDetailsPurchase> = {

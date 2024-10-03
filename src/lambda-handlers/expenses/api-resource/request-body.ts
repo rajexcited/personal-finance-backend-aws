@@ -1,13 +1,17 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import * as receiptValidator from "../../receipts/validate";
-import { LoggerBase, utils } from "../../utils";
+import { getLogger, LoggerBase, utils, validations } from "../../utils";
 import { ApiResourceExpense } from "./resource-path";
 import { InvalidField, ValidationError } from "../../apigateway";
 import { ErrorMessage, ExpenseRequestResourcePath } from "./error";
 import { ExpenseStatus } from "../base-config";
 import * as fieldValidator from "./prop-validator";
+import { BelongsTo, isConfigIdExists } from "../../config-type";
+import { getValidatedUserId } from "../../user";
 
-export const getValidatedRequestToUpdateExpenseDetails = (event: APIGatewayProxyEvent, logger: LoggerBase) => {
+const MAX_ALLOWED_PERSON_TAGGING = 10;
+
+export const getValidatedRequestToUpdateExpenseDetails = async (event: APIGatewayProxyEvent, logger: LoggerBase) => {
   const req: ApiResourceExpense | null = utils.getJsonObj(event.body as string);
   logger.info("request =", req);
 
@@ -41,10 +45,32 @@ export const getValidatedRequestToUpdateExpenseDetails = (event: APIGatewayProxy
 
   fieldValidator.validateTags(req.tags, invalidFields, logger);
 
+  const userId = getValidatedUserId(event);
+  if (!(await areValidPersonIds(req.personIds, userId, logger))) {
+    invalidFields.push({ path: ExpenseRequestResourcePath.SHARE_PERSON, message: ErrorMessage.INCORRECT_VALUE });
+  }
+
   logger.info("invalidFields =", invalidFields);
   if (invalidFields.length > 0) {
     throw new ValidationError(invalidFields);
   }
 
   return req;
+};
+
+const areValidPersonIds = async (personIds: string[] | undefined, userId: string, _logger: LoggerBase) => {
+  const logger = getLogger("areValidPersonIds", _logger);
+  if (!personIds) {
+    logger.debug("personIds not exists");
+    return false;
+  }
+
+  if (personIds.length > MAX_ALLOWED_PERSON_TAGGING) {
+    return false;
+  }
+
+  const validIdPromises = personIds.map((pid) => isConfigIdExists(pid, BelongsTo.SharePerson, userId, logger));
+  const validIds = await Promise.all(validIdPromises);
+  const foundInvalidIndex = validIds.findIndex((isValid) => !isValid);
+  return foundInvalidIndex === -1;
 };
