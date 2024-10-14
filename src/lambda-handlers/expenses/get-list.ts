@@ -37,7 +37,7 @@ export const getExpenseList = apiGatewayHandlerWrapper(async (event: APIGatewayP
 
   const expenseDetailPKList = await getListOfPK(authUser.userId, statusParam, pageNoParam, pageMonthsParam, belongsToParam, logger);
   const detailsItemKeys = expenseDetailPKList.map((pk) => ({ PK: pk }));
-  const detailsItemList = await dbutil.batchGet<DbItemExpense<DbDetailsExpense>>(detailsItemKeys, ExpenseTableName, logger);
+  const detailsItemList = await dbutil.batchGet<DbItemExpense<DbDetailsExpense>>(detailsItemKeys, ExpenseTableName, {}, logger);
   const dbDetailsExpenseList = detailsItemList.map((item) => item.details);
 
   const resourcePromises = dbDetailsExpenseList.map(async (details) => {

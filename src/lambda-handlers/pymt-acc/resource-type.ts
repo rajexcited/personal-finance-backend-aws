@@ -27,6 +27,7 @@ export interface DefaultPaymentAccounts {
   tags: string[];
   description: string;
   institutionName: string;
+  status?: PymtAccStatus;
 }
 
 export interface ApiPaymentAccountResource {

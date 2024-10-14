@@ -1,5 +1,4 @@
-import { dbutil, LoggerBase } from "../../utils";
-import { DbItemExpense, ExpenseTableName } from "../db-config";
+import { LoggerBase } from "../../utils";
 import { ExpenseBelongsTo, ExpenseStatus } from "../../expenses/base-config";
 import {
   DbDetailsType,

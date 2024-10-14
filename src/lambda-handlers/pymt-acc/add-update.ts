@@ -21,7 +21,7 @@ import {
   getUserIdStatusShortnameGsiPk,
   getUserIdStatusShortnameGsiSk,
 } from "./base-config";
-import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils, validations } from "../utils";
+import { LoggerBase, dbutil, getLogger, utils, validations } from "../utils";
 import { getAuthorizeUser, getValidatedUserId } from "../user";
 import { ApiPaymentAccountResource, DbPaymentAccountDetails, DbItemPymtAcc } from "./resource-type";
 import { v4 as uuidv4 } from "uuid";
@@ -50,7 +50,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
       // validate user access to config details
       const gsiPkForReq = getUserIdStatusShortnameGsiPk(authUser.userId, PymtAccStatus.ENABLE);
       if (gsiPkForReq !== existingDbItem.UP_GSI_PK) {
-        // not same user
+        // not same user or status is deleted
         throw new UnAuthorizedError("not authorized to update payment type details");
       }
     } else {
@@ -78,7 +78,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
     shortName: req.shortName,
     accountIdNum: req.accountIdNum || "",
     institutionName: req.institutionName || "",
-    status: req.status,
+    status: existingDbItem?.details.status === PymtAccStatus.Immutable ? PymtAccStatus.Immutable : PymtAccStatus.ENABLE,
     description: req.description,
     tags: req.tags,
     typeId: req.typeId,
@@ -129,7 +129,7 @@ const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, 
   if (!validations.isValidName(req.shortName, SHORTNAME_MAX_LENGTH, NAME_MIN_LENGTH)) {
     invalidFields.push({ path: PymtAccResourcePath.SHORTNAME, message: ErrorMessage.INCORRECT_FORMAT });
   }
-  if (req.status !== PymtAccStatus.ENABLE) {
+  if (req.status && req.status === PymtAccStatus.DELETED) {
     invalidFields.push({ path: PymtAccResourcePath.STATUS, message: ErrorMessage.INCORRECT_VALUE });
   }
 

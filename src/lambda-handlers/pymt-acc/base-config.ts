@@ -1,6 +1,6 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
-import { AuditDetailsType, LoggerBase, getLogger, validations, dateutil } from "../utils";
-import { InvalidError, ValidationError } from "../apigateway";
+import { LoggerBase, getLogger, validations } from "../utils";
+import { ValidationError } from "../apigateway";
 
 export const _pymtAccTableName = process.env.PAYMENT_ACCOUNT_TABLE_NAME as string;
 export const _userIdStatusShortnameIndex = process.env.PAYMENT_ACCOUNT_USERID_GSI_NAME as string;
@@ -36,6 +36,7 @@ export enum PymtAccResourcePath {
 export enum PymtAccStatus {
   ENABLE = "enable",
   DELETED = "deleted",
+  Immutable = "immutable",
 }
 
 export const getDetailsTablePk = (paymentAccountId: string) => {
@@ -43,6 +44,9 @@ export const getDetailsTablePk = (paymentAccountId: string) => {
 };
 
 export const getUserIdStatusShortnameGsiPk = (userId: string, status: PymtAccStatus) => {
+  if (status === PymtAccStatus.Immutable) {
+    return `userId#${userId}#status#${PymtAccStatus.ENABLE}`;
+  }
   return `userId#${userId}#status#${status}`;
 };
 

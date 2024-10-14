@@ -167,7 +167,7 @@ export const retrieveDbPurchaseItems = async (dbPurchase: DbItemExpense<DbDetail
 export const retrieveDbPurchaseToApiResource = async (purchaseId: string, authUser: AuthorizeUser, _logger: LoggerBase) => {
   const logger = getLogger("retrieveDbPurchase", _logger);
   const itemKeys = [{ PK: getTablePkDetails(purchaseId, logger) }, { PK: getTablePkItems(purchaseId, logger) }];
-  const purchaseRecords = await dbutil.batchGet<DbItemExpense<DbDetailsPurchase | DbDetailsPurchaseItem>>(itemKeys, ExpenseTableName, logger);
+  const purchaseRecords = await dbutil.batchGet<DbItemExpense<DbDetailsPurchase | DbDetailsPurchaseItem>>(itemKeys, ExpenseTableName, {}, logger);
   logger.info("retrieved purchase from DB");
 
   const purchaseDetails = purchaseRecords.find((pr) => pr.details.recordType === ExpenseRecordType.Details) as DbItemExpense<DbDetailsPurchase>;

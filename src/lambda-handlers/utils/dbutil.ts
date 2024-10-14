@@ -122,19 +122,25 @@ export const queryOnce = async (input: QueryCommandInput, _logger: LoggerBase) =
   }
 };
 
-export const batchGet = async <T>(itemsKeys: Record<string, NativeAttributeValue>[], tableName: string, loggerBase: LoggerBase) => {
+export const batchGet = async <T>(
+  itemsKeys: Record<string, NativeAttributeValue>[],
+  tableName: string,
+  requestAttributes: Partial<Record<"ProjectionExpression", string>>,
+  loggerBase: LoggerBase
+) => {
   const stopwatch = new StopWatch("batchGet");
   const logger = getLogger("batchGet", loggerBase);
   let counter = 1;
   const itemResponse: T[] = [];
   try {
     let itemsToGet: Record<string, NativeAttributeValue>[] = [...itemsKeys];
+    type BatchRequestItems = Record<string, { Keys: Record<string, NativeAttributeValue>[]; ProjectionExpression?: string }>;
 
     while (itemsToGet.length > 0) {
       stopwatch.start("iteration-" + counter);
       try {
-        const requestItems: Record<string, { Keys: Record<string, NativeAttributeValue>[] }> = {};
-        requestItems[tableName] = { Keys: [...itemsToGet] };
+        const requestItems: BatchRequestItems = {};
+        requestItems[tableName] = { Keys: [...itemsToGet], ProjectionExpression: requestAttributes.ProjectionExpression };
         logger.debug("requesting [", itemsToGet.length, "] items, requestItems =", requestItems);
 
         const output = await ddbClient.batchGet({ RequestItems: requestItems });

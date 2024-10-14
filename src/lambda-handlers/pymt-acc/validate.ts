@@ -1,13 +1,6 @@
 import { GetCommandInput } from "@aws-sdk/lib-dynamodb";
 import { LoggerBase, dbutil, getLogger, validations } from "../utils";
-import {
-  ACCOUNT_ID_NUM_MAX_LENGTH,
-  INSTITUTION_NAME_MAX_LENGTH,
-  NAME_MIN_LENGTH,
-  _pymtAccTableName,
-  getDetailsTablePk,
-  getUserIdStatusShortnameGsiPk,
-} from "./base-config";
+import { ACCOUNT_ID_NUM_MAX_LENGTH, INSTITUTION_NAME_MAX_LENGTH, NAME_MIN_LENGTH, _pymtAccTableName, getDetailsTablePk } from "./base-config";
 import { DbItemPymtAcc } from "./resource-type";
 
 export const isValidAccountIdNum = (accountIdNum: string | undefined | null) => {

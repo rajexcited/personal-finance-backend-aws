@@ -11,7 +11,7 @@ import {
   getValidatedPymtAccId,
 } from "./base-config";
 import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils } from "../utils";
-import { AuthorizeUser, getAuthorizeUser, getValidatedUserId } from "../user";
+import { AuthorizeUser, getAuthorizeUser } from "../user";
 import { ApiPaymentAccountResource, DbItemPymtAcc } from "./resource-type";
 
 export const deletePaymentAccount = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
@@ -82,7 +82,9 @@ export const updateStatus = async (authUser: AuthorizeUser, pymtAccId: string, s
     // not same user
     throw new UnAuthorizedError("not authorized to update status of payment account");
   }
-
+  if (dbItem.details.status === PymtAccStatus.Immutable) {
+    throw new UnAuthorizedError("not authorized to update status of payment account");
+  }
   if (dbItem.details.status === status) {
     throw new ValidationError([{ path: PymtAccResourcePath.STATUS, message: ErrorMessage.INCORRECT_VALUE }]);
   }

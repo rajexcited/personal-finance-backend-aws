@@ -5,6 +5,7 @@
     "typeName": "savings",
     "tags": [],
     "description": "my cash, notes or coins stored",
-    "institutionName": ""
+    "institutionName": "",
+    "status": "immutable"
   }
 ]

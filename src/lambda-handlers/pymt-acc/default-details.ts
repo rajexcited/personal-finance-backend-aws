@@ -1,4 +1,4 @@
-import { JSONObject, NotFoundError, MissingError } from "../apigateway";
+import { JSONObject, NotFoundError } from "../apigateway";
 import { BelongsTo, getConfigId } from "../config-type";
 import { dbutil, getLogger, utils, validations } from "../utils";
 import {
@@ -65,7 +65,7 @@ export const createDetails = async (details: DefaultPaymentAccounts[], authUser:
       tags: detail.tags,
       typeId: typeId as string,
       institutionName: detail.institutionName,
-      status: PymtAccStatus.ENABLE,
+      status: detail.status || PymtAccStatus.ENABLE,
       auditDetails: { ...auditDetails },
     };
 
