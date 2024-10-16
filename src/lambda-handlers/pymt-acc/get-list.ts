@@ -12,6 +12,7 @@ import {
 } from "./base-config";
 import { getAuthorizeUser, getValidatedUserId } from "../user";
 import { ApiPaymentAccountResource, DbItemPymtAcc } from "./resource-type";
+import { getDefaultCurrencyProfile } from "../config-type";
 
 export const getPaymentAccountList = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("getPaymentAccountList", _logger);
@@ -33,6 +34,7 @@ export const getPaymentAccountList = apiGatewayHandlerWrapper(async (event: APIG
       description: details.description,
       tags: details.tags,
       auditDetails: auditDetails,
+      currencyProfileId: details.profileId,
     };
     return resource;
   });
@@ -45,12 +47,13 @@ export const getPaymentAccountList = apiGatewayHandlerWrapper(async (event: APIG
 const getListOfDetails = async (userId: string, status: PymtAccStatus, _logger: LoggerBase) => {
   const logger = getLogger("getListOfDetails", _logger);
 
+  const currencyProfile = await getDefaultCurrencyProfile(userId, logger);
   const items = await dbutil.queryAll<DbItemPymtAcc>(logger, {
     TableName: _pymtAccTableName,
     IndexName: _userIdStatusShortnameIndex,
     KeyConditionExpression: "UP_GSI_PK = :pkv",
     ExpressionAttributeValues: {
-      ":pkv": getUserIdStatusShortnameGsiPk(userId, status),
+      ":pkv": getUserIdStatusShortnameGsiPk(userId, status, currencyProfile),
     },
   });
   logger.info("retrieved", items.length, "items for status [", status, "]");

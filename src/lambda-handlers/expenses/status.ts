@@ -12,6 +12,7 @@ import { updateReceiptsIns3 } from "../receipts";
 import { DbDetailsPurchase } from "./purchase";
 import { retrieveDbIncomeDetails } from "./income";
 import { retrieveDbRefundDetails } from "./refund";
+import { DbConfigTypeDetails, getDefaultCurrencyProfile } from "../config-type";
 
 const DELETE_EXPENSE_EXPIRES_IN_SEC = Number(process.env.DELETE_EXPENSE_EXPIRES_IN_SEC);
 
@@ -27,7 +28,8 @@ export const deleteExpenseDetails = apiGatewayHandlerWrapper(async (event: APIGa
   const authUser = getAuthorizeUser(event);
   const expenseId = getValidatedExpenseIdPathParam(event, logger);
   const belongsToParam = getValidatedBelongsToPathParam(event, logger);
-  const dbExpense = await getValidatedDbDetails(authUser, expenseId, belongsToParam, ExpenseStatus.ENABLE, logger);
+  const currencyProfile = await getDefaultCurrencyProfile(authUser.userId, logger);
+  const dbExpense = await getValidatedDbDetails(authUser, expenseId, belongsToParam, ExpenseStatus.ENABLE, currencyProfile, logger);
 
   if (isNaN(DELETE_EXPENSE_EXPIRES_IN_SEC)) {
     throw new InvalidError("value of DELETE_EXPENSE_EXPIRES_IN_SEC is not a number. configured value is " + DELETE_EXPENSE_EXPIRES_IN_SEC);
@@ -38,7 +40,7 @@ export const deleteExpenseDetails = apiGatewayHandlerWrapper(async (event: APIGa
 
   const deletingDbDetails: DbItemExpense<DbDetailsType> = {
     PK: dbExpense.PK,
-    US_GSI_PK: getGsiPkDetails(authUser.userId, ExpenseStatus.DELETED, logger),
+    US_GSI_PK: getGsiPkDetails(authUser.userId, ExpenseStatus.DELETED, currencyProfile, logger),
     US_GSI_SK: dbExpense.US_GSI_SK,
     US_GSI_BELONGSTO: dbExpense.US_GSI_BELONGSTO,
     ExpiresAt: deleteGracefulTimeInSec,
@@ -113,6 +115,7 @@ const getValidatedDbDetails = async (
   expenseId: string,
   belongsTo: ExpenseBelongsTo,
   currentStatus: ExpenseStatus,
+  currencyProfile: DbConfigTypeDetails,
   _logger: LoggerBase
 ) => {
   const logger = getLogger("getValidatedDbDetails", _logger);
@@ -132,7 +135,7 @@ const getValidatedDbDetails = async (
     throw new NotFoundError("expense doesn't exist");
   }
 
-  validateExpenseAuthorization(dbDetails, authUser, logger);
+  validateExpenseAuthorization(dbDetails, authUser, currencyProfile, logger);
 
   if (dbDetails.details.status !== currentStatus) {
     throw new ValidationError([{ path: PurchaseResourcePath.STATUS, message: ErrorMessage.INCORRECT_VALUE }]);

@@ -16,6 +16,7 @@ export interface DbDetailsType {
   auditDetails: AuditDetailsType;
   status: ExpenseStatus;
   recordType: ExpenseRecordType.Details;
+  profileId: string;
 }
 
 export interface DbItemsType {

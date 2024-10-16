@@ -1,4 +1,5 @@
 import { InvalidError, JSONObject } from "../../apigateway";
+import { DbConfigTypeDetails } from "../../config-type";
 import { DbDetailsReceipt } from "../../receipts";
 import { AuthorizeUser } from "../../user";
 import { dbutil, getLogger, LoggerBase, utils } from "../../utils";
@@ -14,11 +15,12 @@ export const addDbIncomeTransactions = async (
   dbItem: DbItemExpense<DbDetailsIncome> | null,
   dbReceipts: DbDetailsReceipt[],
   incomeId: string,
+  currencyProfile: DbConfigTypeDetails,
   authUser: AuthorizeUser,
   transactWriter: dbutil.TransactionWriter,
   logger: LoggerBase
 ) => {
-  const dbIncomeDetails = putDbIncome(req, dbItem, dbReceipts, incomeId, authUser, transactWriter, logger);
+  const dbIncomeDetails = putDbIncome(req, dbItem, dbReceipts, incomeId, currencyProfile, authUser, transactWriter, logger);
 
   const apiResource = await convertIncomeDbToApiResource(dbIncomeDetails.details, authUser, logger);
 
@@ -30,6 +32,7 @@ const putDbIncome = (
   dbItem: DbItemExpense<DbDetailsIncome> | null,
   dbReceipts: DbDetailsReceipt[],
   incomeId: string,
+  currencyProfile: DbConfigTypeDetails,
   authUser: AuthorizeUser,
   transactWriter: dbutil.TransactionWriter,
   _logger: LoggerBase
@@ -56,11 +59,12 @@ const putDbIncome = (
     belongsTo: ExpenseBelongsTo.Income,
     recordType: ExpenseRecordType.Details,
     personIds: req.personIds,
+    profileId: currencyProfile.id,
   };
 
   const dbItemPrch: DbItemExpense<DbDetailsIncome> = {
     PK: getTablePkDetails(incomeId, logger),
-    US_GSI_PK: getGsiPkDetails(authUser.userId, apiToDbDetails.status, logger),
+    US_GSI_PK: getGsiPkDetails(authUser.userId, apiToDbDetails.status, currencyProfile, logger),
     US_GSI_SK: getGsiSkIncomeDate(apiToDbDetails.incomeDate, logger),
     US_GSI_BELONGSTO: getGsiAttrDetailsIncomeBelongsTo(logger),
     details: apiToDbDetails,

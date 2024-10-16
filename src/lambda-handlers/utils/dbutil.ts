@@ -18,11 +18,11 @@ import { StopWatch } from "stopwatch-node";
 import { JSONObject } from "../apigateway";
 import { MissingError } from "../apigateway";
 import { caching } from "cache-manager";
+import ms from "ms";
 
 const getItemMemoryCache = caching("memory", {
   max: 25,
-  // ttl in seconds
-  ttl: 60 * 1000,
+  ttl: ms("60 sec"),
 });
 
 const DdbTranslateConfig: TranslateConfig = {

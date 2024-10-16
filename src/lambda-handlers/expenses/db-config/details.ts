@@ -1,5 +1,6 @@
 import { getTablePkExpenseDetails } from ".";
 import { IllegelArgumentError, UnAuthorizedError } from "../../apigateway";
+import { DbConfigTypeDetails } from "../../config-type";
 import { AuthorizeUser } from "../../user";
 import { getLogger, validations, dateutil, LoggerBase, dbutil } from "../../utils";
 import { ExpenseBelongsTo, ExpenseStatus } from "../base-config";
@@ -12,8 +13,8 @@ export const getTablePkDetails = (id: string, belongsTo: ExpenseBelongsTo, _logg
   return getTablePK(id, belongsTo, ExpenseRecordType.Details, _logger);
 };
 
-export const getGsiPkDetails = (userId: string, status: ExpenseStatus, _logger: LoggerBase) => {
-  return getGsiPk(userId, status, null, ExpenseRecordType.Details, _logger);
+export const getGsiPkDetails = (userId: string, status: ExpenseStatus, currencyProfile: DbConfigTypeDetails, _logger: LoggerBase) => {
+  return getGsiPk(userId, status, null, ExpenseRecordType.Details, currencyProfile, _logger);
 };
 
 export const getGsiSkDetailsExpenseDate = (expenseDate: string | Date | undefined | null, _logger: LoggerBase) => {
@@ -60,14 +61,19 @@ export const getGsiAttrDetailsBelongsTo = (belongsTo: ExpenseBelongsTo | null | 
   return `expenseBelongsTo#${belongsTo}`;
 };
 
-export const validateExpenseAuthorization = (expenseDetails: DbItemExpense<DbDetailsType>, authUser: AuthorizeUser, _logger: LoggerBase) => {
+export const validateExpenseAuthorization = (
+  expenseDetails: DbItemExpense<DbDetailsType>,
+  authUser: AuthorizeUser,
+  currencyProfile: DbConfigTypeDetails,
+  _logger: LoggerBase
+) => {
   const logger = getLogger("validateExpenseAuthorization", _logger);
   // validate user access to config details
-  const gsiPkForReq = getGsiPkDetails(authUser.userId, expenseDetails.details.status, logger);
+  const gsiPkForReq = getGsiPkDetails(authUser.userId, expenseDetails.details.status, currencyProfile, logger);
   if (gsiPkForReq !== expenseDetails.US_GSI_PK) {
     // not same user
     logger.warn("gsiPkForReq =", gsiPkForReq, ", dbItem.US_GSI_PK =", expenseDetails.US_GSI_PK);
-    throw new UnAuthorizedError("not authorized to get expense details");
+    throw new UnAuthorizedError("expense detail is not authorized");
   }
 };
 

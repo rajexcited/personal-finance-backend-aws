@@ -24,7 +24,7 @@ import {
 } from "./base-config";
 import { encrypt } from "./pcrypt";
 import { DbUserDetails, DbItemUser, DbItemToken, ApiUserResource, AuthorizeUser, DbUserStatus } from "./resource-type";
-import { BelongsTo, DbConfigTypeDetails, DefaultConfigData, _configDataBucketName, addDefaultConfigTypes } from "../config-type";
+import { ConfigBelongsTo, DbConfigTypeDetails, DefaultConfigData, _configDataBucketName, addDefaultConfigTypes } from "../config-type";
 import { DefaultPaymentAccounts } from "../pymt-acc/resource-type";
 import { JSONObject } from "../apigateway";
 import { addDefaultPymtAccounts } from "../pymt-acc";
@@ -173,32 +173,32 @@ const initUserConfigurations = async (
   transactionWriter: dbutil.TransactionWriter
 ) => {
   const logger = getLogger("initUserConfigurations", _logger);
-  const confInit: Partial<Record<BelongsTo, DbConfigTypeDetails[]>> = {};
+  const confInit: Partial<Record<ConfigBelongsTo, DbConfigTypeDetails[]>> = {};
 
   // create default configs
-  stopwatch.start(BelongsTo.PurchaseType);
-  const prchTyps = await addDefaultConfig(BelongsTo.PurchaseType, authUser, logger, transactionWriter);
-  confInit[BelongsTo.PurchaseType] = prchTyps;
+  stopwatch.start(ConfigBelongsTo.PurchaseType);
+  const prchTyps = await addDefaultConfig(ConfigBelongsTo.PurchaseType, authUser, logger, transactionWriter);
+  confInit[ConfigBelongsTo.PurchaseType] = prchTyps;
   stopwatch.stop();
   //
-  stopwatch.start(BelongsTo.PaymentAccountType);
-  const pymtAccTyps = await addDefaultConfig(BelongsTo.PaymentAccountType, authUser, logger, transactionWriter);
-  confInit[BelongsTo.PaymentAccountType] = pymtAccTyps;
+  stopwatch.start(ConfigBelongsTo.PaymentAccountType);
+  const pymtAccTyps = await addDefaultConfig(ConfigBelongsTo.PaymentAccountType, authUser, logger, transactionWriter);
+  confInit[ConfigBelongsTo.PaymentAccountType] = pymtAccTyps;
   stopwatch.stop();
   //
-  stopwatch.start(BelongsTo.IncomeType);
-  const incomeTyps = await addDefaultConfig(BelongsTo.IncomeType, authUser, logger, transactionWriter);
-  confInit[BelongsTo.IncomeType] = incomeTyps;
+  stopwatch.start(ConfigBelongsTo.IncomeType);
+  const incomeTyps = await addDefaultConfig(ConfigBelongsTo.IncomeType, authUser, logger, transactionWriter);
+  confInit[ConfigBelongsTo.IncomeType] = incomeTyps;
   stopwatch.stop();
   //
-  stopwatch.start(BelongsTo.RefundReason);
-  const refundRsns = await addDefaultConfig(BelongsTo.RefundReason, authUser, logger, transactionWriter);
-  confInit[BelongsTo.RefundReason] = refundRsns;
+  stopwatch.start(ConfigBelongsTo.RefundReason);
+  const refundRsns = await addDefaultConfig(ConfigBelongsTo.RefundReason, authUser, logger, transactionWriter);
+  confInit[ConfigBelongsTo.RefundReason] = refundRsns;
   stopwatch.stop();
   // create default currency profiles
-  stopwatch.start(BelongsTo.CurrencyProfile);
+  stopwatch.start(ConfigBelongsTo.CurrencyProfile);
   const currPrf = await addCurrencyConfig(countryCode, authUser, logger, transactionWriter);
-  confInit[BelongsTo.CurrencyProfile] = currPrf;
+  confInit[ConfigBelongsTo.CurrencyProfile] = currPrf;
   stopwatch.stop();
   logger.info("all config types are added to new user");
 
@@ -206,7 +206,7 @@ const initUserConfigurations = async (
 };
 
 const addDefaultConfig = async (
-  belongsTo: BelongsTo,
+  belongsTo: ConfigBelongsTo,
   authUser: AuthorizeUser,
   baseLogger: LoggerBase,
   transactionWriter: dbutil.TransactionWriter
@@ -238,7 +238,7 @@ const addCurrencyConfig = async (
   baseLogger: LoggerBase,
   transactionWriter: dbutil.TransactionWriter
 ) => {
-  const belongsTo = BelongsTo.CurrencyProfile;
+  const belongsTo = ConfigBelongsTo.CurrencyProfile;
   const logger = getLogger(belongsTo, baseLogger);
 
   const currencyConfigData = await getCurrencyByCountry(logger);
@@ -264,7 +264,7 @@ const addCurrencyConfig = async (
 
 const initPaymentAccount = async (
   authUser: AuthorizeUser,
-  confInit: Partial<Record<BelongsTo, DbConfigTypeDetails[]>>,
+  confInit: Partial<Record<ConfigBelongsTo, DbConfigTypeDetails[]>>,
   transactionWriter: dbutil.TransactionWriter
 ) => {
   // add default payment accounts
@@ -273,7 +273,7 @@ const initPaymentAccount = async (
   const s3Key = "default/payment-accounts.json";
 
   const pymtAccs = await s3utils.getJsonObjectFromS3<DefaultPaymentAccounts[]>(_configDataBucketName, s3Key, logger);
-  const pymtAccTyp = confInit[BelongsTo.PaymentAccountType];
+  const pymtAccTyp = confInit[ConfigBelongsTo.PaymentAccountType];
   if (!pymtAccs || !pymtAccTyp) {
     throw new MissingError("payment accounts or payment account types not exist");
   }
@@ -295,8 +295,12 @@ const initPaymentAccount = async (
   if (missingTypeNames.length) {
     throw new NotFoundError(`payment account types [${missingTypeNames.join(", ")}] are missing`);
   }
+  const currencyProfiles = confInit[ConfigBelongsTo.CurrencyProfile];
+  if (!currencyProfiles || currencyProfiles.length !== 1) {
+    throw new MissingError("default currency profile not exist");
+  }
   // create
-  const pymtAccounts = await addDefaultPymtAccounts(pymtAccs, authUser, transactionWriter);
+  const pymtAccounts = await addDefaultPymtAccounts(pymtAccs, authUser, currencyProfiles[0], transactionWriter);
   logger.info("Payment Accounts are added to user");
   return pymtAccounts;
 };

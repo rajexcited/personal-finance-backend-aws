@@ -1,7 +1,7 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { getLogger, LoggerBase, validations } from "../../../utils";
 import { ValidationError, InvalidField } from "../../../apigateway";
-import { isConfigIdExists, BelongsTo } from "../../../config-type";
+import { isConfigIdExists, ConfigBelongsTo, DbConfigTypeDetails } from "../../../config-type";
 import { isPaymentAccountExists } from "../../../pymt-acc";
 import { getValidatedUserId } from "../../../user";
 import { ErrorMessage, expenseFieldValidator } from "../../api-resource";
@@ -9,7 +9,11 @@ import { ApiResourcePurchaseDetails, ApiResourcePurchaseItemDetails } from "./re
 import { PurchaseRequestResourcePath } from "./error";
 import { getValidatedRequestToUpdateExpenseDetails } from "../../api-resource/request-body";
 
-export const getValidatedRequestToUpdatePurchaseDetails = async (event: APIGatewayProxyEvent, logger: LoggerBase) => {
+export const getValidatedRequestToUpdatePurchaseDetails = async (
+  event: APIGatewayProxyEvent,
+  currencyProfile: DbConfigTypeDetails,
+  logger: LoggerBase
+) => {
   const req = (await getValidatedRequestToUpdateExpenseDetails(event, logger)) as ApiResourcePurchaseDetails;
 
   const userId = getValidatedUserId(event);
@@ -39,12 +43,12 @@ export const getValidatedRequestToUpdatePurchaseDetails = async (event: APIGatew
     throw new ValidationError(invalidFields);
   }
 
-  const isValidPurchaseType = await isConfigIdExists(req.purchaseTypeId, BelongsTo.PurchaseType, userId, logger);
+  const isValidPurchaseType = await isConfigIdExists(req.purchaseTypeId, ConfigBelongsTo.PurchaseType, userId, logger);
   if (!isValidPurchaseType) {
     throw new ValidationError([{ path: PurchaseRequestResourcePath.PURCHASE_TYPE, message: ErrorMessage.INCORRECT_VALUE }]);
   }
 
-  const isValidPymtAccId = await isPaymentAccountExists(req.paymentAccountId, userId, logger);
+  const isValidPymtAccId = await isPaymentAccountExists(req.paymentAccountId, userId, currencyProfile, logger);
   if (!isValidPymtAccId) {
     throw new ValidationError([{ path: PurchaseRequestResourcePath.PAYMENT_ACCOUNT, message: ErrorMessage.INCORRECT_VALUE }]);
   }
@@ -82,7 +86,7 @@ const validateItemPurchaseExists = async (items: ApiResourcePurchaseItemDetails[
   const logger = getLogger("arePurchaseTypeValid", _logger);
   let isValidPurchaseType = true;
   for (let i = 0; i < items.length; i++) {
-    isValidPurchaseType = await isConfigIdExists(items[i].purchaseTypeId, BelongsTo.PurchaseType, userId, logger);
+    isValidPurchaseType = await isConfigIdExists(items[i].purchaseTypeId, ConfigBelongsTo.PurchaseType, userId, logger);
     logger.info("isValidPurchaseType =", isValidPurchaseType, ", i=", i, ", items[i] =", items[i]);
     if (!isValidPurchaseType) {
       throw new ValidationError([

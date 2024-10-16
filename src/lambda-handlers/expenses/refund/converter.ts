@@ -36,6 +36,7 @@ export const convertRefundDbToApiResource = async (dbDetails: DbDetailsRefund | 
     receipts: apiReceipts,
     auditDetails: auditDetails,
     personIds: dbDetails.personIds,
+    profileId: dbDetails.profileId,
   };
 
   return apiResource;

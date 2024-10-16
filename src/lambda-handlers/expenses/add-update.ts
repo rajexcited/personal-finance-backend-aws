@@ -20,7 +20,6 @@ import {
   ExpenseRecordType,
   ExpenseTableName,
   getGsiAttrDetailsBelongsTo,
-  getGsiPkDetails,
   getGsiPkExpenseTags,
   getTablePkExpenseTags,
 } from "./db-config";
@@ -47,18 +46,21 @@ import {
   retrieveDbIncomeDetails,
   DbDetailsIncome,
 } from "./income";
+import { DbConfigTypeDetails, getDefaultCurrencyProfile } from "../config-type";
+import { validateExpenseAuthorization } from "./db-config/details";
 
-const rootLogger = getLogger("purchase.add-update");
+const rootLogger = getLogger("expense.add-update");
 
 const addUpdateHandler = async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("handler", rootLogger);
 
-  const req = await getValidatedRequestForUpdateDetails(event, logger);
   const authUser = getAuthorizeUser(event);
+  const currencyProfile = await getDefaultCurrencyProfile(authUser.userId, logger);
+  const req = await getValidatedRequestForUpdateDetails(event, currencyProfile, logger);
   // perform the add or update
 
   // find db record if any.
-  const dbItem = await getValidatedDbItem(req, authUser.userId, logger);
+  const dbItem = await getValidatedDbItem(req, authUser, currencyProfile, logger);
   const purchaseId = dbItem?.details.id || uuidv4();
   /**
    * for update expense,
@@ -88,6 +90,7 @@ const addUpdateHandler = async (event: APIGatewayProxyEvent) => {
       dbItem as DbItemExpense<DbDetailsPurchase>,
       dbReceipts,
       purchaseId,
+      currencyProfile,
       authUser,
       transactWriter,
       logger
@@ -98,6 +101,7 @@ const addUpdateHandler = async (event: APIGatewayProxyEvent) => {
       dbItem as DbItemExpense<DbDetailsRefund>,
       dbReceipts,
       purchaseId,
+      currencyProfile,
       authUser,
       transactWriter,
       logger
@@ -108,6 +112,7 @@ const addUpdateHandler = async (event: APIGatewayProxyEvent) => {
       dbItem as DbItemExpense<DbDetailsIncome>,
       dbReceipts,
       purchaseId,
+      currencyProfile,
       authUser,
       transactWriter,
       logger
@@ -187,7 +192,7 @@ const putExpenseTags = async (
   return dbExpenseTags;
 };
 
-const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, _logger: LoggerBase) => {
+const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, currencyProfile: DbConfigTypeDetails, _logger: LoggerBase) => {
   const sw = new StopWatch("validateRequest");
   const logger = getLogger("validateRequest", _logger);
 
@@ -196,17 +201,17 @@ const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, 
 
     const belongsToParam = getValidatedBelongsToPathParam(event, logger);
     if (belongsToParam === ExpenseBelongsTo.Purchase) {
-      const req = await getValidatedRequestToUpdatePurchaseDetails(event, logger);
+      const req = await getValidatedRequestToUpdatePurchaseDetails(event, currencyProfile, logger);
       req.belongsTo = belongsToParam;
       return req;
     }
     if (belongsToParam === ExpenseBelongsTo.Income) {
-      const req = await getValidatedRequestToUpdateIncomeDetails(event, logger);
+      const req = await getValidatedRequestToUpdateIncomeDetails(event, currencyProfile, logger);
       req.belongsTo = belongsToParam;
       return req;
     }
     if (belongsToParam === ExpenseBelongsTo.Refund) {
-      const req = await getValidatedRequestToUpdateRefundDetails(event, logger);
+      const req = await getValidatedRequestToUpdateRefundDetails(event, currencyProfile, logger);
       req.belongsTo = belongsToParam;
       return req;
     }
@@ -221,7 +226,7 @@ const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, 
   }
 };
 
-const getValidatedDbItem = async (req: ApiResourceExpense, userId: string, _logger: LoggerBase) => {
+const getValidatedDbItem = async (req: ApiResourceExpense, authUser: AuthorizeUser, currencyProfile: DbConfigTypeDetails, _logger: LoggerBase) => {
   const logger = getLogger("getValidatedDbItem", _logger);
   let dbExpense = null;
   if (req.belongsTo === ExpenseBelongsTo.Purchase) {
@@ -235,24 +240,19 @@ const getValidatedDbItem = async (req: ApiResourceExpense, userId: string, _logg
   if (!dbExpense) {
     return null;
   }
-  // is it eligible for update?
-  // validate user access to config details
-  const gsiPkForReq = getGsiPkDetails(userId, ExpenseStatus.ENABLE, logger);
-  if (gsiPkForReq !== dbExpense.US_GSI_PK) {
-    // not same user
-    logger.warn("gsiPkForReq =", gsiPkForReq, ", dbItem.US_GSI_PK =", dbExpense.US_GSI_PK);
-    throw new UnAuthorizedError("not authorized to update expense details");
+
+  if (dbExpense.details.status !== ExpenseStatus.ENABLE) {
+    logger.warn("expense not enabled. dbExpense.details.status =", dbExpense.details.status);
+    throw new UnAuthorizedError("not authorized to update disabled or deleted expense details");
   }
+
+  validateExpenseAuthorization(dbExpense, authUser, currencyProfile, logger);
 
   if (dbExpense.ExpiresAt !== undefined) {
     logger.warn("getting deleted. dbExpense.ExpiresAt =", dbExpense.ExpiresAt);
     throw new UnAuthorizedError("not authorized to update purchase details");
   }
 
-  if (dbExpense.details.status !== ExpenseStatus.ENABLE) {
-    logger.warn("expense not enabled. dbExpense.details.status =", dbExpense.details.status);
-    throw new UnAuthorizedError("not authorized to update disabled or deleted expense details");
-  }
   return dbExpense;
 };
 

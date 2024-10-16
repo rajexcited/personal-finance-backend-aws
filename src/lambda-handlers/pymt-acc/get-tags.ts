@@ -4,6 +4,7 @@ import { getLogger, dbutil } from "../utils";
 import { DbItemPymtAcc } from "./resource-type";
 import { _logger, _pymtAccTableName, _userIdStatusShortnameIndex, getUserIdStatusShortnameGsiPk, PymtAccStatus } from "./base-config";
 import { getValidatedUserId } from "../user";
+import { getDefaultCurrencyProfile } from "../config-type";
 
 /**
  * DynamoDB code example
@@ -13,13 +14,13 @@ export const getPaymentAccountTags = apiGatewayHandlerWrapper(async (event: APIG
   const logger = getLogger("getPaymentAccountTags", _logger);
 
   const userId = getValidatedUserId(event);
-
+  const currencyProfile = await getDefaultCurrencyProfile(userId, logger);
   const items = await dbutil.queryAll<DbItemPymtAcc>(logger, {
     TableName: _pymtAccTableName,
     IndexName: _userIdStatusShortnameIndex,
-    KeyConditionExpression: `UP_GSI_PK = :pkv`,
+    KeyConditionExpression: "UP_GSI_PK = :pkv",
     ExpressionAttributeValues: {
-      ":pkv": getUserIdStatusShortnameGsiPk(userId, PymtAccStatus.ENABLE),
+      ":pkv": getUserIdStatusShortnameGsiPk(userId, PymtAccStatus.ENABLE, currencyProfile),
     },
     ProjectionExpression: "details.tags",
   });

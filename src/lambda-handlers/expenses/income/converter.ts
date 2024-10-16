@@ -31,6 +31,7 @@ export const convertIncomeDbToApiResource = async (dbDetails: DbDetailsIncome, a
     receipts: apiReceipts,
     auditDetails: auditDetails,
     personIds: dbDetails.personIds,
+    profileId: dbDetails.profileId,
   };
 
   return apiResource;

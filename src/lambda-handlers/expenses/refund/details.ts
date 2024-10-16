@@ -14,17 +14,19 @@ import {
 import { ApiResourceRefundDetails } from "./api-resource";
 import { DbDetailsRefund, getGsiAttrDetailsRefundBelongsTo, getTablePkDetails } from "./db-config";
 import { convertRefundDbToApiResource } from "./converter";
+import { DbConfigTypeDetails } from "../../config-type";
 
 export const addDbRefundTransactions = async (
   req: ApiResourceRefundDetails,
   dbItem: DbItemExpense<DbDetailsRefund> | null,
   dbReceipts: DbDetailsReceipt[],
   refundId: string,
+  currencyProfile: DbConfigTypeDetails,
   authUser: AuthorizeUser,
   transactWriter: dbutil.TransactionWriter,
   logger: LoggerBase
 ) => {
-  const dbRefundDetails = putDbRefund(req, dbItem, dbReceipts, refundId, authUser, transactWriter, logger);
+  const dbRefundDetails = putDbRefund(req, dbItem, dbReceipts, refundId, currencyProfile, authUser, transactWriter, logger);
 
   const apiResource = await convertRefundDbToApiResource(dbRefundDetails.details, authUser, logger);
 
@@ -36,6 +38,7 @@ const putDbRefund = (
   dbItem: DbItemExpense<DbDetailsRefund> | null,
   dbReceipts: DbDetailsReceipt[],
   refundId: string,
+  currencyProfile: DbConfigTypeDetails,
   authUser: AuthorizeUser,
   transactWriter: dbutil.TransactionWriter,
   _logger: LoggerBase
@@ -63,11 +66,12 @@ const putDbRefund = (
     recordType: ExpenseRecordType.Details,
     purchaseId: req.purchaseId,
     personIds: req.personIds,
+    profileId: currencyProfile.id,
   };
 
   const dbItemRfd: DbItemExpense<DbDetailsRefund> = {
     PK: getTablePkDetails(refundId, logger),
-    US_GSI_PK: getGsiPkDetails(authUser.userId, apiToDbDetails.status, logger),
+    US_GSI_PK: getGsiPkDetails(authUser.userId, apiToDbDetails.status, currencyProfile, logger),
     US_GSI_SK: getGsiSkDetailsExpenseDate(apiToDbDetails.refundDate, logger),
     US_GSI_BELONGSTO: getGsiAttrDetailsRefundBelongsTo(logger),
     details: apiToDbDetails,

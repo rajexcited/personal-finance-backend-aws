@@ -13,6 +13,7 @@ import {
 import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils } from "../utils";
 import { AuthorizeUser, getAuthorizeUser } from "../user";
 import { ApiPaymentAccountResource, DbItemPymtAcc } from "./resource-type";
+import { getDefaultCurrencyProfile } from "../config-type";
 
 export const deletePaymentAccount = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("deletePaymentAccount", _logger);
@@ -32,6 +33,7 @@ export const deletePaymentAccount = apiGatewayHandlerWrapper(async (event: APIGa
     tags: details.tags,
     auditDetails: auditDetails,
     description: details.description,
+    currencyProfileId: details.profileId,
   };
 
   return apiResource as unknown as JSONObject;
@@ -56,6 +58,7 @@ export const updatePaymentAccountStatus = apiGatewayHandlerWrapper(async (event:
     tags: details.tags,
     auditDetails: auditDetails,
     description: details.description,
+    currencyProfileId: details.profileId,
   };
 
   return apiResource as unknown as JSONObject;
@@ -76,8 +79,9 @@ export const updateStatus = async (authUser: AuthorizeUser, pymtAccId: string, s
   if (!dbItem) {
     throw new NotFoundError("db item not exists");
   }
+  const currencyProfile = await getDefaultCurrencyProfile(authUser.userId, logger);
   // validate user access to config details
-  const gsiPkForReq = getUserIdStatusShortnameGsiPk(authUser.userId, dbItem.details.status);
+  const gsiPkForReq = getUserIdStatusShortnameGsiPk(authUser.userId, dbItem.details.status, currencyProfile);
   if (gsiPkForReq !== dbItem.UP_GSI_PK) {
     // not same user
     throw new UnAuthorizedError("not authorized to update status of payment account");
@@ -92,7 +96,7 @@ export const updateStatus = async (authUser: AuthorizeUser, pymtAccId: string, s
   const auditDetails = utils.updateAuditDetailsFailIfNotExists(dbItem.details.auditDetails, authUser);
   const updateDbItem: DbItemPymtAcc = {
     PK: getDetailsTablePk(pymtAccId),
-    UP_GSI_PK: getUserIdStatusShortnameGsiPk(authUser.userId, status),
+    UP_GSI_PK: getUserIdStatusShortnameGsiPk(authUser.userId, status, currencyProfile),
     UP_GSI_SK: dbItem.UP_GSI_SK,
     details: {
       ...dbItem.details,

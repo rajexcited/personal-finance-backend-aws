@@ -10,8 +10,10 @@ export { createDefaultDetails as addDefaultConfigTypes, DefaultConfigData } from
 
 export { DbConfigTypeDetails } from "./resource-type";
 
-export { ConfigStatus, BelongsTo, _configDataBucketName } from "./base-config";
+export { ConfigStatus, BelongsTo as ConfigBelongsTo, _configDataBucketName } from "./base-config";
 
 export { isConfigIdExists } from "./validate";
 
 export { getConfigTypeTags } from "./get-tags";
+
+export { getDefaultCurrencyProfile } from "./db-config";

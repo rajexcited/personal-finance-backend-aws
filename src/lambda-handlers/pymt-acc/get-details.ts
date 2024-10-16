@@ -11,6 +11,7 @@ import {
 } from "./base-config";
 import { getAuthorizeUser, getValidatedUserId } from "../user";
 import { ApiPaymentAccountResource, DbItemPymtAcc } from "./resource-type";
+import { getDefaultCurrencyProfile } from "../config-type";
 
 export const getPaymentAccount = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("getPaymentAccount", _logger);
@@ -30,7 +31,8 @@ export const getPaymentAccount = apiGatewayHandlerWrapper(async (event: APIGatew
     throw new NotFoundError("db item not exists");
   }
   // validate user access to config details
-  const gsiPkForReq = getUserIdStatusShortnameGsiPk(userId, dbItem.details.status);
+  const currencyProfile = await getDefaultCurrencyProfile(userId, logger);
+  const gsiPkForReq = getUserIdStatusShortnameGsiPk(userId, dbItem.details.status, currencyProfile);
   if (gsiPkForReq !== dbItem.UP_GSI_PK) {
     // not same user
     throw new UnAuthorizedError("not authorized to get payment account details");
@@ -50,6 +52,7 @@ export const getPaymentAccount = apiGatewayHandlerWrapper(async (event: APIGatew
     description: details.description,
     tags: details.tags,
     auditDetails: auditDetails,
+    currencyProfileId: details.profileId,
   };
 
   return resource as unknown as JSONObject;

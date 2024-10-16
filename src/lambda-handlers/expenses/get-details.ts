@@ -9,6 +9,7 @@ import { retrieveDbPurchaseToApiResource } from "./purchase";
 import { ExpenseBelongsTo } from "./base-config";
 import { retrieveDbIncomeToApiResource } from "./income";
 import { retrieveDbRefundToApiResource } from "./refund";
+import { getDefaultCurrencyProfile } from "../config-type";
 
 const rootLogger = getLogger("expense.get-details");
 
@@ -42,7 +43,8 @@ export const getExpenseDetails = apiGatewayHandlerWrapper(async (event: APIGatew
   }
   validateDeletedExpense(dbDetails, logger);
 
-  validateExpenseAuthorization(dbDetails, authUser, logger);
+  const currencyProfile = await getDefaultCurrencyProfile(authUser.userId, logger);
+  validateExpenseAuthorization(dbDetails, authUser, currencyProfile, logger);
 
   return apiResourceExpense as unknown as JSONObject;
 });

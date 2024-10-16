@@ -15,10 +15,11 @@ import {
   getValidatedUserId,
 } from "./base-config";
 import { caching } from "cache-manager";
+import ms from "ms";
 
 const userDetailsMemoryCache = caching("memory", {
   max: 5,
-  ttl: 5 * 60 * 1000,
+  ttl: ms("5 min"),
 });
 
 const DELETE_USER_EXPIRES_IN_SEC = Number(process.env.DELETE_USER_EXPIRES_IN_SEC);

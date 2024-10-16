@@ -1,5 +1,5 @@
 import { JSONObject, NotFoundError } from "../apigateway";
-import { BelongsTo, getConfigId } from "../config-type";
+import { ConfigBelongsTo, DbConfigTypeDetails, getConfigId } from "../config-type";
 import { dbutil, getLogger, utils, validations } from "../utils";
 import {
   NAME_MIN_LENGTH,
@@ -16,7 +16,12 @@ import { v4 as uuidv4 } from "uuid";
 import { isValidAccountIdNum, isValidInstitutionName } from "./validate";
 import { AuthorizeUser } from "../user";
 
-export const createDetails = async (details: DefaultPaymentAccounts[], authUser: AuthorizeUser, transactionWriter: dbutil.TransactionWriter) => {
+export const createDetails = async (
+  details: DefaultPaymentAccounts[],
+  authUser: AuthorizeUser,
+  currencyProfile: DbConfigTypeDetails,
+  transactionWriter: dbutil.TransactionWriter
+) => {
   const logger = getLogger("createDetails", _logger);
   logger.info("details", details);
 
@@ -29,7 +34,7 @@ export const createDetails = async (details: DefaultPaymentAccounts[], authUser:
     if (!validations.areTagsValid(item.tags)) return true;
 
     if (!validations.isValidUuid(item.typeName)) {
-      const typeId = await getConfigId(item.typeName, authUser.userId, BelongsTo.PaymentAccountType, logger);
+      const typeId = await getConfigId(item.typeName, authUser.userId, ConfigBelongsTo.PaymentAccountType, logger);
       if (!typeId) return true;
     }
 
@@ -54,7 +59,7 @@ export const createDetails = async (details: DefaultPaymentAccounts[], authUser:
     if (validations.isValidUuid(detail.typeName)) {
       typeId = detail.typeName;
     } else {
-      typeId = await getConfigId(detail.typeName, authUser.userId, BelongsTo.PaymentAccountType, logger);
+      typeId = await getConfigId(detail.typeName, authUser.userId, ConfigBelongsTo.PaymentAccountType, logger);
     }
 
     const itemDetail: DbPaymentAccountDetails = {
@@ -67,11 +72,12 @@ export const createDetails = async (details: DefaultPaymentAccounts[], authUser:
       institutionName: detail.institutionName,
       status: detail.status || PymtAccStatus.ENABLE,
       auditDetails: { ...auditDetails },
+      profileId: currencyProfile.id,
     };
 
     const item: DbItemPymtAcc = {
       PK: getDetailsTablePk(itemDetail.id),
-      UP_GSI_PK: getUserIdStatusShortnameGsiPk(authUser.userId, itemDetail.status),
+      UP_GSI_PK: getUserIdStatusShortnameGsiPk(authUser.userId, itemDetail.status, currencyProfile),
       UP_GSI_SK: getUserIdStatusShortnameGsiSk(itemDetail.shortName),
       details: itemDetail,
     };

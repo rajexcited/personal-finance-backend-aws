@@ -1,6 +1,7 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { LoggerBase, getLogger, validations } from "../utils";
 import { ValidationError } from "../apigateway";
+import { DbConfigTypeDetails } from "../config-type";
 
 export const _pymtAccTableName = process.env.PAYMENT_ACCOUNT_TABLE_NAME as string;
 export const _userIdStatusShortnameIndex = process.env.PAYMENT_ACCOUNT_USERID_GSI_NAME as string;
@@ -43,11 +44,16 @@ export const getDetailsTablePk = (paymentAccountId: string) => {
   return `pymtAccId#${paymentAccountId}`;
 };
 
-export const getUserIdStatusShortnameGsiPk = (userId: string, status: PymtAccStatus) => {
+export const getUserIdStatusShortnameGsiPk = (userId: string, status: PymtAccStatus, currencyProfile: DbConfigTypeDetails) => {
+  const parts = ["userId", userId];
+  parts.push("profileCode", currencyProfile.name + currencyProfile.value);
+  parts.push("status");
   if (status === PymtAccStatus.Immutable) {
-    return `userId#${userId}#status#${PymtAccStatus.ENABLE}`;
+    parts.push(PymtAccStatus.ENABLE);
+  } else {
+    parts.push(status);
   }
-  return `userId#${userId}#status#${status}`;
+  return parts.join("#");
 };
 
 export const getUserIdStatusShortnameGsiSk = (shortName: string) => {

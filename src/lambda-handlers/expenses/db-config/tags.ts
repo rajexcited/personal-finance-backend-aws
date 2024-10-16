@@ -9,7 +9,7 @@ export const getTablePkTags = (id: string, belongsTo: ExpenseBelongsTo, _logger:
 };
 
 export const getGsiPkTags = (userId: string, status: ExpenseStatus, belongsTo: ExpenseBelongsTo, _logger: LoggerBase) => {
-  return getGsiPk(userId, status, belongsTo, ExpenseRecordType.Tags, _logger);
+  return getGsiPk(userId, status, belongsTo, ExpenseRecordType.Tags, null, _logger);
 };
 
 export const getGsiSkTagsYear = (dateOrYear: string | number, _logger: LoggerBase) => {

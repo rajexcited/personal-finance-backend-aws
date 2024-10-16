@@ -1,12 +1,13 @@
 import { caching } from "cache-manager";
 import { getLogger, LoggerBase, s3utils } from "../utils";
 import { ExpenseReceiptsBucketName } from "./base-config";
+import ms from "ms";
 
 export const RECEIPTS_MAX_ALLOWED = 5;
 
 const receiptHeadDetailsMemoryCache = caching("memory", {
   max: RECEIPTS_MAX_ALLOWED * 2,
-  ttl: 30 * 1000,
+  ttl: ms("30 sec"),
 });
 
 export const getReceiptFileHeadDetails = async (s3Key: string, _logger: LoggerBase) => {

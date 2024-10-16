@@ -26,7 +26,7 @@ import { getAuthorizeUser, getValidatedUserId } from "../user";
 import { ApiPaymentAccountResource, DbPaymentAccountDetails, DbItemPymtAcc } from "./resource-type";
 import { v4 as uuidv4 } from "uuid";
 import { isValidAccountIdNum, isValidInstitutionName } from "./validate";
-import { BelongsTo, isConfigIdExists } from "../config-type";
+import { ConfigBelongsTo, getDefaultCurrencyProfile, isConfigIdExists } from "../config-type";
 import { GetCommandInput, QueryCommandInput } from "@aws-sdk/lib-dynamodb";
 
 const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
@@ -36,19 +36,21 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   const authUser = getAuthorizeUser(event);
   // find db record if any.
   // perform the add or update
+  const currencyProfile = await getDefaultCurrencyProfile(authUser.userId, logger);
   let existingDbItem: DbItemPymtAcc | null = null;
   if (req.id) {
     const cmdInput: GetCommandInput = {
       TableName: _pymtAccTableName,
       Key: { PK: getDetailsTablePk(req.id) },
     };
+
     const output = await dbutil.getItem(cmdInput, logger);
 
     logger.info("retrieved pymt account from DB");
     if (output.Item) {
       existingDbItem = output.Item as DbItemPymtAcc;
       // validate user access to config details
-      const gsiPkForReq = getUserIdStatusShortnameGsiPk(authUser.userId, PymtAccStatus.ENABLE);
+      const gsiPkForReq = getUserIdStatusShortnameGsiPk(authUser.userId, PymtAccStatus.ENABLE, currencyProfile);
       if (gsiPkForReq !== existingDbItem.UP_GSI_PK) {
         // not same user or status is deleted
         throw new UnAuthorizedError("not authorized to update payment type details");
@@ -59,7 +61,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
         IndexName: _userIdStatusShortnameIndex,
         KeyConditionExpression: "UP_GSI_PK = :pkv and UP_GSI_SK = :skv",
         ExpressionAttributeValues: {
-          ":pkv": getUserIdStatusShortnameGsiPk(authUser.userId, PymtAccStatus.ENABLE),
+          ":pkv": getUserIdStatusShortnameGsiPk(authUser.userId, PymtAccStatus.ENABLE, currencyProfile),
           ":skv": getUserIdStatusShortnameGsiSk(req.shortName),
         },
       };
@@ -83,11 +85,12 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
     tags: req.tags,
     typeId: req.typeId,
     auditDetails: auditDetails,
+    profileId: currencyProfile.id,
   };
 
   const dbItem: DbItemPymtAcc = {
     PK: getDetailsTablePk(pymtAccId),
-    UP_GSI_PK: getUserIdStatusShortnameGsiPk(authUser.userId, apiToDbDetails.status),
+    UP_GSI_PK: getUserIdStatusShortnameGsiPk(authUser.userId, apiToDbDetails.status, currencyProfile),
     UP_GSI_SK: getUserIdStatusShortnameGsiSk(req.shortName),
     details: apiToDbDetails,
   };
@@ -146,7 +149,7 @@ const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, 
     invalidFields.push({ path: PymtAccResourcePath.INSTITUTION_NAME, message: ErrorMessage.INCORRECT_FORMAT });
   }
   const userId = getValidatedUserId(event);
-  const isValidPymtAccId = await isConfigIdExists(req.typeId, BelongsTo.PaymentAccountType, userId, logger);
+  const isValidPymtAccId = await isConfigIdExists(req.typeId, ConfigBelongsTo.PaymentAccountType, userId, logger);
   if (!isValidPymtAccId) {
     invalidFields.push({ path: PymtAccResourcePath.TYPE_ID, message: ErrorMessage.INCORRECT_VALUE });
   }

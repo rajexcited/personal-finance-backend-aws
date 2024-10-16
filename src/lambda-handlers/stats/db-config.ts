@@ -1,3 +1,4 @@
+import { getDefaultCurrencyProfile } from "../config-type";
 import { _configTypeTableName } from "../config-type/base-config";
 import { DbConfigTypeDetails, DbItemConfigType } from "../config-type/resource-type";
 import { ExpenseBelongsTo, ExpenseStatus } from "../expenses/base-config";
@@ -16,6 +17,8 @@ import { dateutil, dbutil, getLogger, LoggerBase } from "../utils";
 export const getListOfPK = async (userId: string, year: number, belongsTo: ExpenseBelongsTo, _logger: LoggerBase) => {
   const logger = getLogger("getListOfPK", _logger);
 
+  const currencyProfile = await getDefaultCurrencyProfile(userId, logger);
+
   const searchStartDate = dateutil.parseTimestamp("01-01-" + year, "MM-DD-YYYY", logger);
   const searchEndDate = dateutil.parseTimestamp("01-01-" + (year + 1), "MM-DD-YYYY", logger);
 
@@ -25,7 +28,7 @@ export const getListOfPK = async (userId: string, year: number, belongsTo: Expen
     KeyConditionExpression: "US_GSI_PK = :gpkv and US_GSI_SK BETWEEN :gskv1 and :gskv2",
     FilterExpression: "US_GSI_BELONGSTO = :gbtv",
     ExpressionAttributeValues: {
-      ":gpkv": getGsiPkDetails(userId, ExpenseStatus.ENABLE, logger),
+      ":gpkv": getGsiPkDetails(userId, ExpenseStatus.ENABLE, currencyProfile, logger),
       ":gskv1": getGsiSkDetailsExpenseDate(searchStartDate, logger),
       ":gskv2": getGsiSkDetailsExpenseDate(searchEndDate, logger),
       ":gbtv": getGsiAttrDetailsBelongsTo(belongsTo, logger),

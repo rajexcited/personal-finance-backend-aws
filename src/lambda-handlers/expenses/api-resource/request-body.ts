@@ -1,12 +1,12 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import * as receiptValidator from "../../receipts/validate";
-import { getLogger, LoggerBase, utils, validations } from "../../utils";
+import { getLogger, LoggerBase, utils } from "../../utils";
 import { ApiResourceExpense } from "./resource-path";
 import { InvalidField, ValidationError } from "../../apigateway";
 import { ErrorMessage, ExpenseRequestResourcePath } from "./error";
 import { ExpenseStatus } from "../base-config";
 import * as fieldValidator from "./prop-validator";
-import { BelongsTo, isConfigIdExists } from "../../config-type";
+import { ConfigBelongsTo, isConfigIdExists } from "../../config-type";
 import { getValidatedUserId } from "../../user";
 
 const MAX_ALLOWED_PERSON_TAGGING = 10;
@@ -69,7 +69,7 @@ const areValidPersonIds = async (personIds: string[] | undefined, userId: string
     return false;
   }
 
-  const validIdPromises = personIds.map((pid) => isConfigIdExists(pid, BelongsTo.SharePerson, userId, logger));
+  const validIdPromises = personIds.map((pid) => isConfigIdExists(pid, ConfigBelongsTo.SharePerson, userId, logger));
   const validIds = await Promise.all(validIdPromises);
   const foundInvalidIndex = validIds.findIndex((isValid) => !isValid);
   return foundInvalidIndex === -1;

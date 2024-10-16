@@ -18,6 +18,7 @@ export interface DbPaymentAccountDetails {
   status: PymtAccStatus;
   tags: string[];
   auditDetails: AuditDetailsType;
+  profileId: string;
 }
 
 export interface DefaultPaymentAccounts {
@@ -40,4 +41,5 @@ export interface ApiPaymentAccountResource {
   status: PymtAccStatus;
   tags: string[];
   auditDetails: AuditDetailsType;
+  currencyProfileId: string;
 }

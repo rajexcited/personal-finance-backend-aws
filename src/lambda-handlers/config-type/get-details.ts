@@ -15,10 +15,11 @@ import {
   getDetailsTablePk,
 } from "./base-config";
 import { caching } from "cache-manager";
+import ms from "ms";
 
 const belongsToConfigListMemoryCache = caching("memory", {
   max: 3,
-  ttl: 60 * 1000,
+  ttl: ms("60 sec"),
 });
 
 /**

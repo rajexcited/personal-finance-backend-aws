@@ -41,6 +41,7 @@ export const convertPurchaseDbToApiResource = async (
     items: dbPurchaseItem?.items || [],
     auditDetails: auditDetails,
     personIds: dbDetails.personIds,
+    profileId: dbDetails.profileId,
   };
 
   return apiResource;

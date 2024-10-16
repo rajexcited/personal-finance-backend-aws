@@ -1,4 +1,5 @@
 import { InvalidError, JSONObject } from "../../apigateway";
+import { DbConfigTypeDetails } from "../../config-type";
 import { DbDetailsReceipt } from "../../receipts";
 import { AuthorizeUser } from "../../user";
 import { dbutil, getLogger, LoggerBase, utils } from "../../utils";
@@ -23,11 +24,12 @@ export const addDbPurchaseTransactions = async (
   dbItem: DbItemExpense<DbDetailsPurchase> | null,
   dbReceipts: DbDetailsReceipt[],
   purchaseId: string,
+  currencyProfile: DbConfigTypeDetails,
   authUser: AuthorizeUser,
   transactWriter: dbutil.TransactionWriter,
   logger: LoggerBase
 ) => {
-  const dbPurchaseDetails = putDbPurchase(req, dbItem, dbReceipts, purchaseId, authUser, transactWriter, logger);
+  const dbPurchaseDetails = putDbPurchase(req, dbItem, dbReceipts, purchaseId, currencyProfile, authUser, transactWriter, logger);
   const dbPurchaseItems = await putDbPurchaseItems(req, purchaseId, dbItem, authUser, transactWriter, logger);
 
   const apiResource = await convertPurchaseDbToApiResource(dbPurchaseDetails.details, dbPurchaseItems?.details, authUser, logger);
@@ -40,6 +42,7 @@ const putDbPurchase = (
   dbItem: DbItemExpense<DbDetailsPurchase> | null,
   dbReceipts: DbDetailsReceipt[],
   purchaseId: string,
+  currencyProfile: DbConfigTypeDetails,
   authUser: AuthorizeUser,
   transactWriter: dbutil.TransactionWriter,
   _logger: LoggerBase
@@ -69,11 +72,12 @@ const putDbPurchase = (
     belongsTo: ExpenseBelongsTo.Purchase,
     recordType: ExpenseRecordType.Details,
     personIds: req.personIds,
+    profileId: currencyProfile.id,
   };
 
   const dbItemPrch: DbItemExpense<DbDetailsPurchase> = {
     PK: getTablePkDetails(purchaseId, logger),
-    US_GSI_PK: getGsiPkDetails(authUser.userId, apiToDbDetails.status, logger),
+    US_GSI_PK: getGsiPkDetails(authUser.userId, apiToDbDetails.status, currencyProfile, logger),
     US_GSI_SK: getGsiSkPurchaseDate(apiToDbDetails.purchaseDate, logger),
     US_GSI_BELONGSTO: getGsiAttrDetailsPurchaseBelongsTo(logger),
     details: apiToDbDetails,

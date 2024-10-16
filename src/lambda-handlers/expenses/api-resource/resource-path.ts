@@ -13,4 +13,5 @@ export interface ApiResourceExpense {
   auditDetails: AuditDetailsType;
   status: ExpenseStatus;
   personIds: string[];
+  profileId: string;
 }

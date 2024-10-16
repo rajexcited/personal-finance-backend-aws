@@ -1,7 +1,7 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { LoggerBase, validations } from "../../../utils";
 import { ValidationError, InvalidField } from "../../../apigateway";
-import { isConfigIdExists, BelongsTo } from "../../../config-type";
+import { isConfigIdExists, ConfigBelongsTo, DbConfigTypeDetails } from "../../../config-type";
 import { isPaymentAccountExists } from "../../../pymt-acc";
 import { getValidatedUserId } from "../../../user";
 import { ErrorMessage, expenseFieldValidator } from "../../api-resource";
@@ -9,7 +9,11 @@ import { ApiResourceIncomeDetails } from "./resource-type";
 import { IncomeRequestResourcePath } from "./error";
 import { getValidatedRequestToUpdateExpenseDetails } from "../../api-resource/request-body";
 
-export const getValidatedRequestToUpdateIncomeDetails = async (event: APIGatewayProxyEvent, logger: LoggerBase) => {
+export const getValidatedRequestToUpdateIncomeDetails = async (
+  event: APIGatewayProxyEvent,
+  currencyProfile: DbConfigTypeDetails,
+  logger: LoggerBase
+) => {
   const req = (await getValidatedRequestToUpdateExpenseDetails(event, logger)) as ApiResourceIncomeDetails;
 
   const userId = getValidatedUserId(event);
@@ -33,12 +37,12 @@ export const getValidatedRequestToUpdateIncomeDetails = async (event: APIGateway
     throw new ValidationError(invalidFields);
   }
 
-  const isValidPurchaseType = await isConfigIdExists(req.incomeTypeId, BelongsTo.IncomeType, userId, logger);
+  const isValidPurchaseType = await isConfigIdExists(req.incomeTypeId, ConfigBelongsTo.IncomeType, userId, logger);
   if (!isValidPurchaseType) {
     throw new ValidationError([{ path: IncomeRequestResourcePath.INCOME_TYPE, message: ErrorMessage.INCORRECT_VALUE }]);
   }
 
-  const isValidPymtAccId = await isPaymentAccountExists(req.paymentAccountId, userId, logger);
+  const isValidPymtAccId = await isPaymentAccountExists(req.paymentAccountId, userId, currencyProfile, logger);
   if (!isValidPymtAccId) {
     throw new ValidationError([{ path: IncomeRequestResourcePath.PAYMENT_ACCOUNT, message: ErrorMessage.INCORRECT_VALUE }]);
   }

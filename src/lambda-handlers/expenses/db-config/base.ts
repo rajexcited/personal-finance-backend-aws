@@ -1,4 +1,6 @@
 import { IllegelArgumentError } from "../../apigateway";
+import { DbConfigTypeDetails } from "../../config-type";
+import { ConfigResourcePath } from "../../config-type/base-config";
 import { getLogger, LoggerBase } from "../../utils";
 import { ExpenseBelongsTo, ExpenseStatus } from "../base-config";
 import { ExpenseRecordType } from "./field-types";
@@ -18,7 +20,14 @@ export const getTablePK = (id: string, belongsTo: ExpenseBelongsTo, pkType: Expe
   return [belongsTo + "Id", id, pkType].join("#");
 };
 
-export const getGsiPk = (userId: string, status: ExpenseStatus, pkTypePrefix: string | null, pkType: ExpenseRecordType, _logger: LoggerBase) => {
+export const getGsiPk = (
+  userId: string,
+  status: ExpenseStatus,
+  pkTypePrefix: string | null,
+  pkType: ExpenseRecordType,
+  currencyProfile: DbConfigTypeDetails | null,
+  _logger: LoggerBase
+) => {
   const logger = getLogger("getGsiPk", _logger);
   if (!pkType) {
     throw new IllegelArgumentError("type primary partition key is not given");
@@ -28,8 +37,16 @@ export const getGsiPk = (userId: string, status: ExpenseStatus, pkTypePrefix: st
     logger.debug("userId or status is not provisioned.", " userId =", userId, " status =", status);
     throw new IllegelArgumentError("userId or status is not provided to format gsi PK");
   }
-  if (!pkTypePrefix) {
-    return ["userId", userId, "status", status, pkType].join("#");
+
+  const parts = ["userId", userId];
+  if (currencyProfile) {
+    parts.push("profileCode", currencyProfile.name + currencyProfile.value);
   }
-  return ["userId", userId, "status", status, pkTypePrefix, pkType].join("#");
+  parts.push("status", status);
+
+  if (pkTypePrefix) {
+    parts.push(pkTypePrefix);
+  }
+  parts.push(pkType);
+  return parts.join("#");
 };

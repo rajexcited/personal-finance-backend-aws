@@ -1,7 +1,15 @@
 import { GetCommandInput } from "@aws-sdk/lib-dynamodb";
 import { LoggerBase, dbutil, getLogger, validations } from "../utils";
-import { ACCOUNT_ID_NUM_MAX_LENGTH, INSTITUTION_NAME_MAX_LENGTH, NAME_MIN_LENGTH, _pymtAccTableName, getDetailsTablePk } from "./base-config";
+import {
+  ACCOUNT_ID_NUM_MAX_LENGTH,
+  INSTITUTION_NAME_MAX_LENGTH,
+  NAME_MIN_LENGTH,
+  _pymtAccTableName,
+  getDetailsTablePk,
+  getUserIdStatusShortnameGsiPk,
+} from "./base-config";
 import { DbItemPymtAcc } from "./resource-type";
+import { DbConfigTypeDetails } from "../config-type";
 
 export const isValidAccountIdNum = (accountIdNum: string | undefined | null) => {
   const validLength = validations.isValidLength(accountIdNum, NAME_MIN_LENGTH, ACCOUNT_ID_NUM_MAX_LENGTH);
@@ -28,7 +36,12 @@ export const isValidInstitutionName = (institutionName: string | undefined | nul
  * @param _logger
  * @returns true if valid otherwise false
  */
-export const isPaymentAccountExists = async (paymentAccountId: string | undefined, userId: string, _logger: LoggerBase) => {
+export const isPaymentAccountExists = async (
+  paymentAccountId: string | undefined,
+  userId: string,
+  currencyProfile: DbConfigTypeDetails,
+  _logger: LoggerBase
+) => {
   const logger = getLogger("isPaymentAccountExists", _logger);
   if (!validations.isValidUuid(paymentAccountId) || !paymentAccountId) {
     return false;
@@ -44,5 +57,6 @@ export const isPaymentAccountExists = async (paymentAccountId: string | undefine
     return false;
   }
   const item = output.Item as DbItemPymtAcc;
-  return item.UP_GSI_PK.startsWith(`userId#${userId}`);
+  const gsiPk = getUserIdStatusShortnameGsiPk(userId, item.details.status, currencyProfile);
+  return item.UP_GSI_PK === gsiPk;
 };

@@ -21,6 +21,7 @@ import { convertPurchaseDbToApiResource, ApiResourcePurchaseDetails, DbDetailsPu
 import { DbDetailsIncome, ApiResourceIncomeDetails, convertIncomeDbToApiResource } from "./income";
 import { DbDetailsRefund, ApiResourceRefundDetails, convertRefundDbToApiResource } from "./refund";
 import { DbDetailsInvestment, ApiResourceInvestmentDetails, convertInvestmentDbToApiResource } from "./investment";
+import { getDefaultCurrencyProfile } from "../config-type";
 
 const rootLogger = getLogger("expenses.get-list");
 type DbDetailsExpense = DbDetailsPurchase | DbDetailsRefund | DbDetailsIncome | DbDetailsInvestment;
@@ -92,6 +93,8 @@ const getListOfPK = async (
   const searchEndDate = getEndDateAfterMonths(now, (1 - pageNo) * pageMonths, logger);
   const searchStartDate = getStartDateBeforeMonths(now, -1 * pageNo * pageMonths, logger);
 
+  const currencyProfile = await getDefaultCurrencyProfile(userId, logger);
+
   const belongsToAttrVal = belongsTo ? { ":gbtv": getGsiAttrDetailsBelongsTo(belongsTo, logger) } : {};
   const items = await dbutil.queryAll<DbItemExpense<null>>(logger, {
     TableName: ExpenseTableName,
@@ -99,7 +102,7 @@ const getListOfPK = async (
     KeyConditionExpression: "US_GSI_PK = :gpkv and US_GSI_SK BETWEEN :gskv1 and :gskv2",
     FilterExpression: belongsTo ? "US_GSI_BELONGSTO = :gbtv" : undefined,
     ExpressionAttributeValues: {
-      ":gpkv": getGsiPkDetails(userId, status, logger),
+      ":gpkv": getGsiPkDetails(userId, status, currencyProfile, logger),
       ":gskv1": getGsiSkDetailsExpenseDate(searchStartDate, logger),
       ":gskv2": getGsiSkDetailsExpenseDate(searchEndDate, logger),
       ...belongsToAttrVal,
