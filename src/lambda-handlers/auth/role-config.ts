@@ -474,9 +474,28 @@ const ExpenseUriAuthConfigList: RoleAuthorizeConfigType[] = [
   ...RefundUriAuthConfigList,
 ];
 
+const StatsUriAuthConfigList: RoleAuthorizeConfigType[] = [
+  {
+    apiPath: "/stats/purchase",
+    method: MethodType.GET,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
+    apiPath: "/stats/refund",
+    method: MethodType.GET,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+  {
+    apiPath: "/stats/income",
+    method: MethodType.GET,
+    role: [AuthRole.ADMIN, AuthRole.PRIMARY],
+  },
+];
+
 export const RoleAuthConfigList: RoleAuthorizeConfigType[] = [
   ...UserUriAuthConfigList,
   ...ConfigTypeUriAuthConfigList,
   ...PymtAccUriAuthConfigList,
   ...ExpenseUriAuthConfigList,
+  ...StatsUriAuthConfigList,
 ];

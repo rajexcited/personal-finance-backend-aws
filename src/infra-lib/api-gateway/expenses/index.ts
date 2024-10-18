@@ -28,6 +28,7 @@ export class ExpenseApiConstruct extends Construct {
       userTable: props.allDb.userTable,
       expenseTable: props.allDb.expenseTable,
       expenseResource: expensesResource,
+      configTypeTable: props.allDb.configTypeTable,
     });
 
     const expenseCrudApi = new ExpenseCrudApiConstruct(this, "PurchaseApiConstruct", {

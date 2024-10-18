@@ -59,16 +59,19 @@ export class ExpenseCrudApiConstruct extends BaseApiConstruct {
     const expenseTagResource = belongsToResource.addResource("tags");
     const getTagsLambdaFunction = this.buildApi(expenseTagResource, HttpMethod.GET, ExpenseCrudLambdaHandler.GetTagList, getTagsRequestQueryParams);
     props.expenseTable.table.ref.grantReadData(getTagsLambdaFunction);
+    props.configTypeTable.table.ref.grantReadData(getTagsLambdaFunction);
 
     const expenseIdResource = belongsToResource.addResource("id").addResource("{expenseId}");
     const getDetailsLambdaFunction = this.buildApi(expenseIdResource, HttpMethod.GET, ExpenseCrudLambdaHandler.GetItem);
     props.userTable.table.ref.grantReadData(getDetailsLambdaFunction);
     props.expenseTable.table.ref.grantReadData(getDetailsLambdaFunction);
+    props.configTypeTable.table.ref.grantReadData(getDetailsLambdaFunction);
 
     // to schedule deletion. this action can be undone if delete time is not expired.
     const deleteDetailsLambdaFunction = this.buildApi(expenseIdResource, HttpMethod.DELETE, ExpenseCrudLambdaHandler.DeleteItem);
     props.userTable.table.ref.grantReadData(deleteDetailsLambdaFunction);
     props.expenseTable.table.ref.grantReadWriteData(deleteDetailsLambdaFunction);
+    props.configTypeTable.table.ref.grantReadData(deleteDetailsLambdaFunction);
     const permittedDeleteResources = belongsToList.map((prefix) => {
       const finalizeReceiptKeyPrefix = props.expenseReceiptContext.finalizeReceiptKeyPrefix + prefix + "/*";
       return props.receiptBucket.arnForObjects(finalizeReceiptKeyPrefix);
@@ -119,8 +122,6 @@ export class ExpenseCrudApiConstruct extends BaseApiConstruct {
 
     if (lambdaHandlerName === ExpenseCrudLambdaHandler.AddUpdate) {
       additionalEnvs.EXPENSE_RECEIPTS_BUCKET_NAME = props.receiptBucket.bucketName;
-      additionalEnvs.CONFIG_TYPE_TABLE_NAME = props.configTypeTable.table.name;
-      additionalEnvs.CONFIG_TYPE_BELONGS_TO_GSI_NAME = props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name;
       additionalEnvs.PAYMENT_ACCOUNT_TABLE_NAME = props.pymtAccTable.table.name;
       additionalEnvs.PAYMENT_ACCOUNT_USERID_GSI_NAME = props.pymtAccTable.globalSecondaryIndexes.userIdStatusShortnameIndex.name;
     }
@@ -144,6 +145,8 @@ export class ExpenseCrudApiConstruct extends BaseApiConstruct {
         USER_TABLE_NAME: props.userTable.table.name,
         EXPENSES_TABLE_NAME: props.expenseTable.table.name,
         EXPENSE_USERID_STATUS_GSI_NAME: props.expenseTable.globalSecondaryIndexes.userIdStatusIndex.name,
+        CONFIG_TYPE_TABLE_NAME: props.configTypeTable.table.name,
+        CONFIG_TYPE_BELONGS_TO_GSI_NAME: props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name,
         RECEIPT_KEY_PREFIX: props.expenseReceiptContext.finalizeReceiptKeyPrefix,
         RECEIPT_TEMP_KEY_PREFIX: props.expenseReceiptContext.temporaryKeyPrefix,
         DEFAULT_LOG_LEVEL: this.props.environment === EnvironmentName.LOCAL ? "debug" : "undefined",

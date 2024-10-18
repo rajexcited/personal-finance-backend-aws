@@ -39,6 +39,7 @@ export class PymtAccApiConstruct extends BaseApiConstruct {
     const getListLambdaFunction = this.buildApi(pymtAccResource, HttpMethod.GET, PaymentAccountLambdaHandler.GetList, pymtAccListRequestQueryParams);
     props.userTable.table.ref.grantReadData(getListLambdaFunction);
     props.pymtAccTable.table.ref.grantReadData(getListLambdaFunction);
+    props.configTypeTable.table.ref.grantReadData(getListLambdaFunction);
 
     const addUpdateDetailsLambdaFunction = this.buildApi(pymtAccResource, HttpMethod.POST, PaymentAccountLambdaHandler.AddUpdate);
     props.userTable.table.ref.grantReadData(addUpdateDetailsLambdaFunction);
@@ -47,21 +48,25 @@ export class PymtAccApiConstruct extends BaseApiConstruct {
 
     const pymtAccTagResource = pymtAccResource.addResource("tags");
     const getTagsLambdaFunction = this.buildApi(pymtAccTagResource, HttpMethod.GET, PaymentAccountLambdaHandler.GetTagList);
+    props.configTypeTable.table.ref.grantReadData(getTagsLambdaFunction);
     props.pymtAccTable.table.ref.grantReadData(getTagsLambdaFunction);
 
     const pymtAccIdResource = pymtAccResource.addResource("id").addResource("{pymtAccId}");
     const getPymtAccLambdaFunction = this.buildApi(pymtAccIdResource, HttpMethod.GET, PaymentAccountLambdaHandler.GetItem);
     props.userTable.table.ref.grantReadData(getPymtAccLambdaFunction);
     props.pymtAccTable.table.ref.grantReadData(getPymtAccLambdaFunction);
+    props.configTypeTable.table.ref.grantReadData(getPymtAccLambdaFunction);
 
     const deletePymtAccLambdaFunction = this.buildApi(pymtAccIdResource, HttpMethod.DELETE, PaymentAccountLambdaHandler.DeleteItem);
     props.userTable.table.ref.grantReadData(deletePymtAccLambdaFunction);
     props.pymtAccTable.table.ref.grantReadWriteData(deletePymtAccLambdaFunction);
+    props.configTypeTable.table.ref.grantReadData(deletePymtAccLambdaFunction);
 
     const statusResource = pymtAccIdResource.addResource("status").addResource("{status}");
     const updateStatusLambdaFunction = this.buildApi(statusResource, HttpMethod.POST, PaymentAccountLambdaHandler.UpdateStatus);
     props.userTable.table.ref.grantReadData(updateStatusLambdaFunction);
     props.pymtAccTable.table.ref.grantReadWriteData(updateStatusLambdaFunction);
+    props.configTypeTable.table.ref.grantReadData(updateStatusLambdaFunction);
   }
 
   private buildApi(

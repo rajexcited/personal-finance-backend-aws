@@ -4,7 +4,7 @@ import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import { HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
-import { ExpenseDbProps, UserDbProps } from "../../db";
+import { ConfigDbProps, ExpenseDbProps, UserDbProps } from "../../db";
 import { Duration } from "aws-cdk-lib";
 import { EnvironmentName } from "../../common";
 import { BaseApiConstruct } from "../base-api";
@@ -13,6 +13,7 @@ interface ExpenseListApiProps extends RestApiProps {
   userTable: UserDbProps;
   expenseTable: ExpenseDbProps;
   expenseResource: apigateway.Resource;
+  configTypeTable: ConfigDbProps;
 }
 
 enum ExpenseListLambdaHandler {
@@ -35,11 +36,13 @@ export class ExpenseListApiConstruct extends BaseApiConstruct {
     const getListLambdaFunction = this.buildApi(props.expenseResource, HttpMethod.GET, ExpenseListLambdaHandler.GetList, getListRequestQueryParams);
     props.userTable.table.ref.grantReadData(getListLambdaFunction);
     props.expenseTable.table.ref.grantReadData(getListLambdaFunction);
+    props.configTypeTable.table.ref.grantReadData(getListLambdaFunction);
 
     const expenseCountResource = props.expenseResource.addResource("count");
     const getCountLambdaFunction = this.buildApi(expenseCountResource, HttpMethod.GET, ExpenseListLambdaHandler.GetCount, getListRequestQueryParams);
     props.userTable.table.ref.grantReadData(getCountLambdaFunction);
     props.expenseTable.table.ref.grantReadData(getCountLambdaFunction);
+    props.configTypeTable.table.ref.grantReadData(getCountLambdaFunction);
   }
 
   private buildApi(
@@ -61,6 +64,8 @@ export class ExpenseListApiConstruct extends BaseApiConstruct {
         USER_TABLE_NAME: props.userTable.table.name,
         EXPENSES_TABLE_NAME: props.expenseTable.table.name,
         EXPENSE_USERID_STATUS_GSI_NAME: props.expenseTable.globalSecondaryIndexes.userIdStatusIndex.name,
+        CONFIG_TYPE_TABLE_NAME: props.configTypeTable.table.name,
+        CONFIG_TYPE_BELONGS_TO_GSI_NAME: props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name,
         DEFAULT_LOG_LEVEL: this.props.environment === EnvironmentName.LOCAL ? "debug" : "undefined",
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
