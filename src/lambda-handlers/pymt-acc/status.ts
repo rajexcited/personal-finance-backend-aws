@@ -33,7 +33,7 @@ export const deletePaymentAccount = apiGatewayHandlerWrapper(async (event: APIGa
     tags: details.tags,
     auditDetails: auditDetails,
     description: details.description,
-    currencyProfileId: details.profileId,
+    currencyProfileId: details.currencyProfileId,
   };
 
   return apiResource as unknown as JSONObject;
@@ -58,7 +58,7 @@ export const updatePaymentAccountStatus = apiGatewayHandlerWrapper(async (event:
     tags: details.tags,
     auditDetails: auditDetails,
     description: details.description,
-    currencyProfileId: details.profileId,
+    currencyProfileId: details.currencyProfileId,
   };
 
   return apiResource as unknown as JSONObject;

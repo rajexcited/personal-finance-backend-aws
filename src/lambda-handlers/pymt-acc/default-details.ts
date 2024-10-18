@@ -72,7 +72,7 @@ export const createDetails = async (
       institutionName: detail.institutionName,
       status: detail.status || PymtAccStatus.ENABLE,
       auditDetails: { ...auditDetails },
-      profileId: currencyProfile.id,
+      currencyProfileId: currencyProfile.id,
     };
 
     const item: DbItemPymtAcc = {

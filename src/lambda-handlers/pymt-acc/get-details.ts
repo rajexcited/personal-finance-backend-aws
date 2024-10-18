@@ -52,7 +52,7 @@ export const getPaymentAccount = apiGatewayHandlerWrapper(async (event: APIGatew
     description: details.description,
     tags: details.tags,
     auditDetails: auditDetails,
-    currencyProfileId: details.profileId,
+    currencyProfileId: details.currencyProfileId,
   };
 
   return resource as unknown as JSONObject;

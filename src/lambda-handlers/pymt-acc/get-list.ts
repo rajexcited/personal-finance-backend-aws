@@ -34,7 +34,7 @@ export const getPaymentAccountList = apiGatewayHandlerWrapper(async (event: APIG
       description: details.description,
       tags: details.tags,
       auditDetails: auditDetails,
-      currencyProfileId: details.profileId,
+      currencyProfileId: details.currencyProfileId,
     };
     return resource;
   });

@@ -85,7 +85,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
     tags: req.tags,
     typeId: req.typeId,
     auditDetails: auditDetails,
-    profileId: currencyProfile.id,
+    currencyProfileId: currencyProfile.id,
   };
 
   const dbItem: DbItemPymtAcc = {
