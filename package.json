@@ -1,5 +1,5 @@
 {
-  "name": "app",
+  "name": "personal-finance-aws",
   "version": "0.1.0",
   "bin": {
     "app": "src/main/app.js"
