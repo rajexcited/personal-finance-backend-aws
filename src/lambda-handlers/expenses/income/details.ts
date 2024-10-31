@@ -4,11 +4,10 @@ import { DbDetailsReceipt } from "../../receipts";
 import { AuthorizeUser } from "../../user";
 import { dbutil, getLogger, LoggerBase, utils } from "../../utils";
 import { ExpenseBelongsTo, ExpenseStatus } from "../base-config";
-import { DbItemExpense, ExpenseRecordType, ExpenseTableName, getFormattedExpenseDate, getGsiPkDetails } from "../db-config";
+import { DbItemExpense, ExpenseRecordType, ExpenseTableName, getGsiPkDetails } from "../db-config";
 import { ApiResourceIncomeDetails } from "./api-resource";
 import { convertIncomeDbToApiResource } from "./converter";
 import { DbDetailsIncome, getGsiAttrDetailsIncomeBelongsTo, getGsiSkIncomeDate, getTablePkDetails } from "./db-config";
-import { v4 as uuidv4 } from "uuid";
 
 export const addDbIncomeTransactions = async (
   req: ApiResourceIncomeDetails,
@@ -39,14 +38,12 @@ const putDbIncome = (
 ) => {
   const logger = getLogger("putDbIncome", _logger);
 
-  let formattedPurchaseDate = getFormattedExpenseDate(req.incomeDate, logger);
-
   const auditDetails = utils.updateAuditDetailsFailIfNotExists(dbItem?.details.auditDetails, authUser);
 
   const apiToDbDetails: DbDetailsIncome = {
     id: incomeId,
     billName: req.billName,
-    incomeDate: formattedPurchaseDate,
+    incomeDate: req.incomeDate,
     verifiedTimestamp: req.verifiedTimestamp,
     status: ExpenseStatus.ENABLE,
     amount: req.amount,

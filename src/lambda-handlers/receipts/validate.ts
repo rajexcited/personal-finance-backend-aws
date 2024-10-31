@@ -1,3 +1,4 @@
+import { ExpenseBelongsTo } from "../expenses/base-config";
 import { getLogger, LoggerBase, validations } from "../utils";
 import { ApiResourceReceipt, FileExtension, ReceiptContentType } from "./base-config";
 import { getReceiptFileHeadDetails, RECEIPTS_MAX_ALLOWED } from "./details";
@@ -64,7 +65,12 @@ export const isValidFileSize = (size?: number | null) => {
   return size > ONE_KB && size < FILESIZE_MAX_BYTES;
 };
 
-export const areValidReceipts = (receipts: ApiResourceReceipt[] | null | undefined, expenseId: string | undefined, _logger: LoggerBase) => {
+export const areValidReceipts = (
+  receipts: ApiResourceReceipt[] | null | undefined,
+  expenseId: string | undefined,
+  belongsTo: ExpenseBelongsTo,
+  _logger: LoggerBase
+) => {
   const logger = getLogger("areValidReceipts", _logger);
   if (!receipts) return false;
   if (!Array.isArray(receipts) || receipts.length > RECEIPTS_MAX_ALLOWED) return false;
@@ -76,7 +82,9 @@ export const areValidReceipts = (receipts: ApiResourceReceipt[] | null | undefin
 
     if (!isValidReceiptType(rct.contentType)) return false;
     if (!validations.isValidUuid(rct.id)) return false;
-    if (rct.size !== undefined && !isValidFileSize(rct.size)) return false;
+
+    if (rct.relationId !== expenseId) return false;
+    if (rct.belongsTo !== belongsTo) return false;
 
     return true;
   });

@@ -1,4 +1,12 @@
-import { Delete, DynamoDBClient, ProvisionedThroughputExceededException, Put, ReturnValue, Update } from "@aws-sdk/client-dynamodb";
+import {
+  Delete,
+  DynamoDBClient,
+  KeysAndAttributes,
+  ProvisionedThroughputExceededException,
+  Put,
+  ReturnValue,
+  Update,
+} from "@aws-sdk/client-dynamodb";
 import {
   BatchWriteCommandInput,
   DynamoDBDocument,
@@ -19,6 +27,7 @@ import { JSONObject } from "../apigateway";
 import { MissingError } from "../apigateway";
 import { caching } from "cache-manager";
 import ms from "ms";
+import { isKeywordDynamoDbReserve } from "./dynamodb-config";
 
 const getItemMemoryCache = caching("memory", {
   max: 25,
@@ -134,13 +143,22 @@ export const batchGet = async <T>(
   const itemResponse: T[] = [];
   try {
     let itemsToGet: Record<string, NativeAttributeValue>[] = [...itemsKeys];
-    type BatchRequestItems = Record<string, { Keys: Record<string, NativeAttributeValue>[]; ProjectionExpression?: string }>;
+    type BatchRequestItems = Record<
+      string,
+      Omit<KeysAndAttributes, "Keys"> & {
+        Keys: Record<string, NativeAttributeValue>[];
+      }
+    >;
 
+    const projectionAndExpressionAttr = getExpressionAttributeMap(requestAttributes.ProjectionExpression);
     while (itemsToGet.length > 0) {
       stopwatch.start("iteration-" + counter);
       try {
         const requestItems: BatchRequestItems = {};
-        requestItems[tableName] = { Keys: [...itemsToGet], ProjectionExpression: requestAttributes.ProjectionExpression };
+        requestItems[tableName] = {
+          Keys: [...itemsToGet],
+          ...projectionAndExpressionAttr,
+        };
         logger.debug("requesting [", itemsToGet.length, "] items, requestItems =", requestItems);
 
         const output = await ddbClient.batchGet({ RequestItems: requestItems });
@@ -410,3 +428,38 @@ export class TransactionWriter {
     }
   }
 }
+
+const getExpressionAttributeMap = (projectionExpression?: string): Omit<KeysAndAttributes, "Keys"> => {
+  if (!projectionExpression) {
+    return {};
+  }
+
+  let i = 1;
+  const expressionAttrNameMap: Record<string, string> = {};
+  const convertedProjectedExpressionList = projectionExpression.split(",").map((prjExpr) => {
+    return prjExpr.split(".").reduce((exp, ep) => {
+      const expp: string[] = [];
+
+      if (exp) {
+        expp.push(exp);
+      }
+
+      if (isKeywordDynamoDbReserve(ep)) {
+        if (!expressionAttrNameMap[ep]) {
+          expressionAttrNameMap[ep] = "#ea" + i;
+          i++;
+        }
+        expp.push(expressionAttrNameMap[ep]);
+      } else {
+        expp.push(ep);
+      }
+
+      return expp.join(".");
+    }, "");
+  });
+
+  return {
+    ProjectionExpression: convertedProjectedExpressionList.join(","),
+    ExpressionAttributeNames: i === 1 ? undefined : Object.fromEntries(Object.entries(expressionAttrNameMap).map(([k, v]) => [v, k])),
+  };
+};

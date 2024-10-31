@@ -32,14 +32,15 @@ export const getValidatedRequestToUpdateExpenseDetails = async (event: APIGatewa
     invalidFields.push({ path: ExpenseRequestResourcePath.DESCRIPTION, message: msg });
   }
   if (!fieldValidator.isValidExpenseId(req.id)) {
-    invalidFields.push({ path: ExpenseRequestResourcePath.ID, message: ErrorMessage.INCORRECT_FORMAT });
+    const msg = req.id ? ErrorMessage.INCORRECT_FORMAT : ErrorMessage.MISSING_VALUE;
+    invalidFields.push({ path: ExpenseRequestResourcePath.ID, message: msg });
   }
   if (req.verifiedTimestamp && !fieldValidator.isValidVerifiedTimestamp(req.verifiedTimestamp, logger)) {
     invalidFields.push({ path: ExpenseRequestResourcePath.VERIFIED_TIMESTAMP, message: ErrorMessage.INCORRECT_FORMAT });
   }
 
   req.receipts = req.receipts || [];
-  if (!receiptValidator.areValidReceipts(req.receipts, req.id, logger)) {
+  if (!receiptValidator.areValidReceipts(req.receipts, req.id, req.belongsTo, logger)) {
     invalidFields.push({ path: ExpenseRequestResourcePath.RECEIPTS, message: ErrorMessage.INCORRECT_VALUE });
   }
 

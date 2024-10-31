@@ -1,5 +1,12 @@
 import { LoggerBase, dbutil, getLogger, validations } from "../utils";
-import { BelongsTo, _configTypeTableName, getBelongsToGsiPk, getDetailsTablePk } from "./base-config";
+import {
+  BelongsTo,
+  CONFIG_NAME_VALUE_MAX_LENGTH,
+  CONFIG_NAME_VALUE_MIN_LENGTH,
+  _configTypeTableName,
+  getBelongsToGsiPk,
+  getDetailsTablePk,
+} from "./base-config";
 import { DbItemConfigType } from "./resource-type";
 
 export const isConfigIdExists = async (cfgId: string | null | undefined, belongsTo: BelongsTo, userId: string, _logger: LoggerBase) => {
@@ -24,4 +31,21 @@ const getConfigItem = async (cfgId: string | null | undefined, _logger: LoggerBa
   logger.info("retrieved get Output");
   const item = getOutput.Item as DbItemConfigType | null;
   return item;
+};
+
+export const isValidConfigName = (cfgName: string, belongsTo: BelongsTo) => {
+  if (belongsTo === BelongsTo.SharePerson) {
+    return validations.isValidEmail(cfgName);
+  }
+  return validations.isValidName(cfgName, CONFIG_NAME_VALUE_MAX_LENGTH, CONFIG_NAME_VALUE_MIN_LENGTH);
+};
+
+export const isValidConfigValue = (cfgVal: string, belongsTo: BelongsTo) => {
+  if (belongsTo === BelongsTo.SharePerson) {
+    try {
+      return Array.isArray(JSON.parse(cfgVal));
+    } catch (ignore) {}
+    return false;
+  }
+  return validations.isValidName(cfgVal, CONFIG_NAME_VALUE_MAX_LENGTH, CONFIG_NAME_VALUE_MIN_LENGTH);
 };

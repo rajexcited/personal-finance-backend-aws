@@ -4,16 +4,13 @@ import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import { HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
-import { ConfigDbProps, ExpenseDbProps, PymtAccDbProps, UserDbProps } from "../db";
+import { DBConstruct } from "../db";
 import { Duration } from "aws-cdk-lib";
 import { EnvironmentName } from "../common";
 import { BaseApiConstruct } from "./base-api";
 
 interface StatsApiProps extends RestApiProps {
-  userTable: UserDbProps;
-  expenseTable: ExpenseDbProps;
-  pymtAccTable: PymtAccDbProps;
-  configTypeTable: ConfigDbProps;
+  allDb: DBConstruct;
 }
 
 enum StatsLambdaHandler {
@@ -31,24 +28,24 @@ export class StatsApiConstruct extends BaseApiConstruct {
 
     const purchaseResource = statsResource.addResource("purchase");
     const getPurchaseStatsLambdaFunction = this.buildApi(purchaseResource, HttpMethod.GET, StatsLambdaHandler.GetPurchaseStats, statsQueryParams);
-    props.userTable.table.ref.grantReadData(getPurchaseStatsLambdaFunction);
-    props.expenseTable.table.ref.grantReadData(getPurchaseStatsLambdaFunction);
-    props.configTypeTable.table.ref.grantReadData(getPurchaseStatsLambdaFunction);
-    props.pymtAccTable.table.ref.grantReadData(getPurchaseStatsLambdaFunction);
+    props.allDb.userTable.table.ref.grantReadData(getPurchaseStatsLambdaFunction);
+    props.allDb.expenseTable.table.ref.grantReadData(getPurchaseStatsLambdaFunction);
+    props.allDb.configTypeTable.table.ref.grantReadData(getPurchaseStatsLambdaFunction);
+    props.allDb.paymentAccountTable.table.ref.grantReadData(getPurchaseStatsLambdaFunction);
 
     const refundResource = statsResource.addResource("refund");
     const getRefundStatsLambdaFunction = this.buildApi(refundResource, HttpMethod.GET, StatsLambdaHandler.GetRefundStats, statsQueryParams);
-    props.userTable.table.ref.grantReadData(getRefundStatsLambdaFunction);
-    props.expenseTable.table.ref.grantReadData(getRefundStatsLambdaFunction);
-    props.configTypeTable.table.ref.grantReadData(getRefundStatsLambdaFunction);
-    props.pymtAccTable.table.ref.grantReadData(getRefundStatsLambdaFunction);
+    props.allDb.userTable.table.ref.grantReadData(getRefundStatsLambdaFunction);
+    props.allDb.expenseTable.table.ref.grantReadData(getRefundStatsLambdaFunction);
+    props.allDb.configTypeTable.table.ref.grantReadData(getRefundStatsLambdaFunction);
+    props.allDb.paymentAccountTable.table.ref.grantReadData(getRefundStatsLambdaFunction);
 
     const incomeResource = statsResource.addResource("income");
     const getIncomeStatsLambdaFunction = this.buildApi(incomeResource, HttpMethod.GET, StatsLambdaHandler.GetIncomeStats, statsQueryParams);
-    props.userTable.table.ref.grantReadData(getIncomeStatsLambdaFunction);
-    props.expenseTable.table.ref.grantReadData(getIncomeStatsLambdaFunction);
-    props.configTypeTable.table.ref.grantReadData(getIncomeStatsLambdaFunction);
-    props.pymtAccTable.table.ref.grantReadData(getIncomeStatsLambdaFunction);
+    props.allDb.userTable.table.ref.grantReadData(getIncomeStatsLambdaFunction);
+    props.allDb.expenseTable.table.ref.grantReadData(getIncomeStatsLambdaFunction);
+    props.allDb.configTypeTable.table.ref.grantReadData(getIncomeStatsLambdaFunction);
+    props.allDb.paymentAccountTable.table.ref.grantReadData(getIncomeStatsLambdaFunction);
   }
 
   private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: StatsLambdaHandler, queryParams?: Record<string, boolean>) {
@@ -62,12 +59,12 @@ export class StatsApiConstruct extends BaseApiConstruct {
       code: lambda.Code.fromAsset("src/lambda-handlers"),
       layers: [props.layer],
       environment: {
-        USER_TABLE_NAME: props.userTable.table.name,
-        CONFIG_TYPE_TABLE_NAME: props.configTypeTable.table.name,
-        CONFIG_TYPE_BELONGS_TO_GSI_NAME: props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name,
-        PAYMENT_ACCOUNT_TABLE_NAME: props.pymtAccTable.table.name,
-        EXPENSES_TABLE_NAME: props.expenseTable.table.name,
-        EXPENSE_USERID_STATUS_GSI_NAME: props.expenseTable.globalSecondaryIndexes.userIdStatusIndex.name,
+        USER_TABLE_NAME: props.allDb.userTable.table.name,
+        CONFIG_TYPE_TABLE_NAME: props.allDb.configTypeTable.table.name,
+        CONFIG_TYPE_BELONGS_TO_GSI_NAME: props.allDb.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name,
+        PAYMENT_ACCOUNT_TABLE_NAME: props.allDb.paymentAccountTable.table.name,
+        EXPENSES_TABLE_NAME: props.allDb.expenseTable.table.name,
+        EXPENSE_USERID_STATUS_GSI_NAME: props.allDb.expenseTable.globalSecondaryIndexes.userIdStatusIndex.name,
         DEFAULT_LOG_LEVEL: this.props.environment === EnvironmentName.LOCAL ? "debug" : "undefined",
       },
       logRetention: logs.RetentionDays.ONE_MONTH,

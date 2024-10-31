@@ -104,7 +104,7 @@ export const deleteExpenseDetails = apiGatewayHandlerWrapper(async (event: APIGa
     requestReceiptsToAdd: [],
     dbReceiptsToReverseRemove: [],
   };
-  const deleteReceiptPromise = updateReceiptsIns3(deleteReceiptAction, null, expenseId, authUser.userId, logger);
+  const deleteReceiptPromise = updateReceiptsIns3(deleteReceiptAction, null, expenseId, belongsToParam, authUser.userId, logger);
   await Promise.all([transactionWriterPromise, deleteReceiptPromise]);
 
   return apiResource as unknown as JSONObject;

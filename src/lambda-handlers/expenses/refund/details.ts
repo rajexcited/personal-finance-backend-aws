@@ -3,14 +3,7 @@ import { DbDetailsReceipt } from "../../receipts";
 import { AuthorizeUser } from "../../user";
 import { dbutil, getLogger, LoggerBase, utils } from "../../utils";
 import { ExpenseBelongsTo, ExpenseStatus } from "../base-config";
-import {
-  DbItemExpense,
-  ExpenseRecordType,
-  ExpenseTableName,
-  getFormattedExpenseDate,
-  getGsiPkDetails,
-  getGsiSkDetailsExpenseDate,
-} from "../db-config";
+import { DbItemExpense, ExpenseRecordType, ExpenseTableName, getGsiPkDetails, getGsiSkDetailsExpenseDate } from "../db-config";
 import { ApiResourceRefundDetails } from "./api-resource";
 import { DbDetailsRefund, getGsiAttrDetailsRefundBelongsTo, getTablePkDetails } from "./db-config";
 import { convertRefundDbToApiResource } from "./converter";
@@ -45,14 +38,12 @@ const putDbRefund = (
 ) => {
   const logger = getLogger("putDbRefund", _logger);
 
-  let formattedRefundDate = getFormattedExpenseDate(req.refundDate, logger);
-
   const auditDetails = utils.updateAuditDetailsFailIfNotExists(dbItem?.details.auditDetails, authUser);
 
   const apiToDbDetails: DbDetailsRefund = {
     id: refundId,
     billName: req.billName,
-    refundDate: formattedRefundDate,
+    refundDate: req.refundDate,
     verifiedTimestamp: req.verifiedTimestamp,
     status: ExpenseStatus.ENABLE,
     amount: req.amount,

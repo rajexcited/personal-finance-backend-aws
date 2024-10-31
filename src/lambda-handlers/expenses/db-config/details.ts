@@ -31,7 +31,7 @@ export const getGsiSkDetailsExpenseDate = (expenseDate: string | Date | undefine
  * @returns
  * @throws {IllegelArgumentError} if expenseDate is provided or not in incorrect format
  */
-export const getFormattedExpenseDate = (expenseDate: string | Date | undefined | null, logger: LoggerBase) => {
+const getFormattedExpenseDate = (expenseDate: string | Date | undefined | null, logger: LoggerBase) => {
   let formattedExpenseDate;
   if (expenseDate instanceof Date) {
     formattedExpenseDate = dateutil.formatTimestamp(expenseDate, EXPENSE_DATE_FORMAT);

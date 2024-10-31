@@ -23,7 +23,7 @@ export const convertPurchaseDbToApiResource = async (
   if (dbDetails.belongsTo !== ExpenseBelongsTo.Purchase) {
     throw new InvalidError("db details doesnot belongs to Purchase");
   }
-  const apiReceipts = dbDetails.receipts.map((dbRct) => convertReceiptDbToApiResource(dbRct, dbDetails.id, logger));
+  const apiReceipts = dbDetails.receipts.map((dbRct) => convertReceiptDbToApiResource(dbRct, dbDetails.id, ExpenseBelongsTo.Purchase, logger));
 
   const apiResource: ApiResourcePurchaseDetails = {
     id: dbDetails.id,

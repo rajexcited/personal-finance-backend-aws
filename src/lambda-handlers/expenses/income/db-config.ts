@@ -16,7 +16,7 @@ export interface DbDetailsIncome extends DbDetailsType {
   amount: string;
   description: string;
   tags: string[];
-  paymentAccountId?: string;
+  paymentAccountId: string;
   incomeDate: string;
   verifiedTimestamp?: string;
   receipts: DbDetailsReceipt[];

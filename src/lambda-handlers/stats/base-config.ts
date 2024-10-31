@@ -1,9 +1,12 @@
 import { ExpenseBelongsTo } from "../expenses/base-config";
-import { DbDetailsIncome } from "../expenses/income";
-import { DbDetailsPurchase } from "../expenses/purchase";
-import { DbDetailsRefund } from "../expenses/refund";
 import { dateutil, getLogger, LoggerBase } from "../utils";
-import { PartialConfigType, PartialPymtAcc } from "./db-config";
+import {
+  DbItemProjectedConfigType,
+  DbItemProjectedIncome,
+  DbItemProjectedPurchase,
+  DbItemProjectedPymtAcc,
+  DbItemProjectedRefund,
+} from "./db-config";
 import {
   ApiMonthlyStatResource,
   ApiResourceStatisticsBase,
@@ -14,9 +17,9 @@ import {
 
 export type _ApiMonthlyStatResource = Omit<ApiMonthlyStatResource, "total" | "monthName"> & { total: number };
 
-type DbDetailsExpense = DbDetailsPurchase | DbDetailsRefund | DbDetailsIncome;
+type DbItemProjectedExpense = DbItemProjectedPurchase | DbItemProjectedIncome | DbItemProjectedRefund;
 
-export const groupDetailsMonthly = <T extends DbDetailsExpense>(dbExpnsList: T[], _logger: LoggerBase) => {
+export const groupDetailsMonthly = <T extends DbItemProjectedExpense>(dbExpnsList: T[], _logger: LoggerBase) => {
   const logger = getLogger("groupDetailsMonthly", _logger);
 
   const monthlyMap: Record<string, T[]> = {};
@@ -24,23 +27,26 @@ export const groupDetailsMonthly = <T extends DbDetailsExpense>(dbExpnsList: T[]
     monthlyMap[i.toString().padStart(2, "0")] = [];
   }
 
+  logger.debug("dbExpnsList.length =", dbExpnsList.length);
   dbExpnsList.forEach((dbExpns) => {
     let date: string;
-    if (dbExpns.belongsTo === ExpenseBelongsTo.Purchase) {
-      date = dbExpns.purchaseDate;
-    } else if (dbExpns.belongsTo === ExpenseBelongsTo.Refund) {
-      date = dbExpns.refundDate;
+    if (dbExpns.details.belongsTo === ExpenseBelongsTo.Purchase) {
+      date = dbExpns.details.purchaseDate;
+    } else if (dbExpns.details.belongsTo === ExpenseBelongsTo.Refund) {
+      date = dbExpns.details.refundDate;
     } else {
-      date = dbExpns.incomeDate;
+      date = dbExpns.details.incomeDate;
     }
+    logger.debug("expenseDate = ", date, " for belongsTo =", dbExpns.details.belongsTo, " dbExpense =", dbExpns);
     const key = dateutil.parseTimestamp(date).getMonth().toString().padStart(2, "0");
+    logger.debug("month id key =", key, " adding dbExpense to group map list.");
     monthlyMap[key].push(dbExpns);
   });
 
   return monthlyMap;
 };
 
-export const getApiStatsResourceDetails = (groupedMap: Record<string, DbDetailsExpense[]>, year: number, _logger: LoggerBase) => {
+export const getApiStatsResourceDetails = (groupedMap: Record<string, DbItemProjectedExpense[]>, year: number, _logger: LoggerBase) => {
   const logger = getLogger("getApiStatsResourceDetails", _logger);
 
   let totalCount = 0,
@@ -50,7 +56,7 @@ export const getApiStatsResourceDetails = (groupedMap: Record<string, DbDetailsE
   const monthlyTotal: ApiMonthlyStatResource[] = monthIdKeys.map((k) => {
     const xpnsForMonth = groupedMap[k];
     const monthlyTotalAmount = xpnsForMonth
-      .map((p) => p.amount)
+      .map((p) => p.details.amount)
       .filter((amt) => amt !== undefined)
       .reduce((prev, curr) => prev + Number(curr), 0);
 
@@ -76,15 +82,15 @@ export const getApiStatsResourceDetails = (groupedMap: Record<string, DbDetailsE
   return apiResource;
 };
 
-export const getApiStatsResourceByConfigType = <T extends DbDetailsExpense>(
+export const getApiStatsResourceByConfigType = <T extends DbItemProjectedExpense>(
   groupedMap: Record<string, T[]>,
-  configTypeDetailList: PartialConfigType[],
+  configTypeDetailList: DbItemProjectedConfigType[],
   year: number,
   getPropValue: (dtl: any) => string[],
   _logger: LoggerBase
 ) => {
-  const configTypeDetailMap = configTypeDetailList.reduce((prev: Record<string, PartialConfigType>, curr) => {
-    prev[curr.id] = curr;
+  const configTypeDetailMap = configTypeDetailList.reduce((prev: Record<string, DbItemProjectedConfigType>, curr) => {
+    prev[curr.details.id] = curr;
     return prev;
   }, {});
 
@@ -107,7 +113,7 @@ export const getApiStatsResourceByConfigType = <T extends DbDetailsExpense>(
           };
         }
 
-        const amount = xpnsDtl.amount ? Number(xpnsDtl.amount) : 0;
+        const amount = xpnsDtl.details.amount ? Number(xpnsDtl.details.amount) : 0;
         const configTypeStatDtl = configTypeStatDetailMapById[configId];
         configTypeStatDtl.totalAmount += amount;
         configTypeStatDtl.totalCount++;
@@ -127,7 +133,7 @@ export const getApiStatsResourceByConfigType = <T extends DbDetailsExpense>(
   });
 
   return Object.values(configTypeDetailMap).map((configTypeDetail) => {
-    const confStats = configTypeStatDetailMapById[configTypeDetail.id];
+    const confStats = configTypeStatDetailMapById[configTypeDetail.details.id];
     const confMonthlyData = Object.values(confStats.monthlyData).map((monthlyData) => {
       const resp: ApiMonthlyStatResource = {
         total: monthlyData.total.toFixed(2),
@@ -138,20 +144,20 @@ export const getApiStatsResourceByConfigType = <T extends DbDetailsExpense>(
       return resp;
     });
     const response: ApiResourceStatisticsConfigType = {
-      id: configTypeDetail.id,
-      name: configTypeDetail.name,
-      value: configTypeDetail.value,
+      id: configTypeDetail.details.id,
+      name: configTypeDetail.details.name,
+      value: configTypeDetail.details.value,
       count: confStats.totalCount,
       total: confStats.totalAmount.toFixed(2),
-      description: "stats for year [" + year + "] and config name [" + configTypeDetail.name + "]",
-      status: configTypeDetail.status,
+      description: "stats for year [" + year + "] and config name [" + configTypeDetail.details.name + "]",
+      status: configTypeDetail.details.status,
       monthlyTotal: confMonthlyData,
     };
     return response;
   });
 };
 
-export const getApiStatsResourceByTags = (groupedMap: Record<string, DbDetailsExpense[]>, year: number, _logger: LoggerBase) => {
+export const getApiStatsResourceByTags = (groupedMap: Record<string, DbItemProjectedExpense[]>, year: number, _logger: LoggerBase) => {
   type TagStatDetails = {
     tag: string;
     totalCount: number;
@@ -163,7 +169,7 @@ export const getApiStatsResourceByTags = (groupedMap: Record<string, DbDetailsEx
   const monthIdKeys = Object.keys(groupedMap);
   monthIdKeys.forEach((monthKey) => {
     groupedMap[monthKey].forEach((purchaseDtl) => {
-      [...new Set(purchaseDtl.tags)].forEach((tag) => {
+      [...new Set(purchaseDtl.details.tags)].forEach((tag) => {
         if (!(tag in tagStatMap)) {
           tagStatMap[tag] = {
             monthlyData: {},
@@ -174,7 +180,7 @@ export const getApiStatsResourceByTags = (groupedMap: Record<string, DbDetailsEx
         }
         const tagStatDtl = tagStatMap[tag];
 
-        const amount = purchaseDtl.amount ? Number(purchaseDtl.amount) : 0;
+        const amount = purchaseDtl.details.amount ? Number(purchaseDtl.details.amount) : 0;
         tagStatDtl.totalCount++;
         tagStatDtl.totalAmount += amount;
 
@@ -216,20 +222,20 @@ export const getApiStatsResourceByTags = (groupedMap: Record<string, DbDetailsEx
 
 export const getApiStatsResourceByTypeTags = (
   statsByType: ApiResourceStatisticsConfigType[],
-  purchaseTypeDetailList: PartialConfigType[],
+  purchaseTypeDetailList: DbItemProjectedConfigType[],
   year: number,
   _logger: LoggerBase
 ) => {
   type TagStatDetails = {
-    configType: PartialConfigType;
+    configType: DbItemProjectedConfigType;
     tag: string;
     totalCount: number;
     totalAmount: number;
     monthlyData: Record<string, _ApiMonthlyStatResource>;
   };
 
-  const prchTypMapById = purchaseTypeDetailList.reduce((prev: Record<string, PartialConfigType>, curr: PartialConfigType) => {
-    prev[curr.id] = curr;
+  const prchTypMapById = purchaseTypeDetailList.reduce((prev: Record<string, DbItemProjectedConfigType>, curr: DbItemProjectedConfigType) => {
+    prev[curr.details.id] = curr;
     return prev;
   }, {});
 
@@ -237,7 +243,7 @@ export const getApiStatsResourceByTypeTags = (
 
   statsByType.forEach((statDtl) => {
     const prchTyp = prchTypMapById[statDtl.id];
-    prchTyp.tags.forEach((tag) => {
+    prchTyp.details.tags.forEach((tag) => {
       if (!purchaseTypeStatDetailMapByTag[tag]) {
         purchaseTypeStatDetailMapByTag[tag] = {
           configType: prchTyp,
@@ -282,20 +288,20 @@ export const getApiStatsResourceByTypeTags = (
   });
 };
 
-export const getApiStatsResourceByPymtAcc = <T extends DbDetailsExpense>(
+export const getApiStatsResourceByPymtAcc = <T extends DbItemProjectedExpense>(
   groupedMap: Record<string, T[]>,
-  pymtAccDetailList: PartialPymtAcc[],
+  pymtAccDetailList: DbItemProjectedPymtAcc[],
   year: number,
   _logger: LoggerBase
 ) => {
   const logger = getLogger("getApiStatsResourceByPymtAcc", _logger);
-  const pymtAccMapById = pymtAccDetailList.reduce((prev: Record<string, PartialPymtAcc>, curr) => {
-    prev[curr.id] = curr;
+  const pymtAccMapById = pymtAccDetailList.reduce((prev: Record<string, DbItemProjectedPymtAcc>, curr) => {
+    prev[curr.details.id] = curr;
     return prev;
   }, {});
 
   type PymtAccStatDetails = {
-    pymtAcc: PartialPymtAcc;
+    pymtAcc: DbItemProjectedPymtAcc;
     totalCount: number;
     totalAmount: number;
     monthlyData: Record<string, _ApiMonthlyStatResource>;
@@ -305,18 +311,18 @@ export const getApiStatsResourceByPymtAcc = <T extends DbDetailsExpense>(
   const monthIdKeys = Object.keys(groupedMap);
   monthIdKeys.forEach((monthKey) => {
     groupedMap[monthKey].forEach((xpnsDtl) => {
-      if (xpnsDtl.paymentAccountId) {
-        if (!pymtAccStatDetailMapById[xpnsDtl.paymentAccountId]) {
-          pymtAccStatDetailMapById[xpnsDtl.paymentAccountId] = {
-            pymtAcc: pymtAccMapById[xpnsDtl.paymentAccountId],
+      if (xpnsDtl.details.paymentAccountId) {
+        if (!pymtAccStatDetailMapById[xpnsDtl.details.paymentAccountId]) {
+          pymtAccStatDetailMapById[xpnsDtl.details.paymentAccountId] = {
+            pymtAcc: pymtAccMapById[xpnsDtl.details.paymentAccountId],
             totalAmount: 0,
             totalCount: 0,
             monthlyData: {},
           };
         }
 
-        const amount = xpnsDtl.amount ? Number(xpnsDtl.amount) : 0;
-        const pymtAccStatDtl = pymtAccStatDetailMapById[xpnsDtl.paymentAccountId];
+        const amount = xpnsDtl.details.amount ? Number(xpnsDtl.details.amount) : 0;
+        const pymtAccStatDtl = pymtAccStatDetailMapById[xpnsDtl.details.paymentAccountId];
         pymtAccStatDtl.totalAmount += amount;
         pymtAccStatDtl.totalCount++;
 
@@ -345,12 +351,12 @@ export const getApiStatsResourceByPymtAcc = <T extends DbDetailsExpense>(
       return resp;
     });
     const response: ApiResourceStatisticsPymtAcc = {
-      id: statDetail.pymtAcc.id,
-      shortName: statDetail.pymtAcc.shortName,
+      id: statDetail.pymtAcc.details.id,
+      shortName: statDetail.pymtAcc.details.shortName,
       count: statDetail.totalCount,
       total: statDetail.totalAmount.toFixed(2),
-      description: "stats for year [" + year + "] and config name [" + statDetail.pymtAcc.shortName + "]",
-      status: statDetail.pymtAcc.status,
+      description: "stats for year [" + year + "] and config name [" + statDetail.pymtAcc.details.shortName + "]",
+      status: statDetail.pymtAcc.details.status,
       monthlyTotal: pymtAccMonthlyData,
     };
     return response;

@@ -1,6 +1,5 @@
 import { InvalidField } from "../../apigateway";
-import { getFormattedExpenseDate } from "../db-config";
-import { LoggerBase, getLogger, validations } from "../../utils";
+import { LoggerBase, validations } from "../../utils";
 import { ErrorMessage, ExpenseRequestResourcePath } from "../api-resource";
 
 export const BILLNAME_MAX_LENGTH = 50;
@@ -30,17 +29,6 @@ export const isValidAmount = (amount: number | string | undefined | null) => {
   return amt < AMOUNT_MAX && amt > AMOUNT_MIN;
 };
 
-export const isValidExpenseDate = (expenseDate: string | undefined | null, _logger: LoggerBase) => {
-  const logger = getLogger("isValidExpenseDate", _logger);
-  try {
-    const formattedExpenseDate = getFormattedExpenseDate(expenseDate, logger);
-    return true;
-  } catch (err) {
-    logger.log("Error: ", err);
-    return false;
-  }
-};
-
 export const validateTags = (tags: string[] | undefined | null, invalidFields: InvalidField[], logger: LoggerBase) => {
   if (!tags) {
     invalidFields.push({ path: ExpenseRequestResourcePath.TAGS, message: ErrorMessage.MISSING_VALUE });
@@ -61,6 +49,7 @@ export const isValidDescription = validations.isValidDescription;
 
 export const isValidExpenseId = validations.isValidUuid;
 
+export const isValidExpenseDate = validations.isValidDate;
 export const isValidVerifiedTimestamp = validations.isValidDate;
 
 export const areTagsValid = validations.areTagsValid;

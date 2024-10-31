@@ -28,7 +28,7 @@ export const getValidatedRequestToUpdateRefundDetails = async (
   if (!validations.isValidUuid(req.reasonId)) {
     invalidFields.push({ path: RefundRequestResourcePath.REASON, message: ErrorMessage.INCORRECT_FORMAT });
   }
-  if (req.paymentAccountId && !validations.isValidUuid(req.paymentAccountId)) {
+  if (!validations.isValidUuid(req.paymentAccountId)) {
     invalidFields.push({ path: RefundRequestResourcePath.PAYMENT_ACCOUNT, message: ErrorMessage.INCORRECT_FORMAT });
   }
   if (req.purchaseId && !validations.isValidUuid(req.purchaseId)) {

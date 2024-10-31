@@ -1,6 +1,6 @@
 import { getDefaultCurrencyProfile } from "../config-type";
-import { _configTypeTableName } from "../config-type/base-config";
-import { DbConfigTypeDetails, DbItemConfigType } from "../config-type/resource-type";
+import { _configTypeTableName, getDetailsTablePk as getConfigTypeDetailsTablePk } from "../config-type/base-config";
+import { DbConfigTypeDetails } from "../config-type/resource-type";
 import { ExpenseBelongsTo, ExpenseStatus } from "../expenses/base-config";
 import {
   DbItemExpense,
@@ -10,9 +10,39 @@ import {
   getGsiSkDetailsExpenseDate,
   UserIdStatusIndex,
 } from "../expenses/db-config";
-import { _pymtAccTableName } from "../pymt-acc/base-config";
-import { DbItemPymtAcc, DbPaymentAccountDetails } from "../pymt-acc/resource-type";
+import { DbDetailsIncome } from "../expenses/income";
+import { DbDetailsPurchase } from "../expenses/purchase";
+import { DbDetailsRefund } from "../expenses/refund";
+import { _pymtAccTableName, getDetailsTablePk as getPymtAccDetailsPk } from "../pymt-acc/base-config";
+import { DbPaymentAccountDetails } from "../pymt-acc/resource-type";
 import { dateutil, dbutil, getLogger, LoggerBase } from "../utils";
+
+export const purchaseProjectedExpression =
+  "details.amount,details.purchaseTypeId,details.tags,details.personIds,details.purchaseDate,details.belongsTo,details.paymentAccountId";
+export type DbItemProjectedPurchase = Record<
+  "details",
+  Pick<DbDetailsPurchase, "amount" | "purchaseTypeId" | "tags" | "personIds" | "purchaseDate" | "belongsTo" | "paymentAccountId">
+>;
+
+export const incomeProjectedExpression =
+  "details.amount,details.incomeTypeId,details.tags,details.personIds,details.incomeDate,details.belongsTo,details.paymentAccountId";
+export type DbItemProjectedIncome = Record<
+  "details",
+  Pick<DbDetailsIncome, "amount" | "incomeTypeId" | "tags" | "personIds" | "incomeDate" | "belongsTo" | "paymentAccountId">
+>;
+
+export const refundProjectedExpression =
+  "details.amount,details.reasonId,details.tags,details.personIds,details.refundDate,details.belongsTo,details.paymentAccountId";
+export type DbItemProjectedRefund = Record<
+  "details",
+  Pick<DbDetailsRefund, "amount" | "reasonId" | "tags" | "personIds" | "refundDate" | "belongsTo" | "paymentAccountId">
+>;
+
+const configTypeProjectionExpression = "details.tags,details.id,details.name,details.value,details.status";
+export type DbItemProjectedConfigType = Record<"details", Pick<DbConfigTypeDetails, "tags" | "id" | "name" | "value" | "status">>;
+
+const pymtAccProjectionExpression = "details.id,details.shortName,details.status";
+export type DbItemProjectedPymtAcc = Record<"details", Pick<DbPaymentAccountDetails, "id" | "shortName" | "status">>;
 
 export const getListOfPK = async (userId: string, year: number, belongsTo: ExpenseBelongsTo, _logger: LoggerBase) => {
   const logger = getLogger("getListOfPK", _logger);
@@ -40,48 +70,28 @@ export const getListOfPK = async (userId: string, year: number, belongsTo: Expen
   return items.map((xpnsItm) => xpnsItm.PK);
 };
 
-export type PartialConfigType = Pick<DbConfigTypeDetails, "id" | "tags" | "name" | "value" | "status">;
-type NullableString = string | null;
-
-export const getConfigTypeList = async (nullableConfIdList: NullableString[], _logger: LoggerBase) => {
+export const getConfigTypeList = async (nullableConfIdList: Array<NonNullable<string>>, _logger: LoggerBase) => {
   const logger = getLogger("getConfigTypeList", _logger);
-  const NonNullableUniqueConfIdList = [...new Set(nullableConfIdList.filter((pk) => pk !== null))];
-  const detailsItemKeys = NonNullableUniqueConfIdList.map((pk) => ({ PK: pk }));
+  const NonNullableUniqueConfIdList = [...new Set(nullableConfIdList)];
+  const detailsItemKeys = NonNullableUniqueConfIdList.map((pk) => ({ PK: getConfigTypeDetailsTablePk(pk) }));
 
-  const reqAttrs: Record<"ProjectionExpression", string> = {
-    ProjectionExpression: "details.tags,details.id,details.name,details.value,details.status",
-  };
-  const detailsItemList = await dbutil.batchGet<DbItemConfigType>(detailsItemKeys, _configTypeTableName, reqAttrs, logger);
+  const reqAttrs = { ProjectionExpression: configTypeProjectionExpression };
+  const detailsItemList = await dbutil.batchGet<DbItemProjectedConfigType>(detailsItemKeys, _configTypeTableName, reqAttrs, logger);
   logger.debug("retrieved partial projected attribute details");
 
-  const configTypeList: PartialConfigType[] = detailsItemList.map((dbItem) => ({
-    id: dbItem.details.id,
-    name: dbItem.details.name,
-    value: dbItem.details.value,
-    status: dbItem.details.status,
-    tags: dbItem.details.tags,
-  }));
-
-  return configTypeList;
+  return detailsItemList;
 };
 
-export type PartialPymtAcc = Pick<DbPaymentAccountDetails, "id" | "shortName" | "status">;
-export const getPymtAccList = async (nullablePymtAccIdPKList: NullableString[], _logger: LoggerBase) => {
+export const getPymtAccList = async (nullablePymtAccIdList: Array<string | undefined>, _logger: LoggerBase) => {
   const logger = getLogger("getPymtAccList", _logger);
-  const NonNullableUniquePymtAccIdList = [...new Set(nullablePymtAccIdPKList.filter((pk) => pk !== null))];
-  const detailsItemKeys = [...NonNullableUniquePymtAccIdList].map((pk) => ({ PK: pk }));
 
-  const reqAttrs: Record<"ProjectionExpression", string> = {
-    ProjectionExpression: "details.id,details.shortName,details.status",
-  };
-  const detailsItemList = await dbutil.batchGet<DbItemPymtAcc>(detailsItemKeys, _pymtAccTableName, reqAttrs, logger);
+  const nonNullablePymtAccIdList: NonNullable<string>[] = nullablePymtAccIdList.filter((id) => id !== undefined).map((id) => id as string);
+  const nonNullableUniquePymtAccIdList = [...new Set(nonNullablePymtAccIdList)];
+  const detailsItemKeys = [...nonNullableUniquePymtAccIdList].map((pk) => ({ PK: getPymtAccDetailsPk(pk) }));
+
+  const reqAttrs = { ProjectionExpression: pymtAccProjectionExpression };
+  const detailsItemList = await dbutil.batchGet<DbItemProjectedPymtAcc>(detailsItemKeys, _pymtAccTableName, reqAttrs, logger);
   logger.debug("retrieved partial projected attribute details");
 
-  const pymtAccList: PartialPymtAcc[] = detailsItemList.map((dbItem) => ({
-    id: dbItem.details.id,
-    shortName: dbItem.details.shortName,
-    status: dbItem.details.status,
-  }));
-
-  return pymtAccList;
+  return detailsItemList;
 };

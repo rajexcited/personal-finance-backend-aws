@@ -1,3 +1,5 @@
+import { ExpenseBelongsTo } from "../expenses/base-config";
+
 export enum FileExtension {
   JPG = "jpg",
   JPEG = "jpeg",
@@ -15,26 +17,27 @@ export interface DbDetailsReceipt {
   id: string;
   name: string;
   contentType: ReceiptContentType;
-  size: number;
+  // size: number;
 }
 
 export interface ApiResourceReceipt {
   id: string;
   name: string;
   contentType: ReceiptContentType;
-  expenseId: string;
-  size?: number;
+  relationId: string;
+  belongsTo: ExpenseBelongsTo;
 }
 
 export const ExpenseReceiptsBucketName = process.env.EXPENSE_RECEIPTS_BUCKET_NAME as string;
 export const ReceiptTempKeyPrefix = process.env.RECEIPT_TEMP_KEY_PREFIX as string;
 export const ReceiptKeyPrefix = process.env.RECEIPT_KEY_PREFIX as string;
 
-export const getTempReceiptPathkey = (fileName: string, expenseId: string, userId: string) => {
-  const tempPath = [ReceiptTempKeyPrefix, userId, expenseId, fileName].join("/");
-  return tempPath;
+export const getTempReceiptPathkey = (belongsTo: ExpenseBelongsTo, receiptId: string, expenseId: string, userId: string) => {
+  const receiptPath = [belongsTo, userId, expenseId, receiptId].join("/");
+  return ReceiptTempKeyPrefix + receiptPath;
 };
 
-export const getReceiptPathkey = (receiptId: string, expenseId: string, userId: string) => {
-  return [ReceiptKeyPrefix, userId, expenseId, receiptId].join("/");
+export const getReceiptPathkey = (belongsTo: ExpenseBelongsTo, receiptId: string, expenseId: string, userId: string) => {
+  const receiptPath = [belongsTo, userId, expenseId, receiptId].join("/");
+  return ReceiptKeyPrefix + receiptPath;
 };

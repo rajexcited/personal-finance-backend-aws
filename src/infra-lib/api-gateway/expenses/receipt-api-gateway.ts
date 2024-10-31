@@ -90,7 +90,7 @@ export class ReceiptsApiConstruct extends BaseApiConstruct {
     // const tempKeyPrefix = props.receiptContext.temporaryKeyPrefix + props.prefix + "/";
     props.receiptBucket.grantPut(executeRole, tempKeyPrefix + "*");
     const bucket = props.receiptBucket.bucketName;
-    const key = tempKeyPrefix + "{belongsTo}/{userId}/{expenseId}/{receiptName}";
+    const key = tempKeyPrefix + "{belongsTo}/{userId}/{expenseId}/{receiptId}";
 
     // https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-mapping-template-reference.html#context-variable-reference
     const s3integration = new apigateway.AwsIntegration({

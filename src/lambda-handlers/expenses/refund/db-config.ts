@@ -16,7 +16,7 @@ export interface DbDetailsRefund extends DbDetailsType {
   amount: string;
   description: string;
   tags: string[];
-  paymentAccountId?: string;
+  paymentAccountId: string;
   refundDate: string;
   verifiedTimestamp?: string;
   receipts: DbDetailsReceipt[];

@@ -15,10 +15,10 @@ const DEFAULT_PASSWORD_MAX_LENGTH = 25;
 const DEFAULT_PASSWORD_MIN_LENGTH = 8;
 
 const DEFAULT_DESCRIPTION_MAX_LENGTH = 150;
-const DEFAULT_DESCRIPTION_MIN_LENGTH = 2;
+const DEFAULT_DESCRIPTION_MIN_LENGTH = 0;
 
 const DEFAULT_TAG_MAX_LENGTH = 15;
-const DEFAULT_TAG_MIN_LENGTH = 3;
+const DEFAULT_TAG_MIN_LENGTH = 2;
 
 const DEFAULT_COLOR_MAX_LENGTH = 7;
 const DEFAULT_COLOR_MIN_LENGTH = 4;
@@ -53,7 +53,7 @@ export const isValidDate = (date: Date | string | number | null | undefined, _lo
   }
   const invalidDate = new Date(NaN);
   logger.debug("dupdate =", dupdate, ", isValid ?", String(dupdate) !== String(invalidDate));
-  return date && String(dupdate) !== String(invalidDate);
+  return !!date && String(dupdate) !== String(invalidDate);
 };
 
 export const isValidPassword = (password: string | undefined | null) => {
@@ -89,7 +89,7 @@ export const isValidDescription = (description: string | undefined | null, maxLe
   const validLength = isValidLength(description, DEFAULT_DESCRIPTION_MIN_LENGTH, maxLength);
   if (!validLength) return false;
 
-  const descriptionRegex = /^[\w\s\.,<>\?\/'";:\{\}\[\]|\\`~!@#\$%\^&\*\(\)\+=-\Sc]+$/;
+  const descriptionRegex = /^[\w\s\.,<>\?\/'";:\{\}\[\]|\\`~!@#\$%\^&\*\(\)\+=-\Sc]*$/;
   return descriptionRegex.test(description as string);
 };
 

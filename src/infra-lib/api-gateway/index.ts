@@ -10,6 +10,7 @@ import { IBucket } from "aws-cdk-lib/aws-s3";
 import { PymtAccApiConstruct } from "./pymt-acc-api-gateway";
 import { ExpenseApiConstruct } from "./expenses";
 import { ReceiptS3Construct } from "../receipts-s3";
+import { StatsApiConstruct } from "./stats-api-gateway";
 
 interface ApiProps extends ConstructProps {
   allDb: DBConstruct;
@@ -109,6 +110,16 @@ export class ApiConstruct extends Construct {
       allDb: props.allDb,
       expenseReceiptContext: props.expenseReceiptContext,
       receiptBucket: props.receiptS3.receiptBucket,
+    });
+
+    const statApi = new StatsApiConstruct(this, "StatsApiConstruct", {
+      environment: props.environment,
+      resourcePrefix: props.resourcePrefix,
+      layer: lambdaLayer.layer,
+      authorizer: tokenAuthorizer.authorizer,
+      restApi: restApi,
+      apiResource: apiResource,
+      allDb: props.allDb,
     });
   }
 }

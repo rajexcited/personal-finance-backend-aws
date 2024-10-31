@@ -28,7 +28,10 @@ export const getValidatedRequestToUpdateIncomeDetails = async (
   if (req.verifiedTimestamp && !expenseFieldValidator.isValidVerifiedTimestamp(req.verifiedTimestamp, logger)) {
     invalidFields.push({ path: IncomeRequestResourcePath.VERIFIED_TIMESTAMP, message: ErrorMessage.INCORRECT_FORMAT });
   }
-  if (!validations.isValidUuid(req.paymentAccountId)) {
+  if (!validations.isValidUuid(req.incomeTypeId)) {
+    invalidFields.push({ path: IncomeRequestResourcePath.INCOME_TYPE, message: ErrorMessage.INCORRECT_FORMAT });
+  }
+  if (req.paymentAccountId && !validations.isValidUuid(req.paymentAccountId)) {
     invalidFields.push({ path: IncomeRequestResourcePath.PAYMENT_ACCOUNT, message: ErrorMessage.INCORRECT_FORMAT });
   }
 
@@ -37,8 +40,8 @@ export const getValidatedRequestToUpdateIncomeDetails = async (
     throw new ValidationError(invalidFields);
   }
 
-  const isValidPurchaseType = await isConfigIdExists(req.incomeTypeId, ConfigBelongsTo.IncomeType, userId, logger);
-  if (!isValidPurchaseType) {
+  const isValidIncomeType = await isConfigIdExists(req.incomeTypeId, ConfigBelongsTo.IncomeType, userId, logger);
+  if (!isValidIncomeType) {
     throw new ValidationError([{ path: IncomeRequestResourcePath.INCOME_TYPE, message: ErrorMessage.INCORRECT_VALUE }]);
   }
 

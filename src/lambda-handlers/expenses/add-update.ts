@@ -81,7 +81,7 @@ const addUpdateHandler = async (event: APIGatewayProxyEvent) => {
   // before db update for expense
   // receipts copy to s3 if required,
   // delete from s3 if required
-  const dbReceipts = await updateReceiptsIns3(receiptActions, req, purchaseId, authUser.userId, logger);
+  const dbReceipts = await updateReceiptsIns3(receiptActions, req, purchaseId, req.belongsTo, authUser.userId, logger);
 
   let apiResource;
   if (req.belongsTo === ExpenseBelongsTo.Purchase) {

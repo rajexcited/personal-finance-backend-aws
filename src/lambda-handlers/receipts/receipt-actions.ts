@@ -40,7 +40,7 @@ export const getReceiptActions = async (req: ApiResourceExpense, dbReceipts: DbD
   const invalidReceiptCountReducer = async (previousValue: Promise<number>, rct: ApiResourceReceipt) => {
     const prevCount = await previousValue;
 
-    const tempPath = getTempReceiptPathkey(rct.name, req.id as string, userId);
+    const tempPath = getTempReceiptPathkey(req.belongsTo, rct.id, req.id as string, userId);
     const isValidPath = await isValidPathKey(tempPath, logger);
     if (isValidPath) {
       const isValidType = await isValidContentType(tempPath, logger);
@@ -65,19 +65,17 @@ export const getReceiptActions = async (req: ApiResourceExpense, dbReceipts: DbD
 
   // find if any receipts matching to existing db receipts, if so remove from addlist and insert to nochange list
   const matchedDbReceiptsFoundinReqAddPromises = requestReceiptsToAdd.map(async (rct) => {
-    const tempPath = getTempReceiptPathkey(rct.name, req.id as string, userId);
+    const tempPath = getTempReceiptPathkey(req.belongsTo, rct.id, req.id, userId);
     const headDetails = await getReceiptFileHeadDetails(tempPath, logger);
-    const matchedDbRct = dbReceipts
-      ?.filter((dbrct) => dbrct.name === rct.name)
-      .find((dbrct) => headDetails?.ContentType === dbrct.contentType && headDetails.ContentLength === dbrct.size);
+    const matchedDbRct = dbReceipts?.find((dbrct) => headDetails?.ContentType === dbrct.contentType && dbrct.name === rct.name);
 
     if (matchedDbRct) {
       return { db: matchedDbRct, req: rct };
     }
     return null;
   });
-  const matchedDbReceiptsFoundinReqAdd = await Promise.all(matchedDbReceiptsFoundinReqAddPromises);
 
+  const matchedDbReceiptsFoundinReqAdd = await Promise.all(matchedDbReceiptsFoundinReqAddPromises);
   const actions: ReceiptActions = {
     requestReceiptsToAdd: requestReceiptsToAdd.filter((rct) => !matchedDbReceiptsFoundinReqAdd.find((mdr) => mdr?.req === rct)),
     dbReceiptsToRemove: dbReceiptsToRemove.filter((rct) => !matchedDbReceiptsFoundinReqAdd.find((mdr) => mdr?.db === rct)),

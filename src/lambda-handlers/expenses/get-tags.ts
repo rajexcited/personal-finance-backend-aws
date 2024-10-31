@@ -99,13 +99,13 @@ const queryExpenseTags = async (startYear: number, endYear: number, belongsTo: E
   const searchEndDate = dateutil.parseTimestamp("12-31-" + endYear, "MM-DD-YYYY", logger);
 
   const promises = [ExpenseStatus.ENABLE, ExpenseStatus.DISABLE].map(async (status) => {
-    const dbItemTags = await dbutil.queryAll<DbItemExpense<DbTagsType>>(logger, {
+    const dbItemTags = await dbutil.queryAll<DbItemExpense<null>>(logger, {
       TableName: ExpenseTableName,
       IndexName: UserIdStatusIndex,
       KeyConditionExpression: "US_GSI_PK = :gpkv and US_GSI_SK BETWEEN :gskv1 and :gskv2",
       FilterExpression: "US_GSI_BELONGSTO = :gbtv",
       ExpressionAttributeValues: {
-        ":gpkv": getGsiPkExpenseTags(userId, ExpenseStatus.ENABLE, belongsTo, logger),
+        ":gpkv": getGsiPkExpenseTags(userId, status, belongsTo, logger),
         ":gskv1": getGsiSkDetailsExpenseDate(searchStartDate, logger),
         ":gskv2": getGsiSkDetailsExpenseDate(searchEndDate, logger),
         ":gbtv": getGsiAttrDetailsBelongsTo(belongsTo, logger),
@@ -113,9 +113,12 @@ const queryExpenseTags = async (startYear: number, endYear: number, belongsTo: E
     });
 
     logger.info("retrieved [", dbItemTags.length, "] expense tags with status =", status, ", startYear =", startYear, ", endYear =", endYear);
-    return dbItemTags.flatMap((itemTag) => itemTag.details.tags);
+    return dbItemTags.map((itemTag) => itemTag.PK);
   });
 
-  const listOfList = await Promise.all(promises);
-  return listOfList.flat();
+  const listOfKeyList = await Promise.all(promises);
+  const dbKeys = listOfKeyList.flat().map((k) => ({ PK: k }));
+  const projectExpression = "details.tags";
+  const items = await dbutil.batchGet<DbItemExpense<DbTagsType>>(dbKeys, ExpenseTableName, { ProjectionExpression: projectExpression }, logger);
+  return items.flatMap((itm) => itm.details.tags);
 };

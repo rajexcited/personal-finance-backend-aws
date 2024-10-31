@@ -29,14 +29,15 @@ export const getValidatedRequestToUpdatePurchaseDetails = async (
     invalidFields.push({ path: PurchaseRequestResourcePath.VERIFIED_TIMESTAMP, message: ErrorMessage.INCORRECT_FORMAT });
   }
   if (!validations.isValidUuid(req.purchaseTypeId)) {
-    invalidFields.push({ path: PurchaseRequestResourcePath.PURCHASE_TYPE, message: ErrorMessage.INCORRECT_FORMAT });
+    const err = req.purchaseTypeId ? ErrorMessage.INCORRECT_FORMAT : ErrorMessage.MISSING_VALUE;
+    invalidFields.push({ path: PurchaseRequestResourcePath.PURCHASE_TYPE, message: err });
   }
-  if (!validations.isValidUuid(req.paymentAccountId)) {
+  if (req.paymentAccountId && !validations.isValidUuid(req.paymentAccountId)) {
     invalidFields.push({ path: PurchaseRequestResourcePath.PAYMENT_ACCOUNT, message: ErrorMessage.INCORRECT_FORMAT });
   }
 
   req.items = req.items || [];
-  await validateItems(req.items, invalidFields, logger);
+  validateItems(req.items, invalidFields, logger);
 
   logger.info("invalidFields =", invalidFields);
   if (invalidFields.length > 0) {
@@ -53,16 +54,12 @@ export const getValidatedRequestToUpdatePurchaseDetails = async (
     throw new ValidationError([{ path: PurchaseRequestResourcePath.PAYMENT_ACCOUNT, message: ErrorMessage.INCORRECT_VALUE }]);
   }
 
-  validateItemPurchaseExists(req.items, userId, logger);
+  validateItemPurchaseTypeExists(req.items, userId, logger);
 
   return req;
 };
 
-export const validateItems = async (
-  purchaseItemDetailsList: ApiResourcePurchaseItemDetails[],
-  invalidFields: InvalidField[],
-  _logger: LoggerBase
-) => {
+export const validateItems = (purchaseItemDetailsList: ApiResourcePurchaseItemDetails[], invalidFields: InvalidField[], _logger: LoggerBase) => {
   const logger = getLogger("validateItems", _logger);
 
   const invalidPrchItms = purchaseItemDetailsList.filter((ei) => {
@@ -82,7 +79,7 @@ export const validateItems = async (
   }
 };
 
-const validateItemPurchaseExists = async (items: ApiResourcePurchaseItemDetails[], userId: string, _logger: LoggerBase) => {
+const validateItemPurchaseTypeExists = async (items: ApiResourcePurchaseItemDetails[], userId: string, _logger: LoggerBase) => {
   const logger = getLogger("arePurchaseTypeValid", _logger);
   let isValidPurchaseType = true;
   for (let i = 0; i < items.length; i++) {

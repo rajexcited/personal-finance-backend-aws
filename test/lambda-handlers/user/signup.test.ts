@@ -1,5 +1,5 @@
 import { userSignup } from "../../../src/lambda-handlers";
-import { getMockApiGatewayProxyEvent, mockContext, spyConsole } from "../../mock";
+import { getMockApiGatewayProxyEvent, getMockContext, spyConsole } from "../../mock";
 import { MethodType } from "../../../src/lambda-handlers/apigateway";
 
 describe("signup", () => {
@@ -17,7 +17,13 @@ describe("signup", () => {
       firstName: "2 first name",
       lastName: "2 last name",
     };
-    const mockEvent = getMockApiGatewayProxyEvent(MethodType.POST, req);
-    await userSignup(mockEvent, mockContext);
+    const mockEvent = getMockApiGatewayProxyEvent({
+      method: MethodType.POST,
+      body: req,
+    });
+
+    const context = getMockContext();
+    console.log("context =", context);
+    await userSignup(mockEvent, context);
   });
 });

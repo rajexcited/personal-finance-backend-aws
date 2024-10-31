@@ -18,11 +18,14 @@ export class DomainCfConstruct extends Construct {
   constructor(scope: Construct, id: string, props: DomainCfProps) {
     super(scope, id);
 
-    const originAccessIdentity = new cf.OriginAccessIdentity(this, "OriginAccessIdentityConstruct");
-    props.uiBucket.grantRead(originAccessIdentity);
+    // const originAccessControl = new cf.S3OriginAccessControl(this, "OriginAccessControlConstruct", {
 
-    const defaultBucketOrigin = new cfo.S3Origin(props.uiBucket, {
-      originAccessIdentity: originAccessIdentity,
+    // });
+    // props.uiBucket.grantRead(originAccessIdentity);
+
+    const defaultBucketOrigin = cfo.S3BucketOrigin.withOriginAccessControl(props.uiBucket, {
+      // originAccessIdentity: originAccessIdentity,
+      // originAccessCont:originAccessControl
       originId: "s3-static-ui",
     });
 

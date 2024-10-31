@@ -2,20 +2,15 @@ import {
   S3Client,
   GetObjectCommand,
   CopyObjectCommand,
-  PutObjectCommand,
-  DeleteObjectCommand,
-  DeleteObjectsCommand,
   ObjectAttributes,
   GetObjectAttributesCommand,
   HeadObjectCommand,
   PutObjectTaggingCommand,
   DeleteObjectTaggingCommand,
 } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { StopWatch } from "stopwatch-node";
 import { LoggerBase, getLogger } from "./logger";
 import { _logger } from "./base-config";
-import * as datetime from "date-and-time";
 
 const _s3Client = new S3Client({});
 const __logger = getLogger("s3util", _logger);
@@ -125,7 +120,7 @@ export const copyObject = async (
     const copyCmd = new CopyObjectCommand({
       Bucket: destinationBucketName || sourceBucketName,
       Key: destinationKey,
-      CopySource: `${sourceBucketName}/${sourceKey}`,
+      CopySource: `/${sourceBucketName}/${sourceKey}`,
     });
     logger.info("copy command =", copyCmd);
 

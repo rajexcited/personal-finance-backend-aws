@@ -12,8 +12,6 @@ import { getAuthorizeUser } from "../user";
 import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils, validations } from "../utils";
 import {
   CONFIG_DESCRIPTION_MAX_LENGTH,
-  CONFIG_NAME_VALUE_MAX_LENGTH,
-  CONFIG_NAME_VALUE_MIN_LENGTH,
   ConfigResourcePath,
   ErrorMessage,
   MAX_ALLOWED_TAGS,
@@ -30,6 +28,7 @@ import { ApiConfigTypeResource, DbConfigTypeDetails, DbItemConfigType } from "./
 import { v4 as uuidv4 } from "uuid";
 import { getCurrencyByCountry } from "../settings";
 import { CountryCurrencyRelation } from "../settings/currency-profile";
+import { isValidConfigName, isValidConfigValue } from "./validate";
 
 const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("addUpdateDetails", _logger);
@@ -133,11 +132,13 @@ const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, 
 
   const belongsTo = getValidatedBelongsTo(event, logger);
   const invalidFields: InvalidField[] = [];
-  if (!validations.isValidName(req.name, CONFIG_NAME_VALUE_MAX_LENGTH, CONFIG_NAME_VALUE_MIN_LENGTH)) {
-    invalidFields.push({ path: ConfigResourcePath.NAME, message: ErrorMessage.INCORRECT_FORMAT });
+  if (!isValidConfigName(req.name, belongsTo)) {
+    const msg = req.name ? ErrorMessage.INCORRECT_FORMAT : ErrorMessage.MISSING_VALUE;
+    invalidFields.push({ path: ConfigResourcePath.NAME, message: msg });
   }
-  if (!validations.isValidName(req.value, CONFIG_NAME_VALUE_MAX_LENGTH, CONFIG_NAME_VALUE_MIN_LENGTH)) {
-    invalidFields.push({ path: ConfigResourcePath.VALUE, message: ErrorMessage.INCORRECT_FORMAT });
+  if (!isValidConfigValue(req.value, belongsTo)) {
+    const msg = req.name ? ErrorMessage.INCORRECT_FORMAT : ErrorMessage.MISSING_VALUE;
+    invalidFields.push({ path: ConfigResourcePath.VALUE, message: msg });
   }
   if (req.status !== ConfigStatus.ENABLE && req.status !== ConfigStatus.DISABLE && req.status !== ConfigStatus.DELETED) {
     invalidFields.push({ path: ConfigResourcePath.STATUS, message: ErrorMessage.INCORRECT_VALUE });

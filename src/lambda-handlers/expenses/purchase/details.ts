@@ -4,7 +4,7 @@ import { DbDetailsReceipt } from "../../receipts";
 import { AuthorizeUser } from "../../user";
 import { dbutil, getLogger, LoggerBase, utils } from "../../utils";
 import { ExpenseBelongsTo, ExpenseStatus } from "../base-config";
-import { DbItemExpense, ExpenseRecordType, ExpenseTableName, getFormattedExpenseDate, getGsiPkDetails } from "../db-config";
+import { DbItemExpense, ExpenseRecordType, ExpenseTableName, getGsiPkDetails } from "../db-config";
 import { retrieveDbExpenseDetails } from "../db-config/details";
 import { ApiResourcePurchaseDetails } from "./api-resource";
 import { convertPurchaseDbToApiResource } from "./converter";
@@ -49,8 +49,6 @@ const putDbPurchase = (
 ) => {
   const logger = getLogger("putDbPurchase", _logger);
 
-  let formattedPurchaseDate = getFormattedExpenseDate(req.purchaseDate, logger);
-
   const auditDetails = utils.updateAuditDetailsFailIfNotExists(dbItem?.details.auditDetails, authUser);
   if (!auditDetails) {
     throw new InvalidError("auditDetails is null");
@@ -59,7 +57,7 @@ const putDbPurchase = (
   const apiToDbDetails: DbDetailsPurchase = {
     id: purchaseId,
     billName: req.billName,
-    purchaseDate: formattedPurchaseDate,
+    purchaseDate: req.purchaseDate,
     verifiedTimestamp: req.verifiedTimestamp,
     status: ExpenseStatus.ENABLE,
     amount: req.amount,
