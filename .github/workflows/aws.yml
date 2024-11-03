@@ -54,6 +54,11 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - name: print environment to troubleshoot
+      env:
+        VARS_JSON: ${{ toJSON(vars) }}
+      run: echo var context = "${VARS_JSON}"
+
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
