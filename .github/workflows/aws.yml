@@ -59,7 +59,7 @@ jobs:
       with:
         #audience: sts.amazonaws.com default value 
         role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-        aws-region: ${{ env.AWS_REGION }}
+        aws-region: ${{ vars.AWS_REGION }}
         role-session-name: deployCdkSession
 
     - name: Synthesize
@@ -68,7 +68,7 @@ jobs:
         cdk_subcommand: 'synth'
         actions_comment: true
       env:
-        ENV: ${{ env.ENV }}
+        ENV: ${{ vars.ENV }}
         
     - name: Stack Diff
       uses: youyo/aws-cdk-github-actions@v2
@@ -76,7 +76,7 @@ jobs:
         cdk_subcommand: 'diff'
         actions_comment: true
       env:
-        ENV: ${{ env.ENV }}
+        ENV: ${{ vars.ENV }}
       
     - name: Stack Deploy
       uses: youyo/aws-cdk-github-actions@v2
@@ -85,4 +85,4 @@ jobs:
         actions_comment: true
         cdk_args: '--require-approval never'
       env:
-        ENV: ${{ env.ENV }}
+        ENV: ${{ vars.ENV }}
