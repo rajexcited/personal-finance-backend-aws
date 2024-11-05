@@ -93,16 +93,23 @@ jobs:
       #     echo vars context = "${VARS_JSON}"
       #     echo secrets context = "${SECRETS_JSON}"
       #     echo env context = "${ENV_JSON}"
-      - uses: actions/cache@v4
-        with:
-          path: bin
-          fail-on-cache-miss: true
-          key: ${{ runner.os }}-node-${{ github.sha }}
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node Latest
+        uses: actions/setup-node@v4
         with:
           node-version: "latest"
           cache: "npm"
-      - name: Stack Deploy
+      - run: npm ci
+      - run: npm run build
+      - name: cdk diff
+        uses: youyo/aws-cdk-github-actions@v2
+        with:
+          cdk_subcommand: "diff"
+          actions_comment: false
+        env:
+          INFRA_ENV: ${{ vars.INFRA_ENV }}
+      - name: cdk deploy
         uses: youyo/aws-cdk-github-actions@v2
         with:
           cdk_subcommand: "deploy"
