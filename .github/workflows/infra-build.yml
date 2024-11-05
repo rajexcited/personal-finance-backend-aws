@@ -76,26 +76,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Setup Node Latest
+        uses: actions/setup-node@v4
         with:
           node-version: "latest"
           cache: "npm"
       - run: npm ci
       - run: npm run build
-      - run: pwd
-      - run: ls -lrt
-      - uses: actions/cache@v4
-        with:
-          key: ${{ runner.os }}-node-${{ github.sha }}
-          path: |
-            ./bin
-            ./lib
-            ./test
-            ./package*
-            ./cdk.json
-            ./jest.config.json
-            ./tsconfig.json
-      - run: ls -lrt ~/
 
   unittest:
     name: Unit Tests
@@ -103,17 +90,10 @@ jobs:
     needs:
       - build
     steps:
-      - uses: actions/cache@v4
-        id: codecache
-        with:
-          path: bin
-          key: ${{ runner.os }}-node-${{ github.sha }}
-          restore-keys: ${{ runner.os }}-node-${{ github.sha }}
-      - if: steps.codecache.outputs.cache-hit != 'true'
-        run: |
-          echo checked out code not found. exiting
-          exit 1
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node Latest
+        uses: actions/setup-node@v4
         with:
           node-version: "latest"
           cache: "npm"
@@ -125,12 +105,10 @@ jobs:
     needs:
       - build
     steps:
-      - uses: actions/cache@v4
-        with:
-          path: bin
-          fail-on-cache-miss: true
-          key: ${{ runner.os }}-node-${{ github.sha }}
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node Latest
+        uses: actions/setup-node@v4
         with:
           node-version: "latest"
           cache: "npm"
@@ -165,12 +143,10 @@ jobs:
       - synth
       - awsauth
     steps:
-      - uses: actions/cache@v4
-        with:
-          path: bin
-          fail-on-cache-miss: true
-          key: ${{ runner.os }}-node-${{ github.sha }}
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node Latest
+        uses: actions/setup-node@v4
         with:
           node-version: "latest"
           cache: "npm"
