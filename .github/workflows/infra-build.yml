@@ -85,15 +85,15 @@ jobs:
       - uses: actions/cache@v4
         id: codecache
         with:
-          path: |
-            bin
-            lib
-            test
-            package*
-            cdk.json
-            jest.config.json
-            tsconfig.json
           key: ${{ runner.os }}-node-${{ github.sha }}
+          path: |
+            ./bin
+            ./lib
+            ./test
+            ./package*
+            ./cdk.json
+            ./jest.config.json
+            ./tsconfig.json
 
   unittest:
     name: Unit Tests
@@ -106,6 +106,7 @@ jobs:
         with:
           path: bin
           key: ${{ runner.os }}-node-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-node-${{ github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: "latest"
