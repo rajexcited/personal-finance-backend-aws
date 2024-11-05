@@ -140,6 +140,7 @@ jobs:
       - build
       - unittest
       - synth
+    environment: test
     permissions:
       id-token: write
       contents: read
