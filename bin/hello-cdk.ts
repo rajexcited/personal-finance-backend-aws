@@ -1,10 +1,16 @@
 #!/usr/bin/env node
-import 'source-map-support/register';
-import * as cdk from 'aws-cdk-lib';
-import { HelloCdkStack } from '../lib/hello-cdk-stack';
+import "source-map-support/register";
+import * as cdk from "aws-cdk-lib";
+import { HelloCdkStack } from "../lib/hello-cdk-stack";
 
 const app = new cdk.App();
-new HelloCdkStack(app, 'HelloCdkStack', {
+const infraEnv = process.env.INFRA_ENV;
+
+if (!infraEnv) {
+  throw new Error("infra env not provided");
+}
+
+const stack1 = new HelloCdkStack(app, "HelloCdkStack", {
   /* If you don't specify 'env', this stack will be environment-agnostic.
    * Account/Region-dependent features and context lookups will not work,
    * but a single synthesized template can be deployed anywhere. */
@@ -18,4 +24,12 @@ new HelloCdkStack(app, 'HelloCdkStack', {
   // env: { account: '123456789012', region: 'us-east-1' },
 
   /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
+  infraEnv: infraEnv,
 });
+
+const tags = [
+  { key: "environment", value: infraEnv },
+  { key: "app", value: "hellocdk" },
+];
+
+tags.forEach(({ key, value }) => cdk.Tags.of(app).add(key, value));
