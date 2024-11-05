@@ -82,8 +82,9 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run build
+      - run: pwd
+      - run: ls -lrt
       - uses: actions/cache@v4
-        id: codecache
         with:
           key: ${{ runner.os }}-node-${{ github.sha }}
           path: |
@@ -94,6 +95,8 @@ jobs:
             ./cdk.json
             ./jest.config.json
             ./tsconfig.json
+      - run: ls -lrt manifest.txt
+      - run: ls -lrt ~/manifest.txt
 
   unittest:
     name: Unit Tests
@@ -107,14 +110,14 @@ jobs:
           path: bin
           key: ${{ runner.os }}-node-${{ github.sha }}
           restore-keys: ${{ runner.os }}-node-${{ github.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "latest"
-          cache: "npm"
       - if: steps.codecache.outputs.cache-hit != 'true'
         run: |
           echo checked out code not found. exiting
           exit 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "latest"
+          cache: "npm"
       - run: npm run test
 
   synth:
