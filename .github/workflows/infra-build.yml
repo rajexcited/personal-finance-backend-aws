@@ -97,12 +97,8 @@ jobs:
         with:
           node-version: "latest"
           cache: "npm"
-      - run: ls -lrt
-      - run: ls -lrt bin
-      - run: ls -lrt lib
-      - run: ls -lrt test
       - run: npm ci
-      # - run: npm run build
+      - run: npm run build
       - run: npm run test
 
   synth:
@@ -118,6 +114,8 @@ jobs:
         with:
           node-version: "latest"
           cache: "npm"
+      - run: npm ci
+      - run: npm run build
       - uses: youyo/aws-cdk-github-actions@v2
         with:
           cdk_subcommand: "synth"
@@ -156,6 +154,8 @@ jobs:
         with:
           node-version: "latest"
           cache: "npm"
+      - run: npm ci
+      - run: npm run build
       - uses: youyo/aws-cdk-github-actions@v2
         with:
           cdk_subcommand: "diff"
