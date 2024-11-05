@@ -95,8 +95,7 @@ jobs:
             ./cdk.json
             ./jest.config.json
             ./tsconfig.json
-      - run: ls -lrt manifest.txt
-      - run: ls -lrt ~/manifest.txt
+      - run: ls -lrt ~/
 
   unittest:
     name: Unit Tests
