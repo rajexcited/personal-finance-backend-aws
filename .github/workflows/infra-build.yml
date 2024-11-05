@@ -97,6 +97,12 @@ jobs:
         with:
           node-version: "latest"
           cache: "npm"
+      - run: ls -lrt
+      - run: ls -lrt bin
+      - run: ls -lrt lib
+      - run: ls -lrt test
+      - run: npm ci
+      # - run: npm run build
       - run: npm run test
 
   synth:
