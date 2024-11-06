@@ -32,7 +32,7 @@ on:
     workflows: [Test CDK Deploy]
     types: completed
     branches: test-pipeline
-  workflow_dispatch:
+  # workflow_dispatch:
 
   # permissions:
   #   id-token: write
