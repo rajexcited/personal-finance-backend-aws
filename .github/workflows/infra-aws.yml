@@ -118,7 +118,9 @@ jobs:
     #   id-token: write
     #   contents: read
     steps:
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: configure aws credential
+        uses: aws-actions/configure-aws-credentials@v4
+        id: awscred
         with:
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
@@ -132,6 +134,10 @@ jobs:
           echo vars context = "${VARS_JSON}"
           echo secrets context = "${SECRETS_JSON}"
           echo env context = "${ENV_JSON}"
+    outputs:
+      AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ env.AWS_SESSION_TOKEN }}
 
   diff:
     name: Stack Differences
@@ -165,6 +171,9 @@ jobs:
           actions_comment: true
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
+          AWS_ACCESS_KEY_ID: ${{ needs.awsauth.outputs.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ needs.awsauth.outputs.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ needs.awsauth.outputs.AWS_SESSION_TOKEN }}
 
   deploy:
     name: Deploy
@@ -191,6 +200,9 @@ jobs:
           cdk_args: "--require-approval never"
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
+          AWS_ACCESS_KEY_ID: ${{ needs.awsauth.outputs.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ needs.awsauth.outputs.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ needs.awsauth.outputs.AWS_SESSION_TOKEN }}
 
   destroy:
     name: Destroy
@@ -217,3 +229,6 @@ jobs:
           # cdk_args: "--require-approval never"
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
+          AWS_ACCESS_KEY_ID: ${{ needs.awsauth.outputs.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ needs.awsauth.outputs.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ needs.awsauth.outputs.AWS_SESSION_TOKEN }}
