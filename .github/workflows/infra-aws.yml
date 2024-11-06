@@ -24,14 +24,13 @@
 #    See the documentation for each action used below for the recommended IAM policies for this IAM user,
 #    and best practices on handling the access key credentials.
 
-name: Test CDK Build
+name: Test CDK AWS
 
 # list of trigger events https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows
 on:
-  # push:
-  #   branches:
-  #     - test-pipeline
-  workflow_dispatch:
+  push:
+    branches:
+      - test-pipeline
 
 concurrency:
   group: build-test
@@ -52,25 +51,6 @@ concurrency:
 #   contents: read
 
 jobs:
-  # oidc_debug_test:
-  #   permissions:
-  #     contents: read
-  #     id-token: write
-  #   runs-on: ubuntu-latest
-  #   name: A test of the oidc debugger
-  #   steps:
-  #     - name: Checkout actions-oidc-debugger
-  #       uses: actions/checkout@v3
-  #       with:
-  #         repository: github/actions-oidc-debugger
-  #         ref: main
-  #         token: ${{ github.token }}
-  #         path: ./.github/actions/actions-oidc-debugger
-  #     - name: Debug OIDC Claims
-  #       uses: ./.github/actions/actions-oidc-debugger
-  #       with:
-  #         audience: '${{ github.server_url }}/${{ github.repository_owner }}'
-
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -109,15 +89,6 @@ jobs:
       - build
     environment: test
     steps:
-      # - name: print environment to troubleshoot
-      #   env:
-      #     VARS_JSON: ${{ toJSON(vars) }}
-      #     SECRETS_JSON: ${{ toJSON(secrets) }}
-      #     ENV_JSON: ${{ toJSON(env) }}
-      #   run: |
-      #     echo vars context = "${VARS_JSON}"
-      #     echo secrets context = "${SECRETS_JSON}"
-      #     echo env context = "${ENV_JSON}"
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Node Latest
@@ -135,44 +106,96 @@ jobs:
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
 
-  # awsauth:
-  #   name: Configure AWS credentials
-  #   runs-on: ubuntu-latest
-  #   needs:
-  #     - build
-  #     - unittest
-  #     - synth
-  #   environment: test
-  #   permissions:
-  #     id-token: write
-  #     contents: read
-  #   steps:
-  #     - uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #         aws-region: ${{ vars.AWS_REGION }}
-  #         role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-  #         role-session-name: cdkSession
+  awsauth:
+    name: Configure AWS credentials
+    runs-on: ubuntu-latest
+    needs:
+      - build
+      - unittest
+      - synth
+    environment: test
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: cdkSession
 
-  # diff:
-  #   name: Stack Differences
-  #   runs-on: ubuntu-latest
-  #   needs:
-  #     - synth
-  #     - awsauth
-  #   environment: test
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #     - name: Setup Node Latest
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: "latest"
-  #         cache: "npm"
-  #     - run: npm ci
-  #     - run: npm run build
-  #     - uses: youyo/aws-cdk-github-actions@v2
-  #       with:
-  #         cdk_subcommand: "diff"
-  #         actions_comment: true
-  #       env:
-  #         INFRA_ENV: ${{ vars.INFRA_ENV }}
+  diff:
+    name: Stack Differences
+    runs-on: ubuntu-latest
+    needs:
+      - synth
+      - awsauth
+    environment: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node Latest
+        uses: actions/setup-node@v4
+        with:
+          node-version: "latest"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build
+      - uses: youyo/aws-cdk-github-actions@v2
+        with:
+          cdk_subcommand: "diff"
+          actions_comment: true
+        env:
+          INFRA_ENV: ${{ vars.INFRA_ENV }}
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs:
+      - awsauth
+      - diff
+    environment: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node Latest
+        uses: actions/setup-node@v4
+        with:
+          node-version: "latest"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build
+      - name: cdk deploy
+        uses: youyo/aws-cdk-github-actions@v2
+        with:
+          cdk_subcommand: "deploy"
+          actions_comment: true
+          cdk_args: "--require-approval never"
+        env:
+          INFRA_ENV: ${{ vars.INFRA_ENV }}
+
+  destroy:
+    name: Destroy
+    runs-on: ubuntu-latest
+    needs:
+      - awsauth
+      - deploy
+    environment: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node Latest
+        uses: actions/setup-node@v4
+        with:
+          node-version: "latest"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build
+      - name: cdk deploy
+        uses: youyo/aws-cdk-github-actions@v2
+        with:
+          cdk_subcommand: "destroy"
+          actions_comment: true
+          # cdk_args: "--require-approval never"
+        env:
+          INFRA_ENV: ${{ vars.INFRA_ENV }}
