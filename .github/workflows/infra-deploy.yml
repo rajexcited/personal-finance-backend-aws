@@ -28,6 +28,9 @@ name: Test CDK Deploy
 
 # list of trigger events https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows
 on:
+  push:
+    branches:
+      - test-pipeline
   workflow_run:
     workflows: [Test CDK Build]
     types: completed
