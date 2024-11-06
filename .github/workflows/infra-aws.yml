@@ -132,6 +132,15 @@ jobs:
       - awsauth
     environment: test
     steps:
+      - name: print environment to troubleshoot
+        env:
+          VARS_JSON: ${{ toJSON(vars) }}
+          SECRETS_JSON: ${{ toJSON(secrets) }}
+          ENV_JSON: ${{ toJSON(env) }}
+        run: |
+          echo vars context = "${VARS_JSON}"
+          echo secrets context = "${SECRETS_JSON}"
+          echo env context = "${ENV_JSON}"
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Node Latest
