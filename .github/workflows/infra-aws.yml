@@ -46,9 +46,9 @@ concurrency:
 #CONTAINER_NAME: MY_CONTAINER_NAME           # set this to the name of the container in the
 # containerDefinitions section of your task definition
 
-# permissions:
-#   id-token: write
-#   contents: read
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   build:
@@ -114,15 +114,24 @@ jobs:
       - unittest
       - synth
     environment: test
-    permissions:
-      id-token: write
-      contents: read
+    # permissions:
+    #   id-token: write
+    #   contents: read
     steps:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: cdkSession
+      - name: print environment to troubleshoot
+        env:
+          VARS_JSON: ${{ toJSON(vars) }}
+          SECRETS_JSON: ${{ toJSON(secrets) }}
+          ENV_JSON: ${{ toJSON(env) }}
+        run: |
+          echo vars context = "${VARS_JSON}"
+          echo secrets context = "${SECRETS_JSON}"
+          echo env context = "${ENV_JSON}"
 
   diff:
     name: Stack Differences
