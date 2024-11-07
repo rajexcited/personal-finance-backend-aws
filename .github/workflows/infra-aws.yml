@@ -152,6 +152,23 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: cdkSession
+      - name: aws cred outputs
+        run: |
+          echo CREDS_AWS_ACCESS_KEY_ID: "${CREDS_AWS_ACCESS_KEY_ID}"
+          echo CREDS_AWS_SECRET_ACCESS_KEY: "${CREDS_AWS_SECRET_ACCESS_KEY}"
+          echo CREDS_AWS_SESSION_TOKEN: "${CREDS_AWS_SESSION_TOKEN}"
+          echo CREDS_AWS_ACCOUNT_ID: "${CREDS_AWS_ACCOUNT_ID}"
+          echo outputs json: "${AWS_CREDS_JSON}"
+          echo AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
+          echo AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
+          echo AWS_SESSION_TOKEN: "${AWS_SESSION_TOKEN}"
+          echo AWS_ACCOUNT_ID: "${AWS_ACCOUNT_ID}"
+        env:
+          CREDS_AWS_ACCESS_KEY_ID: ${{ steps.awscred.outputs.aws-access-key-id }}
+          CREDS_AWS_SECRET_ACCESS_KEY: ${{ steps.awscred.outputs.aws-secret-access-key }}
+          CREDS_AWS_SESSION_TOKEN: ${{ steps.awscred.outputs.aws-session-token }}
+          CREDS_AWS_ACCOUNT_ID: ${{ steps.awscred.outputs.aws-account-id }}
+          AWS_CREDS_JSON: ${{ toJson(steps.awscred.outputs) }}
       - name: cdk deploy
         uses: youyo/aws-cdk-github-actions@v2
         with:
@@ -160,9 +177,9 @@ jobs:
           cdk_args: "--require-approval never"
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
-          AWS_ACCESS_KEY_ID: ${{ steps.awscred.outputs.aws-access-key-id }}
-          AWS_SECRET_ACCESS_KEY: ${{ steps.awscred.outputs.aws-secret-access-key }}
-          AWS_SESSION_TOKEN: ${{ steps.awscred.outputs.aws-session-token }}
+          # AWS_ACCESS_KEY_ID: ${{ steps.awscred.outputs.aws-access-key-id }}
+          # AWS_SECRET_ACCESS_KEY: ${{ steps.awscred.outputs.aws-secret-access-key }}
+          # AWS_SESSION_TOKEN: ${{ steps.awscred.outputs.aws-session-token }}
 
   destroy:
     name: Destroy
@@ -195,6 +212,6 @@ jobs:
           # cdk_args: "--require-approval never"
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
-          AWS_ACCESS_KEY_ID: ${{ steps.awscred.outputs.aws-access-key-id }}
-          AWS_SECRET_ACCESS_KEY: ${{ steps.awscred.outputs.aws-secret-access-key }}
-          AWS_SESSION_TOKEN: ${{ steps.awscred.outputs.aws-session-token }}
+          # AWS_ACCESS_KEY_ID: ${{ steps.awscred.outputs.aws-access-key-id }}
+          # AWS_SECRET_ACCESS_KEY: ${{ steps.awscred.outputs.aws-secret-access-key }}
+          # AWS_SESSION_TOKEN: ${{ steps.awscred.outputs.aws-session-token }}
