@@ -1,9 +1,11 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as sqs from "aws-cdk-lib/aws-sqs";
+import { AwsInfraEnvironment } from "./aws-infra-env.enum";
 
 interface HelloCdkStackProps extends cdk.StackProps {
-  infraEnv: string;
+  infraEnv: AwsInfraEnvironment;
+  appId: string;
 }
 
 export class HelloCdkStack extends cdk.Stack {
@@ -14,7 +16,7 @@ export class HelloCdkStack extends cdk.Stack {
 
     // example resource
     const queue = new sqs.Queue(this, "HelloCdkQueue", {
-      queueName: ["hellocdk", "my", "first", props.infraEnv, "sqs"].join("-"),
+      queueName: ["hellocdk", "my", "first", props.appId, props.infraEnv, "sqs"].join("-"),
       visibilityTimeout: cdk.Duration.seconds(300),
     });
   }
