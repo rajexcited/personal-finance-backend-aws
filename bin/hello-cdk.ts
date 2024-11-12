@@ -13,7 +13,7 @@ const stack1 = new HelloCdkStack(app, "HelloCdkStack", {
    * Account/Region-dependent features and context lookups will not work,
    * but a single synthesized template can be deployed anywhere. */
   synthesizer: new cdk.DefaultStackSynthesizer({
-    qualifier: `${appId}-${infraEnv}`,
+    qualifier: `${appId}${infraEnv}`,
   }),
 
   /* Uncomment the next line to specialize this stack for the AWS Account
