@@ -96,41 +96,11 @@ jobs:
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
 
-  diff:
-    name: Stack Differences
-    runs-on: ubuntu-latest
-    needs:
-      - synth
-    environment: test
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node Latest
-        uses: actions/setup-node@v4
-        with:
-          node-version: "latest"
-          cache: "npm"
-      - run: npm ci
-      - run: npm run build
-      - name: configure aws credential
-        uses: aws-actions/configure-aws-credentials@v4
-        id: awscred
-        with:
-          aws-region: ${{ vars.AWS_REGION }}
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          role-session-name: cdkSession
-      - uses: youyo/aws-cdk-github-actions@v2
-        with:
-          cdk_subcommand: "diff"
-          actions_comment: true
-        env:
-          INFRA_ENV: ${{ vars.INFRA_ENV }}
-
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
     needs:
-      - diff
+      - synth
     environment: test
     steps:
       - name: Checkout
