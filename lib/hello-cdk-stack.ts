@@ -183,10 +183,15 @@ export class HelloCdkStack extends cdk.Stack {
       passthroughBehavior: apigateway.PassthroughBehavior.NEVER,
     });
 
+    const reqParams: Record<string, boolean> = { "method.request.path.apitype": true };
+    if (method === HttpMethod.GET) {
+      reqParams["method.request.querystring.qry1"] = false;
+    }
+
     const resourceMethod = resource.addMethod(String(method), lambdaIntegration, {
       authorizationType: apigateway.AuthorizationType.CUSTOM,
       authorizer: this.authorizer,
-      requestParameters: { "method.request.path.apitype": true },
+      requestParameters: reqParams,
       requestValidatorOptions: {
         validateRequestParameters: true,
       },
