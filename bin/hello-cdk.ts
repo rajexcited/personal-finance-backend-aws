@@ -3,6 +3,8 @@ import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
 import { HelloCdkStack } from "../lib/hello-cdk-stack";
 import { getValidAwsInfraEnvironment } from "../lib/aws-infra-env.enum";
+import { buildResourceName } from "../lib/utils";
+import { AwsResourceType } from "../lib/props-type";
 
 const app = new cdk.App();
 const infraEnv = getValidAwsInfraEnvironment();
@@ -24,7 +26,7 @@ const stack1 = new HelloCdkStack(app, "HelloCdkStack", {
   /* Uncomment the next line if you know exactly what Account and Region you
    * want to deploy the stack to. */
   // env: { account: '123456789012', region: 'us-east-1' },
-
+  stackName: buildResourceName(["hello", "cdk"], AwsResourceType.Stack, { appId, infraEnv }),
   /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
   infraEnv: infraEnv,
   appId: appId,

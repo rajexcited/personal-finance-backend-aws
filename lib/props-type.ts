@@ -21,4 +21,5 @@ export enum AwsResourceType {
   CloudFrontFunction = "cf-function",
   CftOutput = "cft-output",
   Sqs = "sqs",
+  Stack = "stack",
 }
