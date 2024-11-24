@@ -9,6 +9,7 @@ export enum AwsResourceType {
   Dynamodb = "dynamodb",
   GlobalSecondaryIndex = "gsi",
   S3Bucket = "s3-bucket",
+  BucketDeployment = "bucket-deploy",
   Lambda = "lambda-func",
   LambdaLayer = "lambda-layer",
   SecretManager = "secret",

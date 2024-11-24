@@ -60,7 +60,8 @@ export class HelloCdkStack extends cdk.Stack {
     });
     this.databucket = bucket;
 
-    const deployment = new s3Deploy.BucketDeployment(this, "DummyBucketDeployment", {
+    const bucketDeploymentConstructId = buildResourceName(["dummy"], AwsResourceType.BucketDeployment, props);
+    const deployment = new s3Deploy.BucketDeployment(this, bucketDeploymentConstructId, {
       destinationBucket: bucket,
       sources: [s3Deploy.Source.asset("data")],
     });

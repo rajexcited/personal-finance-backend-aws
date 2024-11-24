@@ -15,8 +15,8 @@ export const buildResourceName = (nameParts: string[], awsResourceType: AwsResou
   const sep = seperator || "-";
   const propsArray = props ? [props.appId, props.infraEnv] : [];
   const name = [...propsArray, ...nameParts, awsResourceType].join(sep);
-  if (awsResourceType === AwsResourceType.CftOutput) {
-    return camelCase(name);
+  if (awsResourceType === AwsResourceType.CftOutput || awsResourceType === AwsResourceType.BucketDeployment) {
+    return camelCase([...nameParts, "z" + propsArray.join(""), awsResourceType].join(sep));
   }
   return name;
 };
