@@ -89,11 +89,12 @@ export class HelloCdkStack extends cdk.Stack {
     };
     const secret = new secretsmanager.Secret(this, "DummySecret", {
       description: "dummy secret used",
-      secretName: buildResourceName(["dummy"], AwsResourceType.SecretManager, props),
+      secretName: buildResourceName(["dummy", "v2"], AwsResourceType.SecretManager, props),
       encryptionKey: kms.Alias.fromAliasName(this, "DummyKms", "alias/aws/secretsmanager"),
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       generateSecretString: generateConfig,
     });
+
     const secretLambdaFunction = new lambda.Function(this, "DummySecretRotationLambda", {
       functionName: buildResourceName(["dummy", "secret", "rotation"], AwsResourceType.Lambda, props),
       runtime: lambda.Runtime.NODEJS_LATEST,
