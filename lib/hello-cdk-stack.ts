@@ -24,10 +24,11 @@ export class HelloCdkStack extends cdk.Stack {
   private mydb: cdk.aws_dynamodb.Table;
   private databucket: cdk.aws_s3.Bucket;
   private authorizer: cdk.aws_apigateway.TokenAuthorizer;
+  private props: HelloCdkStackProps;
 
   constructor(scope: Construct, id: string, props: HelloCdkStackProps) {
     super(scope, id, props);
-
+    this.props = props;
     // The code that defines your stack goes here
 
     // example resource
@@ -164,7 +165,7 @@ export class HelloCdkStack extends cdk.Stack {
 
   private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: string) {
     const lambdaFunction = new lambda.Function(this, lambdaHandlerName + method + "FunctionConstruct", {
-      functionName: [lambdaHandlerName, method, "function"].join("-"),
+      functionName: buildResourceName([lambdaHandlerName, method], AwsResourceType.Lambda, this.props),
       runtime: lambda.Runtime.NODEJS_LATEST,
       handler: lambdaHandlerName,
       // asset path is relative to project
