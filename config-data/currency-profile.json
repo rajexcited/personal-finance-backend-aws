@@ -1,0 +1,36 @@
+{
+  "iso-3166-country-codes": "https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes#:~:text=ISO%203166%2D1%20numeric%20%E2%80%93%20three,systems%20using%20non%2DLatin%20scripts.",
+  "countries": [
+    {
+      "name": "United States of America",
+      "code": "USA"
+    },
+    {
+      "name": "India",
+      "code": "IND"
+    }
+  ],
+  "iso-4217-currency-codes": "https://en.wikipedia.org/wiki/ISO_4217",
+  "currencies": [
+    {
+      "name": "Dollar",
+      "code": "USD",
+      "symbol": "$"
+    },
+    {
+      "name": "Rupee",
+      "code": "INR",
+      "symbol": "₹"
+    }
+  ],
+  "relations": [
+    {
+      "countryCode": "USA",
+      "currencyCode": "USD"
+    },
+    {
+      "countryCode": "IND",
+      "currencyCode": "INR"
+    }
+  ]
+}

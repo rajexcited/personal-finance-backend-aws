@@ -1,0 +1,68 @@
+[
+  {
+    "name": "fee",
+    "value": "fee",
+    "tags": ["spending", "necessary"],
+    "description": "fee described as charges for some services / products, tax, administrative type. \n fee for tax filing, tax, service charges, stamps, unsetle claim, traffic violations, etc."
+  },
+  {
+    "name": "commute",
+    "value": "commute",
+    "tags": ["spending", "necessary", "wants"],
+    "description": "transportation related. \n gas, rent car, bus ticket, train ticket, flight ticket, etc."
+  },
+  {
+    "name": "food shopping",
+    "value": "food shopping",
+    "tags": ["spending", "necessary", "wants"],
+    "description": "all foods we can cook at home or barbequeue or eat raw. \n homecook food - daily lunch, dinner, snacks, breakfast, rice, flour, beans, pot luck, invite and eat during festivals / functions, barbeque supplies, buscuits, chips, farsaan, sweets, etc."
+  },
+  {
+    "name": "health",
+    "value": "health",
+    "tags": ["spending", "necessary"],
+    "description": "related to health visits and exercises. \n health checkup, doctor visit, medicine, vaccination, flue shots, emergency visit, urgent care, primary care, supplimentary, exercise, gym supplies, etc."
+  },
+  {
+    "name": "home stuffs",
+    "value": "home stuffs",
+    "tags": ["spending", "necessary", "wants"],
+    "description": "expenses for home utilities, maintainance, supplies. \n home décor, table, home supplies, fan, kitchen utensils, storage supplies, racks, bathroom supplies, cleaning supplies, table, sofa, blender, bulb, lamp etc."
+  },
+  {
+    "name": "investment",
+    "value": "investment",
+    "tags": ["growth", "necessary"],
+    "description": "for future earnings and improve skills. \n investing for future earnings, profits, retirement plans, insurances, cds, etc."
+  },
+  {
+    "name": "maintenance",
+    "value": "maintenance",
+    "tags": ["spending", "necessary"],
+    "description": "expenses happening at regular interval. It could be for life; common known assets are car, house, family, relatives. \n haircut, car service, car EMI, change car battery, rent, electricity, internet, phone bill, utilities, beauty parlour, car insurance,  etc."
+  },
+  {
+    "name": "nri transfer",
+    "value": "nri transfer",
+    "tags": ["spending", "necessary", "wants", "investment"],
+    "description": "sending money to india. Treat it as transfer so that I can tele with rupees and I will be careful for savings in USA and India. \n send money to india. This converted rupees can be used for mom, our visit, investments, shopping, etc."
+  },
+  {
+    "name": "hangout",
+    "value": "hangout",
+    "tags": ["spending", "necessary", "wants"],
+    "description": "expenses while having hangout with relative, friend, wife, mom, sister, etc. having date. \n eating outside, home delivery food, hanging out, visit places outside, drinking, potluck, get-to-gether, movies, pub, couple date, etc."
+  },
+  {
+    "name": "gift",
+    "value": "gift",
+    "tags": ["spending", "necessary", "wants"],
+    "description": "this is give away. Give gifts, celebrate festival, birthday, anniversaries, etc. Donation \n giving gift at birthdays, family functions, events, celebrations, giving gifts while trip to india, donate clothes, donate money, donate for social cause, donate to education, help someone in need, help friend, etc."
+  },
+  {
+    "name": "shopping",
+    "value": "shopping",
+    "tags": ["spending", "necessary", "wants"],
+    "description": "miscellanious shopping \n shop clothes, jackets, shoes, celebration decors, etc."
+  }
+]

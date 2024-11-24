@@ -1,0 +1,11 @@
+[
+  {
+    "shortName": "cash",
+    "accountIdNum": "cash",
+    "typeName": "savings",
+    "tags": [],
+    "description": "my cash, notes or coins stored",
+    "institutionName": "",
+    "status": "immutable"
+  }
+]

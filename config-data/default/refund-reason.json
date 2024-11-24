@@ -1,0 +1,38 @@
+[
+  {
+    "name": "price match",
+    "value": "price match",
+    "tags": [],
+    "description": "bought high price, than price is reduced. so received credit / refund by matching price"
+  },
+  {
+    "name": "costly",
+    "value": "costly",
+    "tags": [],
+    "description": "it is too pricey"
+  },
+  {
+    "name": "no deal",
+    "value": "no deal",
+    "tags": [],
+    "description": "returned item since there is no deal"
+  },
+  {
+    "name": "wanted to try",
+    "value": "wanted to try",
+    "tags": [],
+    "description": "hadn't intension to keep for longer, but wanted to try for few times and returned."
+  },
+  {
+    "name": "don't like",
+    "value": "don't like",
+    "tags": [],
+    "description": "returned due to unlikable"
+  },
+  {
+    "name": "bad quality",
+    "value": "bad quality",
+    "tags": [],
+    "description": "quality is not good. not worth the price."
+  }
+]

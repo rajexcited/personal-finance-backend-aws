@@ -9,6 +9,9 @@ import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as kms from "aws-cdk-lib/aws-kms";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
+import * as cf from "aws-cdk-lib/aws-cloudfront";
+import * as cfo from "aws-cdk-lib/aws-cloudfront-origins";
+import { CfnOutput } from "aws-cdk-lib";
 import { HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import { AwsInfraEnvironment } from "./aws-infra-env.enum";
 import { buildResourceName } from "./utils";
@@ -17,6 +20,29 @@ import { AwsResourceType } from "./props-type";
 interface HelloCdkStackProps extends cdk.StackProps {
   infraEnv: AwsInfraEnvironment;
   appId: string;
+}
+
+interface CfHeaderValue {
+  value: string;
+}
+
+interface CfRequest {
+  method: string;
+  uri: string;
+  querystring: Record<string, string>;
+  headers: Record<string, CfHeaderValue>;
+  cookies: Record<string, string>;
+}
+
+interface CfEvent {
+  request: CfRequest;
+}
+
+interface CfResponse {
+  statusCode: number;
+  statusDescription: string;
+  headers: Record<string, CfHeaderValue>;
+  body?: unknown;
 }
 
 export class HelloCdkStack extends cdk.Stack {
@@ -162,6 +188,91 @@ export class HelloCdkStack extends cdk.Stack {
     const deleteDetailsLambdaFunction = this.buildApi(apiResource, HttpMethod.DELETE, "deleteDetails");
     db.grantReadWriteData(deleteDetailsLambdaFunction);
     bucket.grantWrite(deleteDetailsLambdaFunction);
+
+    /*************************************************************************************************************************************************
+     *************************************************************************************************************************************************
+     */
+
+    const uiBucket = new s3.Bucket(this, "UIStaticBucketS3", {
+      autoDeleteObjects: true,
+      bucketName: buildResourceName(["dummy", "ui", "static"], AwsResourceType.S3Bucket, props),
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const errorBucketDeploymentConstructId = buildResourceName(["dummy", "cf", "error"], AwsResourceType.BucketDeployment, props);
+    const cfErrorDeployment = new s3Deploy.BucketDeployment(this, errorBucketDeploymentConstructId, {
+      destinationBucket: uiBucket,
+      sources: [s3Deploy.Source.asset("error-pages")],
+      destinationKeyPrefix: "errors/",
+    });
+
+    const cntryBucketDeploymentConstructId = buildResourceName(["dummy", "cf", "cntry"], AwsResourceType.BucketDeployment, props);
+    const cntryDataDeployment = new s3Deploy.BucketDeployment(this, cntryBucketDeploymentConstructId, {
+      destinationBucket: uiBucket,
+      sources: [s3Deploy.Source.asset("config-data", { exclude: ["**/default-*.json"] })],
+      destinationKeyPrefix: "ui/config/",
+    });
+
+    const defaultBucketOrigin = cfo.S3BucketOrigin.withOriginAccessControl(uiBucket, {
+      originId: "s3-static-ui",
+    });
+
+    const redirectHomepageCfFunction = {
+      eventType: cf.FunctionEventType.VIEWER_REQUEST,
+      function: new cf.Function(this, "RedirectHomepage", {
+        code: cf.FunctionCode.fromInline(getRedirectHomeHandlerFunctionString()),
+        runtime: cf.FunctionRuntime.JS_2_0,
+        functionName: buildResourceName(["redirect", "homepage"], AwsResourceType.CloudFrontFunction, props),
+      }),
+    };
+
+    const distribution = new cf.Distribution(this, "DistributionConstruct", {
+      defaultBehavior: {
+        origin: defaultBucketOrigin,
+        viewerProtocolPolicy: cf.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        functionAssociations: [redirectHomepageCfFunction],
+      },
+      priceClass: cf.PriceClass.PRICE_CLASS_100,
+      errorResponses: this.getErrorResponses(),
+    });
+
+    const apiOrigin = new cfo.RestApiOrigin(restApi, {
+      originId: "rest-api",
+      originPath: "/stage",
+    });
+    distribution.addBehavior("api/*", apiOrigin, {
+      allowedMethods: cf.AllowedMethods.ALLOW_ALL,
+      viewerProtocolPolicy: cf.ViewerProtocolPolicy.HTTPS_ONLY,
+      cachePolicy: cf.CachePolicy.CACHING_DISABLED,
+      originRequestPolicy: cf.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+    });
+
+    distribution.addBehavior("ui/*", defaultBucketOrigin, {
+      viewerProtocolPolicy: cf.ViewerProtocolPolicy.HTTPS_ONLY,
+    });
+
+    const loadHomepageCfFunction = {
+      eventType: cf.FunctionEventType.VIEWER_REQUEST,
+      function: new cf.Function(this, "LoadHomepage", {
+        code: cf.FunctionCode.fromInline(getLoadHomepageHandlerFunctionString()),
+        runtime: cf.FunctionRuntime.JS_2_0,
+        functionName: buildResourceName(["load", "homepage"], AwsResourceType.CloudFrontFunction, props),
+      }),
+    };
+    distribution.addBehavior("home*", defaultBucketOrigin, {
+      viewerProtocolPolicy: cf.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      functionAssociations: [loadHomepageCfFunction],
+    });
+
+    const cfDistributionDomainOutput = new CfnOutput(this, "CfDistributionDomainOutput", {
+      value: distribution.distributionDomainName,
+      key: buildResourceName(["distribution", "domain"], AwsResourceType.CftOutput, props),
+    });
+
+    const cfDistributionIdOutput = new CfnOutput(this, "CfDistributionIdOutput", {
+      value: distribution.distributionId,
+      key: buildResourceName(["distribution", "id"], AwsResourceType.CftOutput, props),
+    });
   }
 
   private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: string) {
@@ -201,6 +312,22 @@ export class HelloCdkStack extends cdk.Stack {
     });
 
     return lambdaFunction;
+  }
+
+  private getErrorResponses() {
+    const errorResponse404: cf.ErrorResponse = {
+      httpStatus: 404,
+      responseHttpStatus: 404,
+      responsePagePath: "/errors/not-found.html",
+    };
+
+    const errorResponse403: cf.ErrorResponse = {
+      httpStatus: 403,
+      responseHttpStatus: 403,
+      responsePagePath: "/errors/access-denied.html",
+    };
+
+    return [errorResponse403, errorResponse404];
   }
 
   // private downloadReceiptApi(resource: apigateway.Resource) {
@@ -308,4 +435,68 @@ export class HelloCdkStack extends cdk.Stack {
   //     ...baseMethodOption,
   //   });
   // }
+}
+
+function getRedirectHomeHandlerFunctionString() {
+  async function handler(event: CfEvent) {
+    const homepageUrl = "${props.cfContext.homepageUrl}";
+    const request = event.request;
+    if (request.uri === "/") {
+      const response: CfResponse = {
+        statusCode: 302,
+        statusDescription: "Found",
+        headers: {
+          location: {
+            value: `https://${request.headers.host.value}/${homepageUrl}`,
+          },
+        },
+      };
+      return response;
+    }
+    return request;
+  }
+
+  return handler.toString().replace("${props.cfContext.homepageUrl}", "home");
+}
+
+function getLoadHomepageHandlerFunctionString() {
+  function handler(event: CfEvent) {
+    const request = event.request;
+
+    // if (true) {
+    //   const resp: CfResponse = {
+    //     statusCode: 200,
+    //     statusDescription: "OK",
+    //     headers: {},
+    //     body: event,
+    //   };
+    //   return resp;
+    // }
+    // Check whether the URI is missing a file name.
+    // if (uri.endsWith("/")) {
+    //   request.uri += "index.html";
+    // }
+    // Check whether the URI is missing a file extension.
+    // else
+    //  if (!uri.includes("index.html")) {
+    const rootPath = request.uri.split("/").find((a) => a);
+    request.uri = "/" + rootPath + "/index.html";
+    // }
+
+    return request;
+  }
+
+  // async function handler(event: CfEvent) {
+  //   console.log("event", JSON.stringify(event));
+  //   const homepageUrl = "${props.cfContext.homepageUrl}";
+  //   const request = event.request;
+  //   // request.uri = `/${homepageUrl}/index.html`;
+  //   if (!request.uri.includes("index.html")) {
+  //     request.uri += request.uri.endsWith("/") ? "" : "/" + "index.html";
+  //   }
+  //   return request;
+  // }
+
+  // return handler.toString().replace("${props.cfContext.homepageUrl}", props.cfContext.homepageUrl);
+  return handler.toString();
 }
