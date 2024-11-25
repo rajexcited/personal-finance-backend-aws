@@ -188,7 +188,7 @@ jobs:
         with:
           cdk_subcommand: "destroy"
           actions_comment: true
-          cdk_args: "--force --all"
+          cdk_args: "--all --force"
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
 
