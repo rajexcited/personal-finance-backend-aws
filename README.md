@@ -8,20 +8,45 @@ This is backend api services. The backend infra setup is by environment (local, 
 
 In order to use any aws services, infra stack needs to be deployed. To enable `cdk deploy`, we need to bootstrap and setup the permissions.
 
-## Create IAM boundary
+## Create IAM policies for CDK deployment
 
-Before bootstrapping, make sure to have [IAM boundary policy](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html) in an account. if you don't have, follow steps to [create IAM policy](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_create-console.html)
+Before bootstrapping, make sure to have IAM policies for CDK deployment in an account. if you don't have, follow steps to [create IAM policy](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_create-console.html)
 
-reference file, [my-app-env-boundary-policy.json](my-app-env-boundary-policy.json)
+- copy policy files located at `cfn-exec-role\policies\` to dist folder
+- replace `${aws:PrincipalAccount}` with actual awsAccountNumber in these json files of dist folder.
+- create policy with this JSON files
+- policy name and corresponding file name are listed below table.
+
+| Policy Name     | file location                                                                 |
+| --------------- | ----------------------------------------------------------------------------- |
+| CdkApiLambda    | [api-lambda-policy.json](cfn-exec-role\policies\api-lambda-policy.json)       |
+| CdkCloudfront   | [cloudfront-policy.json](cfn-exec-role\policies\cloudfront-policy.json)       |
+| CdkEventMessage | [event-message-policy.json](cfn-exec-role\policies\event-message-policy.json) |
+| CdkIam          | [iam-policy.json](cfn-exec-role\policies\iam-policy.json)                     |
+| CdkSecretParam  | [secret-param-policy.json](cfn-exec-role\policies\secret-param-policy.json)   |
+| CdkStorage      | [storage-policy.json](cfn-exec-role\policies\storage-policy.json)             |
+
+#### Cli command example
+
+```cmd
+aws iam create-policy --policy-name CdkApiLambda --policy-document file://cfn-exec-role\policies\api-lambda-policy.json
+```
 
 ## Bootstrap for environment
 
-we will customise the cdk bootstrap template to create stack for each environment.
+we will [customise the cdk bootstrap template](https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping-customizing.html) to create stack for each environment.
+
+`cdk bootstrap --tags appId=<appId> --tags environment=<envId> --toolkit-stack-name CDKToolkit-<appId-envId> --qualifier <appId><envId> --cloudformation-execution-policies <list of policy arn seperated by comma>`
 
 bootstrap customized Command example
 
 ```cmd
-cdk bootstrap --tags app=prsfin --toolkit-stack-name CDKToolkit-prsfin-tst --qualifier prsfintst --custom-permissions-boundary my-app-env-boundary-policy
+# (for tst env)
+cdk bootstrap --tags appId=prsfin --tags environment=tst --toolkit-stack-name CDKToolkit-prsfin-tst --qualifier prsfintst --cloudformation-execution-policies "arn:aws:iam::${AwsAccountNo}:policy/CdkApiLambda,arn:aws:iam::${AwsAccountNo}:policy/CdkCloudfront,arn:aws:iam::${AwsAccountNo}:policy/CdkEventMessage,arn:aws:iam::${AwsAccountNo}:policy/CdkIam,arn:aws:iam::${AwsAccountNo}:policy/CdkSecretParam,arn:aws:iam::${AwsAccountNo}:policy/CdkStorage"
+
+
+# (for prd env)
+cdk bootstrap --tags appId=prsfin --tags environment=prd --toolkit-stack-name CDKToolkit-prsfin-prd --qualifier prsfinprd --cloudformation-execution-policies "arn:aws:iam::${AwsAccountNo}:policy/CdkApiLambda,arn:aws:iam::${AwsAccountNo}:policy/CdkCloudfront,arn:aws:iam::${AwsAccountNo}:policy/CdkEventMessage,arn:aws:iam::${AwsAccountNo}:policy/CdkIam,arn:aws:iam::${AwsAccountNo}:policy/CdkSecretParam,arn:aws:iam::${AwsAccountNo}:policy/CdkStorage"
 ```
 
 #### Bootstrap Param Value Rules:

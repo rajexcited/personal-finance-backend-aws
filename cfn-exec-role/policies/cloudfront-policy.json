@@ -1,0 +1,80 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "VisualEditor0",
+      "Effect": "Allow",
+      "Action": "cloudfront:*",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/environment": "${aws:PrincipalTag/environment}",
+          "aws:ResourceTag/appId": "${aws:PrincipalTag/appId}"
+        }
+      }
+    },
+    {
+      "Sid": "VisualEditor1",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:ListCloudFrontOriginAccessIdentities",
+        "cloudfront:ListFunctions",
+        "cloudfront:ListOriginAccessControls",
+        "cloudfront:*SavingsPlan",
+        "cloudfront:ListFieldLevelEncryptionConfigs",
+        "cloudfront:GetPublicKeyConfig",
+        "cloudfront:CreateFieldLevelEncryptionProfile",
+        "cloudfront:*KeyGroup",
+        "cloudfront:UpdateFieldLevelEncryptionConfig",
+        "cloudfront:ListOriginRequestPolicies",
+        "cloudfront:ListDistributionsByRealtimeLogConfig",
+        "cloudfront:ListDistributionsByVpcOriginId",
+        "cloudfront:ListDistributionsByAnycastIpListId",
+        "cloudfront:ListKeyGroups",
+        "cloudfront:ListSavingsPlans",
+        "cloudfront:ListRateCards",
+        "cloudfront:ListContinuousDeploymentPolicies",
+        "cloudfront:*MonitoringSubscription",
+        "cloudfront:GetKeyGroupConfig",
+        "cloudfront:ListUsages",
+        "cloudfront:ListResponseHeadersPolicies",
+        "cloudfront:ListDistributionsByCachePolicyId",
+        "cloudfront:CreateOriginAccessControl",
+        "cloudfront:ListDistributionsByLambdaFunction",
+        "cloudfront:ListCachePolicies",
+        "cloudfront:ListPublicKeys",
+        "cloudfront:ListRealtimeLogConfigs",
+        "cloudfront:ListFieldLevelEncryptionProfiles",
+        "cloudfront:ListDistributions",
+        "cloudfront:CreateVpcOrigin",
+        "cloudfront:*PublicKey",
+        "cloudfront:ListStreamingDistributions",
+        "cloudfront:ListKeyValueStores",
+        "cloudfront:CreateFieldLevelEncryptionConfig",
+        "cloudfront:ListAnycastIpLists",
+        "cloudfront:ListDistributionsByWebACLId",
+        "cloudfront:ListDistributionsByResponseHeadersPolicyId",
+        "cloudfront:ListDistributionsByOriginRequestPolicyId",
+        "cloudfront:DeleteOriginAccessControl",
+        "cloudfront:GetOriginAccessControl"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "VisualEditor2",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:GetFunction",
+        "cloudfront:DescribeFunction",
+        "cloudfront:PublishFunction",
+        "cloudfront:UpdateFunction",
+        "cloudfront:TestFunction",
+        "cloudfront:CreateFunction",
+        "cloudfront:DeleteFunction",
+        "cloudfront:DeleteDistribution",
+        "cloudfront:UpdateDistribution"
+      ],
+      "Resource": "arn:aws:cloudfront::${aws:PrincipalAccount}:function/*${aws:PrincipalTag/appId}*${aws:PrincipalTag/environment}*"
+    }
+  ]
+}

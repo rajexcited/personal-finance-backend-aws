@@ -1,0 +1,86 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "VisualEditor0",
+      "Effect": "Allow",
+      "Action": ["apigateway:*"],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/appId": "${aws:PrincipalTag/appId}",
+          "aws:ResourceTag/environment": "${aws:PrincipalTag/environment}"
+        }
+      }
+    },
+    {
+      "Sid": "VisualEditor1",
+      "Effect": "Allow",
+      "Action": ["lambda:TagResource", "lambda:ListTags", "lambda:UntagResource"],
+      "Resource": [
+        "arn:aws:lambda:*:${aws:PrincipalAccount}:function:*${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*",
+        "arn:aws:lambda:*:${aws:PrincipalAccount}:event-source-mapping:*",
+        "arn:aws:lambda:*:${aws:PrincipalAccount}:code-signing-config:*"
+      ]
+    },
+    {
+      "Sid": "VisualEditor2",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::${aws:PrincipalAccount}:role/*${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*"
+    },
+    {
+      "Sid": "VisualEditor3",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateFunction",
+        "lambda:GetFunction",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:GetFunctionUrlConfig",
+        "lambda:GetFunctionConfiguration",
+        "lambda:UpdateFunctionCode",
+        "lambda:AddPermission",
+        "lambda:RemovePermission",
+        "lambda:InvokeFunction",
+        "lambda:DeleteFunction",
+        "lambda:GetPolicy",
+        "lambda:UpdateFunctionUrlConfig",
+        "lambda:InvokeFunctionUrl",
+        "lambda:ListVersionsByFunction",
+        "lambda:ListFunctionUrlConfigs"
+      ],
+      "Resource": ["arn:aws:lambda:*:${aws:PrincipalAccount}:function:*${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*"]
+    },
+    {
+      "Sid": "VisualEditor4",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:GetLayerVersionPolicy",
+        "lambda:AddLayerVersionPermission",
+        "lambda:RemoveLayerVersionPermission",
+        "lambda:GetLayerVersion",
+        "lambda:PublishLayerVersion",
+        "lambda:DeleteLayerVersion"
+      ],
+      "Resource": [
+        "arn:aws:lambda:*:${aws:PrincipalAccount}:layer:*${aws:PrincipalTag/appId}*${aws:PrincipalTag/environment}*",
+        "arn:aws:lambda:*:${aws:PrincipalAccount}:layer:*${aws:PrincipalTag/appId}*${aws:PrincipalTag/environment}*:*"
+      ]
+    },
+    {
+      "Sid": "VisualEditor5",
+      "Effect": "Allow",
+      "Action": ["lambda:ListLayer*", "lambda:ListFunctions"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "VisualEditor6",
+      "Effect": "Allow",
+      "Action": ["s3:List*", "s3:GetObject*", "s3:GetBucket*"],
+      "Resource": [
+        "arn:aws:s3:::cdk-${aws:PrincipalTag/appId}${aws:PrincipalTag/environment}-assets-${aws:PrincipalAccount}-*/*",
+        "arn:aws:s3:::cdk-${aws:PrincipalTag/appId}${aws:PrincipalTag/environment}-assets-${aws:PrincipalAccount}-*"
+      ]
+    }
+  ]
+}

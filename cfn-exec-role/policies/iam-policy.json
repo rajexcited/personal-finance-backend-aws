@@ -1,0 +1,52 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "VisualEditor0",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetPolicyVersion",
+        "iam:ListRoleTags",
+        "iam:UntagRole",
+        "iam:TagRole",
+        "iam:DeletePolicy",
+        "iam:CreateRole",
+        "iam:AttachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:ListPolicyTags",
+        "iam:ListRolePolicies",
+        "iam:CreatePolicyVersion",
+        "iam:ListPolicies",
+        "iam:GetRole",
+        "iam:GetPolicy",
+        "iam:ListRoles",
+        "iam:DeleteRole",
+        "iam:UpdateRoleDescription",
+        "iam:TagPolicy",
+        "iam:CreatePolicy",
+        "iam:CreateServiceLinkedRole",
+        "iam:ListPolicyVersions",
+        "iam:PutUserPolicy",
+        "iam:UntagPolicy",
+        "iam:UpdateRole",
+        "iam:GetRolePolicy",
+        "iam:SetDefaultPolicyVersion"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "iam:ResourceTag/environment": "${aws:PrincipalTag/environment}",
+          "iam:ResourceTag/appId": "${aws:PrincipalTag/appId}"
+        }
+      }
+    },
+    {
+      "Sid": "VisualEditor1",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::${aws:PrincipalAccount}:role/*${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*"
+    }
+  ]
+}

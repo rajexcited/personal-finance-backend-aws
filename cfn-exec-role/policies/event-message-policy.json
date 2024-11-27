@@ -1,0 +1,29 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "VisualEditor0",
+      "Effect": "Allow",
+      "Action": [
+        "sqs:TagQueue",
+        "sqs:RemovePermission",
+        "sqs:GetQueueUrl",
+        "sqs:ListDeadLetterSourceQueues",
+        "sqs:AddPermission",
+        "sqs:UntagQueue",
+        "sqs:PurgeQueue",
+        "sqs:DeleteQueue",
+        "sqs:GetQueueAttributes",
+        "sqs:ListQueueTags",
+        "sqs:CreateQueue"
+      ],
+      "Resource": "arn:aws:sqs:*:${aws:PrincipalAccount}:*${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*"
+    },
+    {
+      "Sid": "VisualEditor1",
+      "Effect": "Allow",
+      "Action": "sqs:ListQueues",
+      "Resource": "*"
+    }
+  ]
+}
