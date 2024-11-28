@@ -41,6 +41,10 @@ we will [customise the cdk bootstrap template](https://docs.aws.amazon.com/cdk/v
 bootstrap customized Command example
 
 ```cmd
+# (for developer)
+cdk bootstrap --tags appId=prsfin --tags environment=dev --toolkit-stack-name CDKToolkit-prsfin-dev --qualifier prsfindev --cloudformation-execution-policies "arn:aws:iam::${AwsAccountNo}:policy/CdkApiLambda,arn:aws:iam::${AwsAccountNo}:policy/CdkCloudfront,arn:aws:iam::${AwsAccountNo}:policy/CdkEventMessage,arn:aws:iam::${AwsAccountNo}:policy/CdkIam,arn:aws:iam::${AwsAccountNo}:policy/CdkSecretParam,arn:aws:iam::${AwsAccountNo}:policy/CdkStorage"
+
+
 # (for tst env)
 cdk bootstrap --tags appId=prsfin --tags environment=tst --toolkit-stack-name CDKToolkit-prsfin-tst --qualifier prsfintst --cloudformation-execution-policies "arn:aws:iam::${AwsAccountNo}:policy/CdkApiLambda,arn:aws:iam::${AwsAccountNo}:policy/CdkCloudfront,arn:aws:iam::${AwsAccountNo}:policy/CdkEventMessage,arn:aws:iam::${AwsAccountNo}:policy/CdkIam,arn:aws:iam::${AwsAccountNo}:policy/CdkSecretParam,arn:aws:iam::${AwsAccountNo}:policy/CdkStorage"
 
