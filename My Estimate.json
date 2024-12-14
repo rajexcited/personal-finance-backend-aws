@@ -1,0 +1,153 @@
+{
+	"Name": "My Estimate",
+	"Total Cost": {
+		"monthly": "1.54",
+		"upfront": "0.00",
+		"12 months": "18.48"
+	},
+	"Metadata": {
+		"Currency": "USD",
+		"Locale": "en_US",
+		"Created On": "12/9/2024",
+		"Legal Disclaimer": "AWS Pricing Calculator provides only an estimate of your AWS fees and doesn't include any taxes that might apply. Your actual fees depend on a variety of factors, including your actual usage of AWS services.",
+		"Share Url": "https://calculator.aws/#/estimate?id=1024046899bd3c1db373ea0baa3c2bf9070396b2"
+	},
+	"Groups": {
+		"Services": [
+			{
+				"Service Name": "DynamoDB on-demand capacity",
+				"Region": "US East (Ohio)",
+				"Status": "",
+				"Service Cost": {
+					"monthly": "0.01",
+					"upfront": "0.00",
+					"12 months": "0.12"
+				},
+				"Properties": {
+					"Table class": "Standard-Infrequent Access",
+					"Average item size (all attributes)": "4 KB",
+					"Data storage size": "0.05 GB"
+				}
+			},
+			{
+				"Service Name": "DynamoDB Backup and restore",
+				"Region": "US East (Ohio)",
+				"Status": "",
+				"Service Cost": {
+					"monthly": "0.00",
+					"upfront": "0.00",
+					"12 months": "0.00"
+				},
+				"Properties": {}
+			},
+			{
+				"Service Name": "S3 Standard",
+				"Region": "US East (Ohio)",
+				"Status": "",
+				"Service Cost": {
+					"monthly": "0.00",
+					"upfront": "0.00",
+					"12 months": "0.00"
+				},
+				"Properties": {
+					"S3 Standard storage": "0.09 GB per month",
+					"S3 Standard Average Object Size": "1 MB",
+					"PUT, COPY, POST, LIST requests to S3 Standard": "20",
+					"GET, SELECT, and all other requests from S3 Standard": "100"
+				}
+			},
+			{
+				"Service Name": "Amazon API Gateway",
+				"Region": "US East (Ohio)",
+				"Status": "",
+				"Service Cost": {
+					"monthly": "0.00",
+					"upfront": "0.00",
+					"12 months": "0.00"
+				},
+				"Properties": {
+					"HTTP API requests units": "exact number",
+					"REST API request units": "exact number",
+					"Cache memory size (GB)": "None",
+					"WebSocket message units": "thousands",
+					"Average message size": "32 KB",
+					"Requests": "500 per month"
+				}
+			},
+			{
+				"Service Name": "AWS Secrets Manager",
+				"Region": "US East (Ohio)",
+				"Status": "",
+				"Service Cost": {
+					"monthly": "0.40",
+					"upfront": "0.00",
+					"12 months": "4.80"
+				},
+				"Properties": {
+					"Number of secrets": "1",
+					"Average duration of each secret": "30 days",
+					"Number of API calls": "500 per month"
+				}
+			},
+			{
+				"Service Name": "Amazon CloudFront",
+				"Region": "US East (Ohio)",
+				"Status": "",
+				"Service Cost": {
+					"monthly": "0.12",
+					"upfront": "0.00",
+					"12 months": "1.44"
+				},
+				"Properties": {
+					"Data transfer out to internet": "1 GB per month",
+					"Data transfer out to origin": "1 GB per month",
+					"Number of requests (HTTPS)": "5000 per month"
+				}
+			},
+			{
+				"Service Name": "AWS Lambda",
+				"Region": "US East (Ohio)",
+				"Status": "",
+				"Service Cost": {
+					"monthly": "0.00",
+					"upfront": "0.00",
+					"12 months": "0.00"
+				},
+				"Properties": {
+					"Architecture": "x86",
+					"Invoke Mode": "Buffered",
+					"Amount of ephemeral storage allocated": "512 MB",
+					"Number of requests": "5000 per month"
+				}
+			},
+			{
+				"Service Name": "Step Functions - Standard Workflows",
+				"Region": "US East (Ohio)",
+				"Status": "",
+				"Service Cost": {
+					"monthly": "0.00",
+					"upfront": "0.00",
+					"12 months": "0.00"
+				},
+				"Properties": {
+					"Workflow requests": "1000 per month",
+					"State transitions per workflow": "1"
+				}
+			},
+			{
+				"Service Name": "AWS Key Management Service",
+				"Region": "US East (Ohio)",
+				"Status": "",
+				"Service Cost": {
+					"monthly": "1.01",
+					"upfront": "0.00",
+					"12 months": "12.07"
+				},
+				"Properties": {
+					"Number of customer managed Customer Master Keys (CMK)": "1",
+					"Number of symmetric requests": "2000"
+				}
+			}
+		]
+	}
+}

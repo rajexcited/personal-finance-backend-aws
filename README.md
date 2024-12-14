@@ -2,7 +2,7 @@
 
 This is backend api services. The backend infra setup is by environment (local, test, prod).
 
-- The `local` environment is for development.
+- The `dev` environment is for development.
 - The `test` environment is experimental to test through github workflow from branch `test-pipeline`.
 - The `prod` environment is ready to be used as final production.
 
