@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { AwsResourceType, ConstructProps, EnvironmentName, buildResourceName } from "../common";
+import { AwsResourceType, ConstructProps, InfraEnvironmentId, buildResourceName } from "../common";
 import * as waf from "aws-cdk-lib/aws-wafv2";
 
 export interface MyWebAclConstructProps extends ConstructProps {}

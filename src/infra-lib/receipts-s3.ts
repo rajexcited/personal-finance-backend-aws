@@ -1,7 +1,7 @@
 import { Construct } from "constructs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import { Duration, RemovalPolicy } from "aws-cdk-lib";
-import { ConstructProps, EnvironmentName, buildResourceName, AwsResourceType, ExpenseReceiptContextInfo } from "./common";
+import { ConstructProps, InfraEnvironmentId, buildResourceName, AwsResourceType, ExpenseReceiptContextInfo } from "./common";
 import { parsedDuration } from "./common/utils";
 
 const ONE_MONTH = 30;
@@ -20,7 +20,7 @@ export class ReceiptS3Construct extends Construct {
 
     const receiptBucket = new s3.Bucket(this, "ReceiptBucketS3", {
       bucketName: buildResourceName(["expense", "receipt"], AwsResourceType.S3Bucket, props),
-      removalPolicy: props.environment === EnvironmentName.Production ? RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE : RemovalPolicy.DESTROY,
+      removalPolicy: props.environment === InfraEnvironmentId.Production ? RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE : RemovalPolicy.DESTROY,
       lifecycleRules: [
         {
           expiration: parsedDuration(props.expenseReceiptContext.expiration.temporaryReceipt),

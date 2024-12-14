@@ -1,16 +1,15 @@
 import { Construct } from "constructs";
-import { RestApiProps } from "./construct-type";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import { HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
-import * as kms from "aws-cdk-lib/aws-kms";
-import { Duration, RemovalPolicy } from "aws-cdk-lib";
+import { Duration } from "aws-cdk-lib";
+import { RestApiProps } from "./construct-type";
 import { JSONObject } from "../../lambda-handlers";
 import { ConfigDbProps, PymtAccDbProps, UserDbProps } from "../db";
 import { IBucket } from "aws-cdk-lib/aws-s3";
-import { AwsResourceType, EnvironmentName, buildResourceName } from "../common";
+import { InfraEnvironmentId } from "../common";
 import { BaseApiConstruct } from "./base-api";
 import { parsedDuration } from "../common/utils";
 
@@ -19,7 +18,7 @@ interface UserApiProps extends RestApiProps {
   configTypeTable: ConfigDbProps;
   paymentAccountTable: PymtAccDbProps;
   configBucket: IBucket;
-  tokenSecret: secretsmanager.Secret;
+  authSecret: secretsmanager.Secret;
   deleteExpiration: string;
 }
 
@@ -39,18 +38,18 @@ enum ModelId {
 }
 
 export class UserApiConstruct extends BaseApiConstruct {
-  private readonly pSaltSecret: secretsmanager.Secret;
+  // private readonly pSaltSecret: secretsmanager.Secret;
 
   constructor(scope: Construct, id: string, props: UserApiProps) {
     super(scope, id, props);
 
     // https://awscli.amazonaws.com/v2/documentation/api/latest/reference/kms/list-aliases.html#examples
-    this.pSaltSecret = new secretsmanager.Secret(this, "PSaltSecret", {
-      description: "secret used in encryption",
-      secretName: buildResourceName(["encrypt"], AwsResourceType.SecretManager, props),
-      encryptionKey: kms.Alias.fromAliasName(this, "PSaltKms", "alias/aws/secretsmanager"),
-      removalPolicy: RemovalPolicy.DESTROY,
-    });
+    // this.pSaltSecret = new secretsmanager.Secret(this, "PSaltSecret", {
+    //   description: "secret used in encryption",
+    //   secretName: buildResourceName(["encrypt"], AwsResourceType.SecretManager, props),
+    //   encryptionKey: kms.Alias.fromAliasName(this, "PSaltKms", "alias/aws/secretsmanager"),
+    //   removalPolicy: RemovalPolicy.DESTROY,
+    // });
 
     const userResource = props.apiResource.addResource("user");
     //  request validator setup
@@ -86,23 +85,23 @@ export class UserApiConstruct extends BaseApiConstruct {
   }
 
   private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: UserLambdaHandler) {
-    const useTokenSecret = [UserLambdaHandler.Login, UserLambdaHandler.Signup, UserLambdaHandler.Refresh].includes(lambdaHandlerName);
-    const usePsaltSecret = [
+    const useAuthSecret = [
       UserLambdaHandler.Login,
       UserLambdaHandler.Signup,
+      UserLambdaHandler.Refresh,
       UserLambdaHandler.UpdateDetails,
       UserLambdaHandler.DeleteDetails,
     ].includes(lambdaHandlerName);
 
     const props = this.props as UserApiProps;
     const additionalEnvs: JSONObject = {};
-    if (useTokenSecret) {
-      additionalEnvs.TOKEN_SECRET_ID = props.tokenSecret.secretName;
+    if (useAuthSecret) {
+      additionalEnvs.AUTH_SECRET_ID = props.authSecret.secretName;
     }
 
-    if (usePsaltSecret) {
-      additionalEnvs.PSALT_SECRET_ID = this.pSaltSecret.secretName;
-    }
+    // if (usePsaltSecret) {
+    //   additionalEnvs.PSALT_SECRET_ID = this.pSaltSecret.secretName;
+    // }
 
     if (lambdaHandlerName === UserLambdaHandler.Signup) {
       additionalEnvs.CONFIG_DATA_BUCKET_NAME = props.configBucket.bucketName;
@@ -110,7 +109,6 @@ export class UserApiConstruct extends BaseApiConstruct {
       additionalEnvs.CONFIG_TYPE_BELONGS_TO_GSI_NAME = props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name;
       additionalEnvs.PAYMENT_ACCOUNT_TABLE_NAME = props.paymentAccountTable.table.name;
     }
-
     if (lambdaHandlerName === UserLambdaHandler.DeleteDetails) {
       additionalEnvs.DELETE_USER_EXPIRES_IN_SEC = parsedDuration(props.deleteExpiration).toSeconds().toString();
     }
@@ -125,30 +123,28 @@ export class UserApiConstruct extends BaseApiConstruct {
       environment: {
         USER_TABLE_NAME: props.userTable.table.name,
         USER_EMAIL_GSI_NAME: props.userTable.globalSecondaryIndexes.emailIdIndex.name,
-        DEFAULT_LOG_LEVEL: this.props.environment === EnvironmentName.LOCAL ? "debug" : "undefined",
+        DEFAULT_LOG_LEVEL: this.props.environment === InfraEnvironmentId.Development ? "debug" : "undefined",
         ...additionalEnvs,
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
       timeout: Duration.seconds(30),
     });
 
-    if (useTokenSecret) {
-      props.tokenSecret.grantRead(userLambdaFunction);
+    if (useAuthSecret) {
+      props.authSecret.grantRead(userLambdaFunction);
     }
 
-    if (usePsaltSecret) {
-      this.pSaltSecret.grantRead(userLambdaFunction);
-    }
+    // if (usePsaltSecret) {
+    //   this.pSaltSecret.grantRead(userLambdaFunction);
+    // }
 
     const userLambdaIntegration = new apigateway.LambdaIntegration(userLambdaFunction, {
       proxy: true,
       passthroughBehavior: apigateway.PassthroughBehavior.NEVER,
     });
 
-    const baseMethodOption = this.getRequestMethodOptions(lambdaHandlerName, resource);
-
     const applyAuthorize = ![UserLambdaHandler.Login, UserLambdaHandler.Signup].includes(lambdaHandlerName);
-
+    const baseMethodOption = this.getRequestMethodOptions(lambdaHandlerName, resource);
     const userMethod = resource.addMethod(String(method), userLambdaIntegration, {
       authorizationType: this.getAuthorizationType(applyAuthorize),
       authorizer: applyAuthorize ? props.authorizer : undefined,
@@ -159,12 +155,12 @@ export class UserApiConstruct extends BaseApiConstruct {
   }
 
   getJsonRequestModel(lambdaHandlerName: string): apigateway.Model | undefined {
-    if (lambdaHandlerName === UserLambdaHandler.Login) {
-      return this.getLoginModel();
-    }
-    if (lambdaHandlerName === UserLambdaHandler.Signup) {
-      return this.getSignupModel();
-    }
+    // if (lambdaHandlerName === UserLambdaHandler.Login) {
+    //   return this.getLoginModel();
+    // }
+    // if (lambdaHandlerName === UserLambdaHandler.Signup) {
+    //   return this.getSignupModel();
+    // }
     return undefined;
   }
 

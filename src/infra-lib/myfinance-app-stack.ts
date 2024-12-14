@@ -15,7 +15,7 @@ import { MyCfDistributionConstruct } from "./cf-distribution";
  * stack props
  */
 interface MyFinanceAppStackProps extends StackProps, ConstructProps {
-  webAclId: string;
+  // webAclId: string;
 }
 
 export class MyFinanceAppStack extends Stack {
@@ -28,23 +28,23 @@ export class MyFinanceAppStack extends Stack {
 
     const allDbs = new DBConstruct(this, "DatabaseConstruct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
     });
 
     const configS3 = new ConfigS3Construct(this, "ConfigS3Construct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
     });
 
     const receiptS3 = new ReceiptS3Construct(this, "ReceiptS3Construct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
       expenseReceiptContext: contextInfo.expenseReceipt,
     });
 
     const allApis = new ApiConstruct(this, "RestApiConstruct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
       allDb: allDbs,
       apiContext: contextInfo.apigateway,
       restApiPathPrefix: contextInfo.cloudfront.pathPrefix.restApi,
@@ -55,10 +55,11 @@ export class MyFinanceAppStack extends Stack {
 
     const cfDistribution = new MyCfDistributionConstruct(this, "MyCfDistributionConstruct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
       restApi: allApis.restApi,
       contextInfo: contextInfo,
-      webAclId: props.webAclId,
+      stageName: allApis.stageName,
+      // webAclId: props.webAclId,
     });
 
     this.uiBucketArn = cfDistribution.uiBucketArn;

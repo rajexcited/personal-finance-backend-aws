@@ -20,7 +20,7 @@ export class ExpenseApiConstruct extends Construct {
 
     const expenseApi = new ExpenseListApiConstruct(this, "ExpenseListApiConstruct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
       authorizer: props.authorizer,
       restApi: props.restApi,
       apiResource: props.apiResource,
@@ -33,7 +33,7 @@ export class ExpenseApiConstruct extends Construct {
 
     const expenseCrudApi = new ExpenseCrudApiConstruct(this, "PurchaseApiConstruct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
       authorizer: props.authorizer,
       restApi: props.restApi,
       apiResource: props.apiResource,

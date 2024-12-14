@@ -1,7 +1,7 @@
 import { Construct } from "constructs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3Deploy from "aws-cdk-lib/aws-s3-deployment";
-import { ConstructProps } from "../common";
+import { AwsResourceType, buildResourceName, ConstructProps } from "../common";
 
 interface UiAssetDeployS3Props extends ConstructProps {
   uiPathPrefix: string;
@@ -15,7 +15,8 @@ export class UiAssetDeployS3Construct extends Construct {
 
     const uiBucket = s3.Bucket.fromBucketArn(this, "UiBucketFromArn", props.uiBucketArn);
 
-    const uiDeployment = new s3Deploy.BucketDeployment(this, "UiStaticBucketDeployment", {
+    const uiStaticBucketDeploymentConstructId = buildResourceName(["ui", "static"], AwsResourceType.BucketDeployment, props);
+    const uiDeployment = new s3Deploy.BucketDeployment(this, uiStaticBucketDeploymentConstructId, {
       destinationBucket: uiBucket,
       sources: [
         s3Deploy.Source.asset("dist/ui", {
@@ -25,7 +26,8 @@ export class UiAssetDeployS3Construct extends Construct {
       destinationKeyPrefix: props.uiPathPrefix.slice(1) + "/",
     });
 
-    const homepageDeployment = new s3Deploy.BucketDeployment(this, "HomepageBucketDeployment", {
+    const homepageBucketDeploymentConstructId = buildResourceName(["homepage"], AwsResourceType.BucketDeployment, props);
+    const homepageDeployment = new s3Deploy.BucketDeployment(this, homepageBucketDeploymentConstructId, {
       destinationBucket: uiBucket,
       sources: [
         s3Deploy.Source.asset("dist/ui", {

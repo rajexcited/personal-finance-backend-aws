@@ -4,7 +4,7 @@ import { convertReceiptDbToApiResource } from "../../receipts/api-resource";
 import { AuthorizeUser } from "../../user";
 import { getLogger, LoggerBase, utils } from "../../utils";
 import { DbDetailsInvestment } from "./db-config";
-import { ApiResourceInvestmentDetails } from "./resource-type";
+import { ApiResourceInvestmentDetails } from "./api-resource/resource-type";
 
 export const convertInvestmentDbToApiResource = async (dbDetails: DbDetailsInvestment, authUser: AuthorizeUser, _logger: LoggerBase) => {
   const logger = getLogger("convertInvestmentDbToApiResource", _logger);
@@ -36,6 +36,8 @@ export const convertInvestmentDbToApiResource = async (dbDetails: DbDetailsInves
     verifiedTimestamp: dbDetails.verifiedTimestamp,
     receipts: apiReceipts,
     auditDetails: auditDetails,
+    personIds: dbDetails.personIds,
+    profileId: dbDetails.profileId,
   };
 
   return apiResource;

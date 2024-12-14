@@ -11,6 +11,7 @@ import { PymtAccApiConstruct } from "./pymt-acc-api-gateway";
 import { ExpenseApiConstruct } from "./expenses";
 import { ReceiptS3Construct } from "../receipts-s3";
 import { StatsApiConstruct } from "./stats-api-gateway";
+import { AuthSecretConstruct } from "./auth-secret";
 
 interface ApiProps extends ConstructProps {
   allDb: DBConstruct;
@@ -26,25 +27,35 @@ interface ApiProps extends ConstructProps {
 // https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-api-usage-plans.html
 export class ApiConstruct extends Construct {
   public readonly restApi: apigateway.RestApi;
+  public readonly stageName: string;
 
   constructor(scope: Construct, id: string, props: ApiProps) {
     super(scope, id);
 
     const lambdaLayer = new LambdaLayerConstruct(this, "LayerConstruct", props);
+    const authSecret = new AuthSecretConstruct(this, "AuthSecretConstruct", {
+      appId: props.appId,
+      environment: props.environment,
+      layer: lambdaLayer.layer,
+      secretRotatingDuration: props.apiContext.secretRotatingDuration,
+    });
+
     const tokenAuthorizer = new TokenAuthorizerConstruct(this, "AccessTokenAuthConstruct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
       layer: lambdaLayer.layer,
       userTable: props.allDb.userTable,
       restApiPathPrefix: props.restApiPathPrefix,
+      tokenSecret: authSecret.secret,
     });
 
+    this.stageName = [props.environment, "stage", "api"].join("-");
     const restApi = new apigateway.RestApi(this, "MyFinanceRestApi", {
       restApiName: buildResourceName(["backend"], AwsResourceType.RestApi, props),
       binaryMediaTypes: ["*/*"],
       deployOptions: {
-        stageName: props.apiContext.stageName,
-        description: "my finance rest apis",
+        stageName: this.stageName,
+        description: "my personal finance rest apis",
         loggingLevel: apigateway.MethodLoggingLevel.INFO,
         // accessLogDestination: new apigateway.LogGroupLogDestination(
         //   new LogGroup(this, "RestApiAccessLogGroup", {
@@ -63,14 +74,14 @@ export class ApiConstruct extends Construct {
 
     const userApi = new UserApiConstruct(this, "UserApiConstruct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
       configBucket: props.configBucket,
       userTable: props.allDb.userTable,
       configTypeTable: props.allDb.configTypeTable,
       paymentAccountTable: props.allDb.paymentAccountTable,
       layer: lambdaLayer.layer,
       authorizer: tokenAuthorizer.authorizer,
-      tokenSecret: tokenAuthorizer.tokenSecret,
+      authSecret: authSecret.secret,
       restApi: restApi,
       apiResource: apiResource,
       deleteExpiration: props.apiContext.deleteUserExpiration,
@@ -78,7 +89,7 @@ export class ApiConstruct extends Construct {
 
     const configTypeApi = new ConfigTypeApiConstruct(this, "ConfigTypeApiConstruct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
       configBucket: props.configBucket,
       userTable: props.allDb.userTable,
       configTypeTable: props.allDb.configTypeTable,
@@ -90,7 +101,7 @@ export class ApiConstruct extends Construct {
 
     const pymtAccApi = new PymtAccApiConstruct(this, "PymtAccApiConstruct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
       userTable: props.allDb.userTable,
       configTypeTable: props.allDb.configTypeTable,
       pymtAccTable: props.allDb.paymentAccountTable,
@@ -102,7 +113,7 @@ export class ApiConstruct extends Construct {
 
     const expenseApi = new ExpenseApiConstruct(this, "ExpenseApiConstruct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
       layer: lambdaLayer.layer,
       authorizer: tokenAuthorizer.authorizer,
       restApi: restApi,
@@ -114,7 +125,7 @@ export class ApiConstruct extends Construct {
 
     const statApi = new StatsApiConstruct(this, "StatsApiConstruct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
       layer: lambdaLayer.layer,
       authorizer: tokenAuthorizer.authorizer,
       restApi: restApi,

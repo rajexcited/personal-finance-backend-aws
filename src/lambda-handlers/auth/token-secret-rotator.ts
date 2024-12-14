@@ -15,12 +15,21 @@ import {
 import { SecretsManagerRotationEvent, SecretsManagerRotationHandler } from "aws-lambda";
 import { SecretStringGenerator } from "aws-cdk-lib/aws-secretsmanager";
 import * as jwt from "jsonwebtoken";
+import * as bcrypt from "bcryptjs";
 import { TokenSecret } from "./auth-type";
-import { utils, getLogger } from "../utils";
+import { utils, getLogger, LoggerBase } from "../utils";
 import { ValidationError, JSONObject } from "../apigateway";
 
 const client = new SecretsManagerClient();
 const _logger = getLogger("token-rotator");
+
+interface AuthSecretValueMap {
+  psalt: { current: string; previous: string };
+  tokenSecret: string;
+  algorithm: string;
+
+  type: string;
+}
 
 /**
  *
@@ -63,12 +72,16 @@ export const secretRotator: SecretsManagerRotationHandler = async (event, contex
   }
 
   if (event.Step === "createSecret") {
+    // creates new random value for rotation
     await createSecret(event);
   } else if (event.Step === "setSecret") {
+    // sets generated / created secret to downstream system
     await setSecret(event);
   } else if (event.Step === "testSecret") {
+    // tests validity
     await testSecret(event);
   } else if (event.Step === "finishSecret") {
+    // finalize the version to clean up rotation
     await finishSecret(event);
   } else {
     throw new Error("Invalid Step Parameter");
@@ -90,9 +103,13 @@ const createSecret = async (event: SecretsManagerRotationEvent) => {
       VersionStage: "AWSPENDING",
     });
     const getValueResult = await client.send(getValueCmd);
+    const obj = utils.getJsonObj<AuthSecretValueMap>(getValueResult.SecretString as string);
+    if (!obj || !obj.tokenSecret || !obj.psalt.current || obj.psalt.current === obj.psalt.previous) {
+      throw new Error("create proper format for auth secret with all required value");
+    }
     logger.info("successfully retrieved secret for [" + event.SecretId + "].");
   } catch (err) {
-    const passwordStr = await generatePassword();
+    const passwordStr = await generatePassword(event, logger);
     const putSecretCmd = new PutSecretValueCommand({
       SecretId: event.SecretId,
       ClientRequestToken: event.ClientRequestToken,
@@ -113,7 +130,7 @@ const createSecret = async (event: SecretsManagerRotationEvent) => {
 const setSecret = async (event: SecretsManagerRotationEvent) => {
   // update other services or storage where new secret should be used.
   // for accessToken, there is no other place to update.
-  _logger.info("setSecret", "not implemented");
+  _logger.info("setSecret", "not implemented", "nothing to do");
 };
 
 /**
@@ -134,13 +151,23 @@ const testSecret = async (event: SecretsManagerRotationEvent) => {
   const getValueResult = await client.send(getValueCmd);
   logger.debug("getValueCmd", getValueCmd, "getValueResult", getValueResult);
   const secretObj = utils.getJsonObj<TokenSecret>(getValueResult.SecretString as string);
-  if (!secretObj) {
+  if (!secretObj || !secretObj.tokenSecret) {
     throw new ValidationError([{ path: "secret", message: "invalid json" }]);
   }
   const token = jwt.sign({}, secretObj.tokenSecret, { algorithm: secretObj.algorithm });
   logger.info("encrypted token", token);
   const decoded = jwt.verify(token, secretObj.tokenSecret) as jwt.JwtPayload;
   logger.info("decrypted", decoded);
+
+  const saltSecret = (secretObj as AuthSecretValueMap).psalt;
+  if (!saltSecret.current || saltSecret.current === saltSecret.previous) {
+    throw new ValidationError([{ path: "salt-current", message: "same value as previous" }]);
+  }
+  const hash = bcrypt.hashSync("testpassword", saltSecret.current);
+  const currSalt = bcrypt.getSalt(hash);
+  if (currSalt !== saltSecret.current) {
+    throw new ValidationError([{ path: "salt-current", message: "incorrect salt value" }]);
+  }
 };
 
 /**
@@ -179,13 +206,51 @@ const finishSecret = async (event: SecretsManagerRotationEvent) => {
   }
 };
 
-const generatePassword = async () => {
-  const logger = getLogger("generatePassword", _logger);
+const generatePassword = async (event: SecretsManagerRotationEvent, loggerBase: LoggerBase) => {
+  const logger = getLogger("generatePassword", loggerBase);
   const generateTokenConfiguration = utils.getJsonObj<SecretStringGenerator>(process.env.TOKEN_GENERATE_CONFIG as string);
   logger.info("generateTokenConfiguration", generateTokenConfiguration);
   if (!generateTokenConfiguration) {
-    throw new ValidationError([{ path: "token-config", message: "env valud is not valid json" }]);
+    throw new ValidationError([{ path: "token-config", message: "token config value is not valid json" }]);
   }
+
+  const templatedObj = await getTemplateObject(event, generateTokenConfiguration, logger);
+  logger.info("templatedObj", templatedObj);
+  if (!templatedObj) {
+    throw new ValidationError([{ path: "secret-template", message: "invalid json" }]);
+  }
+
+  templatedObj.tokenSecret = await getRandomToken(generateTokenConfiguration, logger);
+
+  // generate random salt
+  templatedObj.psalt.previous = templatedObj.psalt.current;
+  templatedObj.psalt.current = getRandomSalt(generateTokenConfiguration, logger);
+
+  logger.info("templatedObj result", templatedObj);
+  return JSON.stringify(templatedObj);
+};
+
+const getTemplateObject = async (event: SecretsManagerRotationEvent, generateTokenConfiguration: SecretStringGenerator, loggerBase: LoggerBase) => {
+  const logger = getLogger("getTemplateObject", loggerBase);
+  const getValueCmd = new GetSecretValueCommand({ SecretId: event.SecretId });
+  const getValueResult = await client.send(getValueCmd);
+  logger.info("currently active secret value result is ", getValueResult);
+  let templateString = generateTokenConfiguration?.secretStringTemplate as string;
+  if (getValueResult.SecretString) {
+    templateString = getValueResult.SecretString;
+  }
+  const templatedObj = utils.getJsonObj<AuthSecretValueMap>(templateString);
+  logger.info("using env template instead of existing secret value");
+  if (templatedObj) {
+    return templatedObj;
+  }
+  throw new Error("should never be thrown");
+};
+
+const getRandomToken = async (generateTokenConfiguration: SecretStringGenerator, loggerBase: LoggerBase) => {
+  const logger = getLogger("getRandomToken", loggerBase);
+
+  // generate random token hash
   const getPasswordCmd = new GetRandomPasswordCommand({
     PasswordLength: generateTokenConfiguration.passwordLength,
     ExcludeCharacters: generateTokenConfiguration.excludeCharacters,
@@ -198,12 +263,15 @@ const generatePassword = async () => {
   });
   const getPasswordResult = await client.send(getPasswordCmd);
   logger.debug("getPasswordCmd", getPasswordCmd, "getPasswordResult", getPasswordResult);
-  const templatedObj = utils.getJsonObj<JSONObject>(generateTokenConfiguration.secretStringTemplate as string);
-  logger.info("templatedObj", templatedObj);
-  if (!templatedObj) {
-    throw new ValidationError([{ path: "secret-template", message: "invalid json" }]);
+  if (!getPasswordResult.RandomPassword) {
+    throw new ValidationError([{ path: "random-password", message: "incorrect value" }]);
   }
-  templatedObj[generateTokenConfiguration.generateStringKey as string] = getPasswordResult.RandomPassword;
-  logger.info("templatedObj result", templatedObj);
-  return JSON.stringify(templatedObj);
+
+  return getPasswordResult.RandomPassword;
+};
+
+const getRandomSalt = (generateTokenConfiguration: SecretStringGenerator, loggerBase: LoggerBase) => {
+  const logger = getLogger("getRandomSalt", loggerBase);
+
+  return bcrypt.genSaltSync(generateTokenConfiguration.passwordLength);
 };

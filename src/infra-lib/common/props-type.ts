@@ -1,14 +1,15 @@
-import { EnvironmentName } from "./env-enum";
+import { InfraEnvironmentId } from "./env-enum";
 
 export interface ConstructProps {
-  environment: EnvironmentName;
-  resourcePrefix: "myfinance";
+  environment: InfraEnvironmentId;
+  appId: string;
 }
 
 export enum AwsResourceType {
   Dynamodb = "dynamodb",
   GlobalSecondaryIndex = "gsi",
   S3Bucket = "s3-bucket",
+  BucketDeployment = "bucket-deploy",
   Lambda = "lambda-func",
   LambdaLayer = "lambda-layer",
   SecretManager = "secret",
@@ -20,4 +21,5 @@ export enum AwsResourceType {
   Metric = "metric",
   CloudFrontFunction = "cf-function",
   CftOutput = "cft-output",
+  Stack = "stack",
 }

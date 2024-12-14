@@ -46,14 +46,13 @@ aws cloudfront get-invalidation --id I995RQ9E48HWCHXC9Q3CLSZTHR --distribution-i
 
 ### Environments
 
-Before executing cdk command, configure environment name using command `set ENV=<env name>` or `export ENV=<env name>`. Depending env name, aws Cloudformation stack will be created with appropriate configuration.
+Before executing cdk command, configure environment name using command `set INFRA_ENV=<envId>` or `export INFRA_ENV=<envId>`. Depending env Id, aws Cloudformation stack will be created with appropriate configuration.
 
-| < env name > | Description                                          |
-| ------------ | ---------------------------------------------------- |
-| local        | useful for local development, local playground stack |
-| dev          | for development                                      |
-| test         | to run unit or integration or end to end tests       |
-| prod         | finalize version, ready to use                       |
+| envId | Description                                          |
+| ----- | ---------------------------------------------------- |
+| dev   | useful for local development, local playground stack |
+| tst   | to run unit or integration or end to end tests       |
+| prd   | finalize version, ready to use                       |
 
 List npm dependencies to create a lambda layer
 

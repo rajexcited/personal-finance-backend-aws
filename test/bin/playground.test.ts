@@ -45,7 +45,7 @@ describe("play ground", () => {
   });
 
   test("test method arn", () => {
-    const methodArn = "arn:aws:execute-api:us-east-2:471112824979:35cxmwok3j/local/POST/user/details";
+    const methodArn = "arn:aws:execute-api:us-east-2:${aws:PrincipalAccount}:35cxmwok3j/local/POST/user/details";
     const resource = methodArn.split(":").slice(-1)[0];
     resource.split("/").slice(2).join("/");
   });

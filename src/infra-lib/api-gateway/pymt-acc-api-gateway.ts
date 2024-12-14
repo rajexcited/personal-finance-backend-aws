@@ -7,7 +7,7 @@ import * as logs from "aws-cdk-lib/aws-logs";
 import { ConfigDbProps, PymtAccDbProps, UserDbProps } from "../db";
 import { Duration } from "aws-cdk-lib";
 import { ConfigStatus } from "../../lambda-handlers";
-import { EnvironmentName } from "../common";
+import { InfraEnvironmentId } from "../common";
 import { BaseApiConstruct } from "./base-api";
 
 interface PymtAccApiProps extends RestApiProps {
@@ -90,7 +90,7 @@ export class PymtAccApiConstruct extends BaseApiConstruct {
         CONFIG_TYPE_BELONGS_TO_GSI_NAME: props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name,
         PAYMENT_ACCOUNT_TABLE_NAME: props.pymtAccTable.table.name,
         PAYMENT_ACCOUNT_USERID_GSI_NAME: props.pymtAccTable.globalSecondaryIndexes.userIdStatusShortnameIndex.name,
-        DEFAULT_LOG_LEVEL: this.props.environment === EnvironmentName.LOCAL ? "debug" : "undefined",
+        DEFAULT_LOG_LEVEL: this.props.environment === InfraEnvironmentId.Development ? "debug" : "undefined",
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
       timeout: Duration.seconds(30),

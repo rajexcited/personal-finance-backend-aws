@@ -1,6 +1,6 @@
 import { Construct } from "constructs";
-import { AttributeType, TableV2, TableClass, ProjectionType, GlobalSecondaryIndexPropsV2 } from "aws-cdk-lib/aws-dynamodb";
-import { ConstructProps, EnvironmentName, buildResourceName, AwsResourceType } from "../common";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import { ConstructProps, InfraEnvironmentId, buildResourceName, AwsResourceType } from "../common";
 import { RemovalPolicy } from "aws-cdk-lib";
 import { UserDbProps } from "./db-prop-type";
 
@@ -16,19 +16,19 @@ export class UserDBConstruct extends Construct {
   constructor(scope: Construct, id: string, props: ConstructProps) {
     super(scope, id);
 
-    const db = new TableV2(this, "UserDynamoDb", {
+    const db = new dynamodb.Table(this, "UserDynamoDb", {
       tableName: buildResourceName(["user", "info"], AwsResourceType.Dynamodb, props),
-      partitionKey: { name: "PK", type: AttributeType.STRING },
-      tableClass: TableClass.STANDARD_INFREQUENT_ACCESS,
-      pointInTimeRecovery: props.environment === EnvironmentName.Production,
+      partitionKey: { name: "PK", type: dynamodb.AttributeType.STRING },
+      tableClass: dynamodb.TableClass.STANDARD_INFREQUENT_ACCESS,
+      pointInTimeRecovery: props.environment === InfraEnvironmentId.Production,
       timeToLiveAttribute: "ExpiresAt",
       removalPolicy: RemovalPolicy.DESTROY,
     });
 
-    const emailIdGsiProp: GlobalSecondaryIndexPropsV2 = {
+    const emailIdGsiProp: dynamodb.GlobalSecondaryIndexProps = {
       indexName: buildResourceName(["emailId"], AwsResourceType.GlobalSecondaryIndex),
-      partitionKey: { name: "E_GSI_PK", type: AttributeType.STRING },
-      projectionType: ProjectionType.KEYS_ONLY,
+      partitionKey: { name: "E_GSI_PK", type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.KEYS_ONLY,
     };
     db.addGlobalSecondaryIndex(emailIdGsiProp);
 

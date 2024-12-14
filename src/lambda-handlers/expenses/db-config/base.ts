@@ -1,6 +1,5 @@
 import { IllegelArgumentError } from "../../apigateway";
 import { DbConfigTypeDetails } from "../../config-type";
-import { ConfigResourcePath } from "../../config-type/base-config";
 import { getLogger, LoggerBase } from "../../utils";
 import { ExpenseBelongsTo, ExpenseStatus } from "../base-config";
 import { ExpenseRecordType } from "./field-types";

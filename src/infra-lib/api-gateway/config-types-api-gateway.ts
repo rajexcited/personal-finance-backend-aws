@@ -6,9 +6,8 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
 import { ConfigDbProps, UserDbProps } from "../db";
 import { Duration } from "aws-cdk-lib";
-import { ConfigStatus } from "../../lambda-handlers";
 import { IBucket } from "aws-cdk-lib/aws-s3";
-import { EnvironmentName } from "../common";
+import { InfraEnvironmentId } from "../common";
 import { BaseApiConstruct } from "./base-api";
 
 interface ConfigTypeApiProps extends RestApiProps {
@@ -84,7 +83,7 @@ export class ConfigTypeApiConstruct extends BaseApiConstruct {
         CONFIG_TYPE_TABLE_NAME: props.configTypeTable.table.name,
         CONFIG_TYPE_BELONGS_TO_GSI_NAME: props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name,
         CONFIG_DATA_BUCKET_NAME: props.configBucket.bucketName,
-        DEFAULT_LOG_LEVEL: this.props.environment === EnvironmentName.LOCAL ? "debug" : "undefined",
+        DEFAULT_LOG_LEVEL: this.props.environment === InfraEnvironmentId.Development ? "debug" : "undefined",
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
       timeout: Duration.seconds(30),
@@ -107,68 +106,6 @@ export class ConfigTypeApiConstruct extends BaseApiConstruct {
   }
 
   getJsonRequestModel(lambdaHandlerName: string) {
-    if (lambdaHandlerName === ConfigTypeLambdaHandler.AddUpdate) {
-      // return this.getAddUpdateDetailModel();
-    }
     return undefined;
   }
-
-  private getAddUpdateDetailModel = () => {
-    const props = this.props as RestApiProps;
-    const model: apigateway.Model = props.restApi.addModel("ConfigTypeAddUpdateDetailModel", {
-      modelName: "ConfigTypeAddUpdateDetailModel",
-      contentType: "application/json",
-      description: "add update config type details model",
-      schema: {
-        schema: apigateway.JsonSchemaVersion.DRAFT7,
-        title: "ConfigType Detail Schema",
-        type: apigateway.JsonSchemaType.OBJECT,
-        required: ["name", "value", "status", "tags"],
-        properties: {
-          name: {
-            type: apigateway.JsonSchemaType.STRING,
-            maxLength: 15,
-            pattern: "[\\w\\s\\.,<>\\?'\";:\\{\\}\\[\\]|`~!@#\\$%\\^&\\*\\(\\)\\+=-]+",
-          },
-          value: {
-            type: apigateway.JsonSchemaType.STRING,
-            maxLength: 15,
-            pattern: "[\\w\\s\\.,<>\\?'\";:\\{\\}\\[\\]|`~!@#\\$%\\^&\\*\\(\\)\\+=-]+",
-          },
-          description: {
-            type: apigateway.JsonSchemaType.STRING,
-            maxLength: 400,
-            pattern: "[\\w\\s\\.,<>\\?\\/'\";:\\{\\}\\[\\]|\\\\`~!@#\\$%\\^&\\*\\(\\)\\+=-\\Sc]+",
-          },
-          belongsTo: {
-            type: apigateway.JsonSchemaType.STRING,
-            enum: ["expense-category", "pymt-account-type", "currency-profile"],
-          },
-          status: {
-            type: apigateway.JsonSchemaType.STRING,
-            enum: [ConfigStatus.ENABLE, ConfigStatus.DISABLE, ConfigStatus.DELETED],
-          },
-          color: {
-            type: apigateway.JsonSchemaType.STRING,
-            maxLength: 7,
-            pattern: "#[a-zA-Z0-9]+",
-          },
-          id: {
-            type: apigateway.JsonSchemaType.STRING,
-            maxLength: 36,
-          },
-          tags: {
-            type: apigateway.JsonSchemaType.ARRAY,
-            maxItems: 10,
-            items: {
-              type: apigateway.JsonSchemaType.STRING,
-              maxLength: 15,
-              pattern: "^[\\w\\.-]+$",
-            },
-          },
-        },
-      },
-    });
-    return model;
-  };
 }

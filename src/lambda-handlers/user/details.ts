@@ -2,7 +2,7 @@ import { APIGatewayProxyEvent } from "aws-lambda";
 import { InvalidError, InvalidField, JSONObject, RequestBodyContentType, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
 import { utils, validations, getLogger, LoggerBase, dbutil, dateutil } from "../utils";
 import { DbUserDetails, ApiUserResource, DbItemUser, DbUserStatus, ApiUserAccountStatus } from "./resource-type";
-import { encrypt, verify } from "./pcrypt";
+import { encrypt, verifyCurrPrev } from "./pcrypt";
 import {
   ErrorMessage,
   UserResourcePath,
@@ -63,8 +63,8 @@ const updateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   let apiToDbDetails: DbUserDetails;
 
   if (req.password) {
-    const isMatched = await verify(req.password as string, dbDetails.phash);
-    if (!isMatched) {
+    const matchedObj = await verifyCurrPrev(req.password as string, dbDetails.phash);
+    if (!matchedObj.current && !matchedObj.previous) {
       throw new ValidationError([{ path: UserResourcePath.PASSWORD, message: ErrorMessage.INCORRECT_VALUE }]);
     }
     apiToDbDetails = {
@@ -118,8 +118,8 @@ export const deleteDetails = apiGatewayHandlerWrapper(async (event: APIGatewayPr
     throw new ValidationError([{ message: ErrorMessage.UNKNOWN_USER, path: UserResourcePath.USER }]);
   }
   const dbItem = output.Item as DbItemUser;
-  const isPasswordValid = await verify(passwordHeader, dbItem.details.phash);
-  if (!isPasswordValid || dbItem.details.emailId !== emailIdHeader) {
+  const passwordValidObj = await verifyCurrPrev(passwordHeader, dbItem.details.phash);
+  if ((!passwordValidObj.current && !passwordValidObj.previous) || dbItem.details.emailId !== emailIdHeader) {
     throw new ValidationError([{ path: UserResourcePath.REQUEST, message: ErrorMessage.INCORRECT_VALUE }]);
   }
 

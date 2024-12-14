@@ -7,7 +7,7 @@ import * as logs from "aws-cdk-lib/aws-logs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import { ConfigDbProps, ExpenseDbProps, PymtAccDbProps, UserDbProps } from "../../db";
 import { Duration } from "aws-cdk-lib";
-import { EnvironmentName, ExpenseReceiptContextInfo } from "../../common";
+import { InfraEnvironmentId, ExpenseReceiptContextInfo } from "../../common";
 import { BaseApiConstruct, getTagsRequestQueryParams } from "../base-api";
 import { IBucket } from "aws-cdk-lib/aws-s3";
 import { ReceiptsApiConstruct } from "./receipt-api-gateway";
@@ -100,7 +100,7 @@ export class ExpenseCrudApiConstruct extends BaseApiConstruct {
 
     const receiptApi = new ReceiptsApiConstruct(this, "ReceiptsApiConstruct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
       restApi: props.restApi,
       apiResource: props.apiResource,
       layer: props.layer,
@@ -149,7 +149,7 @@ export class ExpenseCrudApiConstruct extends BaseApiConstruct {
         CONFIG_TYPE_BELONGS_TO_GSI_NAME: props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name,
         RECEIPT_KEY_PREFIX: props.expenseReceiptContext.finalizeReceiptKeyPrefix,
         RECEIPT_TEMP_KEY_PREFIX: props.expenseReceiptContext.temporaryKeyPrefix,
-        DEFAULT_LOG_LEVEL: this.props.environment === EnvironmentName.LOCAL ? "debug" : "undefined",
+        DEFAULT_LOG_LEVEL: this.props.environment === InfraEnvironmentId.Development ? "debug" : "undefined",
         ...additionalEnvs,
       },
       logRetention: logs.RetentionDays.ONE_MONTH,

@@ -6,7 +6,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
 import { DBConstruct } from "../db";
 import { Duration } from "aws-cdk-lib";
-import { EnvironmentName } from "../common";
+import { InfraEnvironmentId } from "../common";
 import { BaseApiConstruct } from "./base-api";
 
 interface StatsApiProps extends RestApiProps {
@@ -65,7 +65,7 @@ export class StatsApiConstruct extends BaseApiConstruct {
         PAYMENT_ACCOUNT_TABLE_NAME: props.allDb.paymentAccountTable.table.name,
         EXPENSES_TABLE_NAME: props.allDb.expenseTable.table.name,
         EXPENSE_USERID_STATUS_GSI_NAME: props.allDb.expenseTable.globalSecondaryIndexes.userIdStatusIndex.name,
-        DEFAULT_LOG_LEVEL: this.props.environment === EnvironmentName.LOCAL ? "debug" : "undefined",
+        DEFAULT_LOG_LEVEL: this.props.environment === InfraEnvironmentId.Development ? "debug" : "undefined",
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
       timeout: Duration.seconds(30),

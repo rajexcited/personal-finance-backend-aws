@@ -47,7 +47,7 @@
     "@aws-cdk/aws-codepipeline-actions:useNewDefaultBranchForCodeCommitSource": true,
     "@aws-cdk/aws-cloudwatch-actions:changeLambdaPermissionLogicalIdForLambdaAction": true,
 
-    "local": {
+    "dev": {
       "expenseReceipt": {
         "temporaryKeyPrefix": "temp/",
         "finalizeReceiptKeyPrefix": "receipts/",
@@ -55,13 +55,13 @@
           "delete": "schedule"
         },
         "expiration": {
-          "finalizeReceipt": "1day",
-          "temporaryReceipt": "1day"
+          "finalizeReceipt": "1 day",
+          "temporaryReceipt": "1 day"
         }
       },
       "apigateway": {
-        "stageName": "local-development",
-        "deleteUserExpiration": "1hour"
+        "deleteUserExpiration": "1 hour",
+        "secretRotatingDuration": "2 days"
       },
       "cloudfront": {
         "geoRestriction": {
@@ -72,7 +72,36 @@
           "errors": "/errors",
           "restApi": "/api"
         },
-        "enableWebAcl": true,
+        "enableWebAcl": false,
+        "homepageUrl": "personal-finance"
+      }
+    },
+    "prd": {
+      "expenseReceipt": {
+        "temporaryKeyPrefix": "temp/",
+        "finalizeReceiptKeyPrefix": "receipts/",
+        "deleteTags": {
+          "delete": "schedule"
+        },
+        "expiration": {
+          "finalizeReceipt": "7 days",
+          "temporaryReceipt": "1 day"
+        }
+      },
+      "apigateway": {
+        "deleteUserExpiration": "6 months",
+        "secretRotatingDuration": "6 months"
+      },
+      "cloudfront": {
+        "geoRestriction": {
+          "allowCountryCodes": ["US"]
+        },
+        "pathPrefix": {
+          "ui": "/ui",
+          "errors": "/errors",
+          "restApi": "/api"
+        },
+        "enableWebAcl": false,
         "homepageUrl": "personal-finance"
       }
     }

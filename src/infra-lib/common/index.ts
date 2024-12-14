@@ -1,4 +1,4 @@
-export { EnvironmentName } from "./env-enum";
+export { InfraEnvironmentId, getValidInfraEnvironment } from "./env-enum";
 
 export { ConstructProps, AwsResourceType } from "./props-type";
 

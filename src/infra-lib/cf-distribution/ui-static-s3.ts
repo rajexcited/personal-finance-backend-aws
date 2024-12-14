@@ -23,13 +23,15 @@ export class UiStaticS3Construct extends Construct {
     });
     this.uiBucket = uiBucket;
 
-    const cfErrorDeployment = new s3Deploy.BucketDeployment(this, "cfErrorBucketDeployment", {
+    const cfErrorBucketDeploymentConstructId = buildResourceName(["cf", "error"], AwsResourceType.BucketDeployment, props);
+    const cfErrorDeployment = new s3Deploy.BucketDeployment(this, cfErrorBucketDeploymentConstructId, {
       destinationBucket: uiBucket,
       sources: [s3Deploy.Source.asset("src/error-pages")],
       destinationKeyPrefix: props.errorsPathPrefix.slice(1) + "/",
     });
 
-    const cntryDataDeployment = new s3Deploy.BucketDeployment(this, "cfCountryDataBucketDeployment", {
+    const cfCountryDataBucketDeploymentConstructId = buildResourceName(["cf", "country"], AwsResourceType.BucketDeployment, props);
+    const cntryDataDeployment = new s3Deploy.BucketDeployment(this, cfCountryDataBucketDeploymentConstructId, {
       destinationBucket: uiBucket,
       sources: [s3Deploy.Source.asset("src/config-data", { exclude: ["**/default-*.json"] })],
       destinationKeyPrefix: props.uiPathPrefix.slice(1) + "/config/",

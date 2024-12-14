@@ -3,87 +3,101 @@ import { camelCase } from "./camelcase";
 import { AwsResourceType, ConstructProps } from "./props-type";
 
 /**
+ * resourceNames are mostly consists of dash. for few which doesn't support dash, we convert it to camelCase
  *
- * @param props constructor props containing environment and resource prefix details
  * @param nameParts for build resource name
- * @param seperator to concatenate all parts with seperator. if ommitted DASH (-) is used as default except for CftOutput .
+ * @param awsResourceType resource name to add as suffix.
+ * @param props constructor props containing environment and resource prefix details
  */
-export const buildResourceName = (nameParts: string[], awsResourceType: AwsResourceType, props?: ConstructProps | null, seperator?: string) => {
+export const buildResourceName = (nameParts: string[], awsResourceType: AwsResourceType, props?: ConstructProps) => {
   if (nameParts.length === 0) {
     throw new Error("name parts are not provided. hence resource name can not be built.");
   }
-  const sep = seperator || "-";
-  const propsArray = props ? [props.resourcePrefix, props.environment] : [];
+  const sep = "-";
+  const propsArray = props ? [props.appId, props.environment] : [];
   const name = [...propsArray, ...nameParts, awsResourceType].join(sep);
-  if (awsResourceType === AwsResourceType.CftOutput) {
-    return camelCase(name);
+  if (awsResourceType === AwsResourceType.CftOutput || awsResourceType === AwsResourceType.BucketDeployment) {
+    return camelCase([...nameParts, "fn" + propsArray.join(""), awsResourceType].join(sep));
   }
   return name;
 };
 
+type Nullable<T> = NonNullable<T> | null;
+
 export const parsedDuration = (formatted: string) => {
   const trimmed = formatted.trim();
   const parts = [0, 0, 0, 0, 0];
+  let num: Nullable<string> = null;
+
   trimmed.split(" ").forEach((st) => {
     if (st) {
       const match =
-        /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(st);
+        /^(-?(?:\d+)?\.?\d+)* *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(st);
+      let tm: Nullable<string> = null;
       if (match) {
-        const num = match[1].trim();
-        if (!isNaN(Number(num))) {
-          const tm = match[2].trim();
-          switch (tm) {
-            case "milliseconds":
-            case "millisecond":
-            case "msecs":
-            case "msec":
-            case "ms":
-              const ms = Number(num);
-              if (ms > 999) {
-                parts[4] = ms % 999;
-                parts[3] += Math.floor(ms / 999);
-              } else {
-                parts[4] = Number(num);
-              }
-              break;
-            case "second":
-            case "seconds":
-            case "secs":
-            case "sec":
-            case "s":
-              parts[3] += Number(num);
-              break;
-            case "minute":
-            case "minutes":
-            case "mins":
-            case "min":
-            case "m":
-              parts[2] = Number(num);
-              break;
-            case "hours":
-            case "hour":
-            case "hrs":
-            case "hr":
-            case "h":
-              parts[1] = Number(num);
-              break;
-            case "days":
-            case "day":
-            case "d":
-              parts[0] += Number(num);
-              break;
-            case "weeks":
-            case "week":
-            case "w":
-              parts[0] += 7 * Number(num);
-              break;
-            case "years":
-            case "year":
-            case "yrs":
-            case "y":
-              parts[0] += 365.25 * Number(num);
-              break;
-          }
+        tm = match[2] ? match[2].trim() : null;
+        num = num !== null ? num : match[1] ? match[1].trim() : null;
+      }
+
+      if (!isNaN(Number(num))) {
+        switch (tm?.toLowerCase()) {
+          case "milliseconds":
+          case "millisecond":
+          case "msecs":
+          case "msec":
+          case "ms":
+            const ms = Number(num);
+            if (ms > 999) {
+              parts[4] = ms % 999;
+              parts[3] += Math.floor(ms / 999);
+            } else {
+              parts[4] = Number(num);
+            }
+            num = null;
+            break;
+          case "second":
+          case "seconds":
+          case "secs":
+          case "sec":
+          case "s":
+            parts[3] += Number(num);
+            num = null;
+            break;
+          case "minute":
+          case "minutes":
+          case "mins":
+          case "min":
+          case "m":
+            parts[2] = Number(num);
+            num = null;
+            break;
+          case "hours":
+          case "hour":
+          case "hrs":
+          case "hr":
+          case "h":
+            parts[1] = Number(num);
+            num = null;
+            break;
+          case "days":
+          case "day":
+          case "d":
+            parts[0] += Number(num);
+            num = null;
+            break;
+          case "weeks":
+          case "week":
+          case "w":
+            parts[0] += 7 * Number(num);
+            num = null;
+            break;
+          case "years":
+          case "year":
+          case "yrs":
+          case "y":
+            parts[0] += 365.25 * Number(num);
+            num = null;
+            break;
         }
       }
     }

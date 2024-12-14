@@ -29,6 +29,7 @@ export interface DbDetailsInvestment extends DbDetailsType {
   status: ExpenseStatus;
   belongsTo: ExpenseBelongsTo.Investment;
   investmentTypeId: string;
+  personIds: string[];
 }
 
 export const getTablePkDetails = (investmentId: string, _logger: LoggerBase) => {

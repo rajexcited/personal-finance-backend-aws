@@ -1,11 +1,11 @@
-import { TableV2 } from "aws-cdk-lib/aws-dynamodb";
+import { Table } from "aws-cdk-lib/aws-dynamodb";
 
 interface DbSecondaryIndex {
   name: string;
 }
 
 interface DbTableRef {
-  ref: TableV2;
+  ref: Table;
   name: string;
 }
 

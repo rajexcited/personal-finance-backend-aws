@@ -19,25 +19,25 @@ export class DBConstruct extends Construct {
 
     const userDb = new UserDBConstruct(this, "UserDbConstruct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
     });
     this.userTable = userDb.userTable;
 
     const expenseDb = new ExpenseDBConstruct(this, "ExpenseDbConstruct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
     });
     this.expenseTable = expenseDb.expenseTable;
 
     const pymtAccDb = new PymtAccDBConstruct(this, "PymtAccDbConstruct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
     });
     this.paymentAccountTable = pymtAccDb.pymtAccTable;
 
     const cfgTypDb = new ConfigTypeDBConstruct(this, "CfgTypDbConstruct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
     });
     this.configTypeTable = cfgTypDb.cfgTypTable;
   }

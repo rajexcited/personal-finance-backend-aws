@@ -22,7 +22,7 @@ export class MyFinanceUiDeployAppStack extends Stack {
 
     const uiDeploy = new UiAssetDeployS3Construct(this, "UiAssetDeployS3Construct", {
       environment: props.environment,
-      resourcePrefix: props.resourcePrefix,
+      appId: props.appId,
       uiBucketArn: props.uiBucketArn,
       uiPathPrefix: contextInfo.cloudfront.pathPrefix.ui,
       homepagePath: contextInfo.cloudfront.homepageUrl,

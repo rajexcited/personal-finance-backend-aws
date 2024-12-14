@@ -1,7 +1,7 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { getSignedToken } from "../auth";
 import { AuthRole } from "../common";
-import { UnAuthorizedError, apiGatewayHandlerWrapper, RequestBodyContentType, InvalidField, ValidationError } from "../apigateway";
+import { UnAuthorizedError, apiGatewayHandlerWrapper, RequestBodyContentType, InvalidField, ValidationError, JSONObject } from "../apigateway";
 import { LoggerBase, getLogger, utils, validations, dbutil } from "../utils";
 import {
   _logger,
@@ -13,8 +13,8 @@ import {
   getTokenTablePk,
   getValidatedUserId,
 } from "./base-config";
-import { ApiUserResource, DbItemUser, DbItemToken } from "./resource-type";
-import { verify } from "./pcrypt";
+import { ApiUserResource, DbItemUser, DbItemToken, AuthorizeUser } from "./resource-type";
+import { encrypt, verifyCurrPrev } from "./pcrypt";
 
 const loginHandler = async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("login", _logger);
@@ -40,9 +40,32 @@ const loginHandler = async (event: APIGatewayProxyEvent) => {
   const output = await dbutil.getItem(getcmdInput, logger);
   logger.log("getItem by UserDetail PK");
   const dbDetailsItem = output.Item as DbItemUser;
-  const isMatched = await verify(req.password as string, dbDetailsItem.details.phash);
-  if (!isMatched) {
+  const matchedObj = await verifyCurrPrev(req.password as string, dbDetailsItem.details.phash);
+  if (!matchedObj.current && !matchedObj.previous) {
     throw new UnAuthorizedError(UserResourcePath.PASSWORD + " " + ErrorMessage.INCORRECT_VALUE);
+  }
+
+  const transactionWriter = new dbutil.TransactionWriter(logger);
+
+  if (matchedObj.previous) {
+    // re-encrypt the password and save new
+    const phash = await encrypt(req.password as string);
+
+    const primaryUser: AuthorizeUser = {
+      role: AuthRole.PRIMARY,
+      userId: dbDetailsItem.details.id,
+    };
+    const updatedUserAuditDetails = utils.updateAuditDetailsFailIfNotExists(dbDetailsItem.details.auditDetails, primaryUser);
+    const dbDetailItem: DbItemUser = {
+      PK: dbDetailsItem.PK,
+      E_GSI_PK: dbDetailsItem.E_GSI_PK,
+      details: {
+        ...dbDetailsItem.details,
+        auditDetails: updatedUserAuditDetails,
+        phash,
+      },
+    };
+    transactionWriter.putItems(dbDetailItem as unknown as JSONObject, _userTableName);
   }
 
   const accessTokenObj = await getSignedToken(dbDetailsItem.details.id, AuthRole.PRIMARY);
@@ -54,11 +77,14 @@ const loginHandler = async (event: APIGatewayProxyEvent) => {
       tokenExpiresAt: accessTokenObj.getExpiresAt().toMillis(),
     },
   };
-  const putcmdInput = {
-    TableName: _userTableName,
-    Item: dbTokenItem,
-  };
-  const updateResult = await dbutil.putItem(putcmdInput, logger);
+  // const putcmdInput = {
+  //   TableName: _userTableName,
+  //   Item: dbTokenItem,
+  // };
+  transactionWriter.putItems(dbTokenItem as unknown as JSONObject, _userTableName);
+
+  await transactionWriter.executeTransaction();
+  // const updateResult = await dbutil.putItem(putcmdInput, logger);
   logger.info("updateResult", "accessTokenObj", accessTokenObj);
 
   return {

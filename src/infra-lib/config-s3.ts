@@ -17,7 +17,8 @@ export class ConfigS3Construct extends Construct {
     });
     this.configBucket = configBucket;
 
-    const deployment = new s3Deploy.BucketDeployment(this, "ConfigBucketDeployment", {
+    const configBucketDeploymentConstructId = buildResourceName(["config", "data"], AwsResourceType.BucketDeployment, props);
+    const deployment = new s3Deploy.BucketDeployment(this, configBucketDeploymentConstructId, {
       destinationBucket: configBucket,
       sources: [s3Deploy.Source.asset("src/config-data")],
     });

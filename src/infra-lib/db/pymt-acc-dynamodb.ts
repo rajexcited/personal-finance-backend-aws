@@ -1,6 +1,6 @@
 import { Construct } from "constructs";
-import { AttributeType, TableV2, TableClass, ProjectionType, GlobalSecondaryIndexPropsV2 } from "aws-cdk-lib/aws-dynamodb";
-import { ConstructProps, EnvironmentName, buildResourceName, AwsResourceType } from "../common";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import { ConstructProps, InfraEnvironmentId, buildResourceName, AwsResourceType } from "../common";
 import { RemovalPolicy } from "aws-cdk-lib";
 import { PymtAccDbProps } from "./db-prop-type";
 
@@ -17,19 +17,19 @@ export class PymtAccDBConstruct extends Construct {
   constructor(scope: Construct, id: string, props: ConstructProps) {
     super(scope, id);
 
-    const db = new TableV2(this, "PymtAccountDynamoDb", {
+    const db = new dynamodb.Table(this, "PymtAccountDynamoDb", {
       tableName: buildResourceName(["pymt", "acc"], AwsResourceType.Dynamodb, props),
-      partitionKey: { name: "PK", type: AttributeType.STRING },
-      tableClass: TableClass.STANDARD_INFREQUENT_ACCESS,
-      pointInTimeRecovery: props.environment === EnvironmentName.Production,
+      partitionKey: { name: "PK", type: dynamodb.AttributeType.STRING },
+      tableClass: dynamodb.TableClass.STANDARD_INFREQUENT_ACCESS,
+      pointInTimeRecovery: props.environment === InfraEnvironmentId.Production,
       removalPolicy: RemovalPolicy.DESTROY,
     });
 
-    const gsiProp: GlobalSecondaryIndexPropsV2 = {
+    const gsiProp: dynamodb.GlobalSecondaryIndexProps = {
       indexName: buildResourceName(["userId", "status", "shortName"], AwsResourceType.GlobalSecondaryIndex),
-      partitionKey: { name: "UP_GSI_PK", type: AttributeType.STRING },
-      sortKey: { name: "UP_GSI_SK", type: AttributeType.STRING },
-      projectionType: ProjectionType.ALL,
+      partitionKey: { name: "UP_GSI_PK", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "UP_GSI_SK", type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
     };
     db.addGlobalSecondaryIndex(gsiProp);
 

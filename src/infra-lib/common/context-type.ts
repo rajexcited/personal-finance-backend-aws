@@ -9,8 +9,8 @@ export interface ExpenseReceiptContextInfo {
 }
 
 export interface ApigatewayContextInfo {
-  stageName: string;
   deleteUserExpiration: string;
+  secretRotatingDuration: string;
 }
 
 interface CfPathPrefixContextInfo {

@@ -10,7 +10,7 @@ export interface DomainCfProps extends ConstructProps {
   uiBucket: s3.IBucket;
   restApi: apigateway.RestApi;
   apiStageName: string;
-  webAclId: string | undefined;
+  // webAclId: string | undefined;
   cfContext: CloudFrontContextInfo;
 }
 
@@ -18,14 +18,7 @@ export class DomainCfConstruct extends Construct {
   constructor(scope: Construct, id: string, props: DomainCfProps) {
     super(scope, id);
 
-    // const originAccessControl = new cf.S3OriginAccessControl(this, "OriginAccessControlConstruct", {
-
-    // });
-    // props.uiBucket.grantRead(originAccessIdentity);
-
     const defaultBucketOrigin = cfo.S3BucketOrigin.withOriginAccessControl(props.uiBucket, {
-      // originAccessIdentity: originAccessIdentity,
-      // originAccessCont:originAccessControl
       originId: "s3-static-ui",
     });
 
@@ -56,7 +49,7 @@ export class DomainCfConstruct extends Construct {
         functionAssociations: [redirectHomepageCfFunction],
       },
       priceClass: cf.PriceClass.PRICE_CLASS_100,
-      webAclId: props.cfContext.enableWebAcl ? props.webAclId : undefined,
+      // webAclId: props.cfContext.enableWebAcl ? props.webAclId : undefined,
       geoRestriction: geoRestriction,
       errorResponses: this.getErrorResponses(props),
     });

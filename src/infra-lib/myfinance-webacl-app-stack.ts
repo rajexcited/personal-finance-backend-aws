@@ -23,7 +23,7 @@ export class MyFinanceWebAclAppStack extends Stack {
     if (contextInfo.cloudfront.enableWebAcl) {
       const webAcl = new MyWebAclConstructConstruct(this, "WebAclConstruct", {
         environment: props.environment,
-        resourcePrefix: props.resourcePrefix,
+        appId: props.appId,
       });
       this.webAclId = webAcl.arn;
     } else {

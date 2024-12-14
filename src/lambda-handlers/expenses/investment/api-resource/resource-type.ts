@@ -1,4 +1,5 @@
 import { ApiResourceExpense } from "../../api-resource/resource-path";
+import { ExpenseBelongsTo } from "../../base-config";
 
 export interface ApiResourceInvestmentDetails extends ApiResourceExpense {
   portfolioName: string;
@@ -11,4 +12,5 @@ export interface ApiResourceInvestmentDetails extends ApiResourceExpense {
   targetYear: string;
   interestRate: string;
   investmentTypeId: string;
+  belongsTo: ExpenseBelongsTo.Investment;
 }

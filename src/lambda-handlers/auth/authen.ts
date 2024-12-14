@@ -6,7 +6,7 @@ import { utils, getLogger, validations, dbutil, LoggerBase } from "../utils";
 import { DbItemToken, getTokenTablePk } from "../user";
 import { AuthRole } from "../common";
 import { UnAuthenticatedError, ValidationError } from "../apigateway";
-import { _logger, _smClient, _tokenSecretId, _userTableName, _rootPath } from "./base-config";
+import { _logger, _smClient, _userTableName, _rootPath } from "./base-config";
 import { getSecret } from "./token-secret";
 
 export const authorizer: APIGatewayTokenAuthorizerHandler = async (event, context) => {
