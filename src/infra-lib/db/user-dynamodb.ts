@@ -19,29 +19,29 @@ export class UserDBConstruct extends Construct {
     const db = new dynamodb.Table(this, "UserDynamoDb", {
       tableName: buildResourceName(["user", "info"], AwsResourceType.Dynamodb, props),
       partitionKey: { name: "PK", type: dynamodb.AttributeType.STRING },
-      tableClass: dynamodb.TableClass.STANDARD_INFREQUENT_ACCESS,
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       pointInTimeRecovery: props.environment === InfraEnvironmentId.Production,
       timeToLiveAttribute: "ExpiresAt",
-      removalPolicy: RemovalPolicy.DESTROY,
+      removalPolicy: RemovalPolicy.DESTROY
     });
 
     const emailIdGsiProp: dynamodb.GlobalSecondaryIndexProps = {
       indexName: buildResourceName(["emailId"], AwsResourceType.GlobalSecondaryIndex),
       partitionKey: { name: "E_GSI_PK", type: dynamodb.AttributeType.STRING },
-      projectionType: dynamodb.ProjectionType.KEYS_ONLY,
+      projectionType: dynamodb.ProjectionType.KEYS_ONLY
     };
     db.addGlobalSecondaryIndex(emailIdGsiProp);
 
     this.userTable = {
       table: {
         ref: db,
-        name: db.tableName,
+        name: db.tableName
       },
       globalSecondaryIndexes: {
         emailIdIndex: {
-          name: emailIdGsiProp.indexName,
-        },
-      },
+          name: emailIdGsiProp.indexName
+        }
+      }
     };
   }
 }

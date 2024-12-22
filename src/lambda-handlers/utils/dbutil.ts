@@ -5,7 +5,7 @@ import {
   ProvisionedThroughputExceededException,
   Put,
   ReturnValue,
-  Update,
+  Update
 } from "@aws-sdk/client-dynamodb";
 import {
   BatchWriteCommandInput,
@@ -17,7 +17,7 @@ import {
   GetCommandInput,
   PutCommandInput,
   DeleteCommandInput,
-  UpdateCommandInput,
+  UpdateCommandInput
 } from "@aws-sdk/lib-dynamodb";
 import { NativeAttributeValue } from "@aws-sdk/util-dynamodb";
 import { LoggerBase, getLogger } from "../utils";
@@ -31,7 +31,7 @@ import { isKeywordDynamoDbReserve } from "./dynamodb-config";
 
 const getItemMemoryCache = caching("memory", {
   max: 25,
-  ttl: ms("60 sec"),
+  ttl: ms("60 sec")
 });
 
 const DdbTranslateConfig: TranslateConfig = {
@@ -39,20 +39,24 @@ const DdbTranslateConfig: TranslateConfig = {
     convertClassInstanceToMap: true,
     convertEmptyValues: false,
     convertTopLevelContainer: true,
-    removeUndefinedValues: true,
-  },
+    removeUndefinedValues: true
+  }
 };
 
 const ddbClient = DynamoDBDocument.from(new DynamoDBClient(), DdbTranslateConfig);
 
-export const getItem = async (input: GetCommandInput, _logger: LoggerBase) => {
+export const getItem = async (input: GetCommandInput, _logger: LoggerBase, notFromCache?: boolean) => {
   const stopwatch = new StopWatch("getItem");
   const logger = getLogger("getItem", _logger);
   try {
     stopwatch.start();
     logger.info("getting results from cache if available", "input =", input);
     const cache = await getItemMemoryCache;
-    const outputPromise = cache.wrap(JSON.stringify(input), async () => {
+    const cacheKey = JSON.stringify(input);
+    if (notFromCache) {
+      await cache.del(cacheKey);
+    }
+    const outputPromise = cache.wrap(cacheKey, async () => {
       logger.info("calling db api call");
       const dbOutput = await ddbClient.get(input);
       return dbOutput;
@@ -157,7 +161,7 @@ export const batchGet = async <T>(
         const requestItems: BatchRequestItems = {};
         requestItems[tableName] = {
           Keys: [...itemsToGet],
-          ...projectionAndExpressionAttr,
+          ...projectionAndExpressionAttr
         };
         logger.debug("requesting [", itemsToGet.length, "] items, requestItems =", requestItems);
 
@@ -344,7 +348,7 @@ export class TransactionWriter {
         }
         const item: TransactionPutItem = {
           Item: it,
-          TableName: tableName || (it.TableName as string),
+          TableName: tableName || (it.TableName as string)
         };
         return item;
       })
@@ -377,7 +381,7 @@ export class TransactionWriter {
       const deletingPKs = Array.isArray(partitionKeys) ? partitionKeys : [partitionKeys];
       itemsDelete = deletingPKs.map((pkv) => ({
         Key: { PK: pkv },
-        TableName: tableName,
+        TableName: tableName
       }));
     } else {
       logger.debug("none of partitionKeys and tableName Or deleteItems");
@@ -419,7 +423,7 @@ export class TransactionWriter {
       logger.info("scheduled", this.items.length, "items are getting written in a transaction");
 
       const transactWriteResult = await ddbClient.transactWrite({
-        TransactItems: this.items,
+        TransactItems: this.items
       });
       logger.info("transactWriteResult =", transactWriteResult);
     } finally {
@@ -460,6 +464,6 @@ const getExpressionAttributeMap = (projectionExpression?: string): Omit<KeysAndA
 
   return {
     ProjectionExpression: convertedProjectedExpressionList.join(","),
-    ExpressionAttributeNames: i === 1 ? undefined : Object.fromEntries(Object.entries(expressionAttrNameMap).map(([k, v]) => [v, k])),
+    ExpressionAttributeNames: i === 1 ? undefined : Object.fromEntries(Object.entries(expressionAttrNameMap).map(([k, v]) => [v, k]))
   };
 };

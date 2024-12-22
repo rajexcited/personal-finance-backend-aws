@@ -2,7 +2,7 @@ import { Construct } from "constructs";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
-import { RemovalPolicy } from "aws-cdk-lib";
+import { Duration, RemovalPolicy } from "aws-cdk-lib";
 import { Algorithm } from "jsonwebtoken";
 import { AwsResourceType, buildResourceName, ConstructProps } from "../common";
 import { parsedDuration } from "../common/utils";
@@ -36,25 +36,25 @@ export class AuthSecretConstruct extends Construct {
       // algorithm to encrypt and decrypt token
       algorithm: "HS256",
       // token type
-      type: "JWT",
+      type: "JWT"
     };
 
     const psalt = {
-      current: "",
-      previous: "",
+      saltCurrent: "",
+      saltPrevious: ""
     };
 
     const generateTokenConfig: secretsmanager.SecretStringGenerator = {
       passwordLength: 64,
       generateStringKey: "tokenSecret",
-      secretStringTemplate: JSON.stringify({ ...this.jwtDetails, psalt }),
+      secretStringTemplate: JSON.stringify({ ...this.jwtDetails, ...psalt }),
       excludeCharacters: undefined,
       excludeLowercase: false,
       excludeUppercase: false,
       excludeNumbers: false,
       excludePunctuation: false,
       includeSpace: false,
-      requireEachIncludedType: true,
+      requireEachIncludedType: true
     };
 
     const secret = new secretsmanager.Secret(this, "MySecret", {
@@ -63,7 +63,7 @@ export class AuthSecretConstruct extends Construct {
       // https://awscli.amazonaws.com/v2/documentation/api/latest/reference/kms/list-aliases.html#examples
       //   encryptionKey: kms.Alias.fromAliasName(this, "PSaltKms", "alias/aws/secretsmanager"),
       removalPolicy: RemovalPolicy.DESTROY,
-      generateSecretString: generateTokenConfig,
+      generateSecretString: generateTokenConfig
     });
     this.secret = secret;
 
@@ -74,14 +74,15 @@ export class AuthSecretConstruct extends Construct {
       code: lambda.Code.fromAsset("src/lambda-handlers"),
       layers: [props.layer],
       environment: {
-        TOKEN_GENERATE_CONFIG: JSON.stringify(generateTokenConfig),
+        TOKEN_GENERATE_CONFIG: JSON.stringify(generateTokenConfig)
       },
       logRetention: logs.RetentionDays.FIVE_MONTHS,
+      timeout: Duration.seconds(30)
     });
 
     secret.addRotationSchedule("tokenSecretRotation", {
       rotationLambda: tokenSecretLambdaFunction,
-      automaticallyAfter: parsedDuration(props.secretRotatingDuration),
+      automaticallyAfter: parsedDuration(props.secretRotatingDuration)
     });
   }
 }

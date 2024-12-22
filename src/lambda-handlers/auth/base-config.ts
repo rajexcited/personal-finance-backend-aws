@@ -1,7 +1,5 @@
-import { SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 import { getLogger } from "../utils";
 
-export const _smClient = new SecretsManagerClient();
 export const _tokenSecretId = process.env.AUTH_SECRET_ID as string;
 
 export const _userTableName = process.env.USER_TABLE_NAME as string;

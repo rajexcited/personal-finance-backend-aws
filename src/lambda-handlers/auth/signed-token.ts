@@ -1,10 +1,9 @@
 import * as jwt from "jsonwebtoken";
 import * as datetime from "date-and-time";
-import { getLogger } from "../utils";
+import { getLogger, secretutil } from "../utils";
 import { AuthRole } from "../common";
-import { TokenPayload } from "./auth-type";
-import { _logger } from "./base-config";
-import { getSecret } from "./token-secret";
+import { TokenPayload, TokenSecret } from "./auth-type";
+import { _logger, _tokenSecretId } from "./base-config";
 
 /** 1h */
 const expiresInMillis = 60 * 60 * 1000;
@@ -16,14 +15,14 @@ export const getSignedToken = async (userId: string, role?: AuthRole) => {
   const payload: TokenPayload = {
     role: role || AuthRole.PRIMARY,
     id: userId,
-    iat: iat.getTime(),
+    iat: iat.getTime()
   };
   logger.info("token payload", payload);
 
-  const secret = await getSecret();
+  const secret = await secretutil.getSecret<TokenSecret>(_tokenSecretId, true, logger);
   const options: jwt.SignOptions = {
     expiresIn: 60 * 60 * 1000,
-    algorithm: secret.algorithm,
+    algorithm: secret.algorithm
   };
 
   const token = jwt.sign(payload, secret.tokenSecret, options);
@@ -64,7 +63,7 @@ class SignedToken {
     return {
       toDate: () => this.expiresAt,
       toMillis: () => this.expiresAt.getTime(),
-      toSeconds: () => Math.floor(this.expiresAt.getTime() / 1000),
+      toSeconds: () => Math.floor(this.expiresAt.getTime() / 1000)
     };
   }
 }

@@ -20,29 +20,29 @@ export class PymtAccDBConstruct extends Construct {
     const db = new dynamodb.Table(this, "PymtAccountDynamoDb", {
       tableName: buildResourceName(["pymt", "acc"], AwsResourceType.Dynamodb, props),
       partitionKey: { name: "PK", type: dynamodb.AttributeType.STRING },
-      tableClass: dynamodb.TableClass.STANDARD_INFREQUENT_ACCESS,
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       pointInTimeRecovery: props.environment === InfraEnvironmentId.Production,
-      removalPolicy: RemovalPolicy.DESTROY,
+      removalPolicy: RemovalPolicy.DESTROY
     });
 
     const gsiProp: dynamodb.GlobalSecondaryIndexProps = {
       indexName: buildResourceName(["userId", "status", "shortName"], AwsResourceType.GlobalSecondaryIndex),
       partitionKey: { name: "UP_GSI_PK", type: dynamodb.AttributeType.STRING },
       sortKey: { name: "UP_GSI_SK", type: dynamodb.AttributeType.STRING },
-      projectionType: dynamodb.ProjectionType.ALL,
+      projectionType: dynamodb.ProjectionType.ALL
     };
     db.addGlobalSecondaryIndex(gsiProp);
 
     this.pymtAccTable = {
       table: {
         ref: db,
-        name: db.tableName,
+        name: db.tableName
       },
       globalSecondaryIndexes: {
         userIdStatusShortnameIndex: {
-          name: gsiProp.indexName,
-        },
-      },
+          name: gsiProp.indexName
+        }
+      }
     };
   }
 }

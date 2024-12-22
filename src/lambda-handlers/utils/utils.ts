@@ -127,12 +127,14 @@ const getValidatedUserDetails = async (userIdOrDetails: string | DbUserDetails |
   return details;
 };
 
-export const getJsonObj = <TResult>(jsonstr: string) => {
+export const getJsonObj = <TResult>(jsonstr: string | null | undefined) => {
   const logger = getLogger("getJsonObj", _logger);
   try {
-    const parsed = JSON.parse(jsonstr);
-    if (!parsed) throw Error("incorrect json structure");
-    return parsed as TResult;
+    if (jsonstr) {
+      const parsed = JSON.parse(jsonstr);
+      if (!parsed) throw Error("incorrect json structure");
+      return parsed as TResult;
+    }
   } catch (err) {
     logger.info("error parsing JSON string", err);
   }

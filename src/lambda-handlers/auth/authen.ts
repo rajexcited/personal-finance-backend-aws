@@ -1,13 +1,12 @@
 import { APIGatewayAuthorizerResult, APIGatewayTokenAuthorizerHandler, PolicyDocument } from "aws-lambda";
 import * as jwt from "jsonwebtoken";
-import { TokenHeader, TokenPayload } from "./auth-type";
+import { TokenHeader, TokenPayload, TokenSecret } from "./auth-type";
 import { RoleAuthConfigList } from "./role-config";
-import { utils, getLogger, validations, dbutil, LoggerBase } from "../utils";
+import { utils, getLogger, validations, dbutil, LoggerBase, secretutil } from "../utils";
 import { DbItemToken, getTokenTablePk } from "../user";
 import { AuthRole } from "../common";
 import { UnAuthenticatedError, ValidationError } from "../apigateway";
-import { _logger, _smClient, _userTableName, _rootPath } from "./base-config";
-import { getSecret } from "./token-secret";
+import { _logger, _userTableName, _rootPath, _tokenSecretId } from "./base-config";
 
 export const authorizer: APIGatewayTokenAuthorizerHandler = async (event, context) => {
   const logger = getLogger("authorizer", _logger);
@@ -32,8 +31,8 @@ export const authorizer: APIGatewayTokenAuthorizerHandler = async (event, contex
     policyDocument: iamPolicyDocument,
     principalId: payload.id,
     context: {
-      role: payload.role,
-    },
+      role: payload.role
+    }
   };
   logger.info("authorizer response", resp);
   return resp;
@@ -46,7 +45,7 @@ const authenticate = async (token: string) => {
     const tokenPayload = getTokenPayload(token);
 
     logger.info("token headers", tokenHeaders, "token payload", tokenPayload);
-    const secret = await getSecret();
+    const secret = await secretutil.getSecret<TokenSecret>(_tokenSecretId, true, logger);
     const decoded = jwt.verify(token, secret.tokenSecret) as jwt.JwtPayload;
     logger.info("decoded result", decoded);
 
@@ -100,7 +99,7 @@ const authorize = async (payload: TokenPayload, resourceArn: string, jwtPayload:
   }
 
   const { methodUri, httpMethod } = getResourceParts(resourceArn, logger);
-  // logger.debug("roleAuthConfigList", RoleAuthConfigList);
+
   const filteredCfg = RoleAuthConfigList.filter((cfg) => {
     const includesStar = cfg.apiPath.includes("/*");
     const fullApiPath = _rootPath + cfg.apiPath;
@@ -133,9 +132,9 @@ const authorize = async (payload: TokenPayload, resourceArn: string, jwtPayload:
   // verify if user is valid
   const cmdInput = {
     TableName: _userTableName,
-    Key: { PK: getTokenTablePk(payload.id) },
+    Key: { PK: getTokenTablePk(payload.id) }
   };
-  const result = await dbutil.getItem(cmdInput, logger);
+  const result = await dbutil.getItem(cmdInput, logger, filteredCfg[0].clearCache);
 
   logger.debug("retrieved user");
   if (!result.Item) {
@@ -203,9 +202,9 @@ const generatePolicy = function (effect: "Allow" | "Deny", resourceArn: string |
       {
         Action: "execute-api:Invoke",
         Effect: effect,
-        Resource: resourceArn,
-      },
-    ],
+        Resource: resourceArn
+      }
+    ]
   };
   return policyDocument;
 };
@@ -228,6 +227,6 @@ const getResourceParts = (resourceArn: string, baseLogger: LoggerBase) => {
     apiNameWithStage: methodParts.slice(0, 2).join("/"),
     apiName: methodParts[0],
     stageName: methodParts[1],
-    resourceArnPrefix: resourceParts.slice(0, -1).join(":"),
+    resourceArnPrefix: resourceParts.slice(0, -1).join(":")
   };
 };

@@ -38,7 +38,6 @@ const loginHandler = async (event: APIGatewayProxyEvent) => {
     Key: { PK: gsioutput.Items[0].PK },
   };
   const output = await dbutil.getItem(getcmdInput, logger);
-  logger.log("getItem by UserDetail PK");
   const dbDetailsItem = output.Item as DbItemUser;
   const matchedObj = await verifyCurrPrev(req.password as string, dbDetailsItem.details.phash);
   if (!matchedObj.current && !matchedObj.previous) {

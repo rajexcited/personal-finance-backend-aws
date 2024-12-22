@@ -20,29 +20,29 @@ export class ConfigTypeDBConstruct extends Construct {
     const db = new dynamodb.Table(this, "ConfigTypeDynamoDb", {
       tableName: buildResourceName(["cfg", "type"], AwsResourceType.Dynamodb, props),
       partitionKey: { name: "PK", type: dynamodb.AttributeType.STRING },
-      tableClass: dynamodb.TableClass.STANDARD_INFREQUENT_ACCESS,
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       pointInTimeRecovery: props.environment === InfraEnvironmentId.Production,
-      removalPolicy: RemovalPolicy.DESTROY,
+      removalPolicy: RemovalPolicy.DESTROY
     });
 
     const gsiProp: dynamodb.GlobalSecondaryIndexProps = {
       indexName: buildResourceName(["userId", "belongsTo"], AwsResourceType.GlobalSecondaryIndex),
       partitionKey: { name: "UB_GSI_PK", type: dynamodb.AttributeType.STRING },
       sortKey: { name: "UB_GSI_SK", type: dynamodb.AttributeType.STRING },
-      projectionType: dynamodb.ProjectionType.ALL,
+      projectionType: dynamodb.ProjectionType.ALL
     };
     db.addGlobalSecondaryIndex(gsiProp);
 
     this.cfgTypTable = {
       table: {
         ref: db,
-        name: db.tableName,
+        name: db.tableName
       },
       globalSecondaryIndexes: {
         userIdBelongsToIndex: {
-          name: gsiProp.indexName,
-        },
-      },
+          name: gsiProp.indexName
+        }
+      }
     };
   }
 }

@@ -24,10 +24,10 @@ const client = new SecretsManagerClient();
 const _logger = getLogger("token-rotator");
 
 interface AuthSecretValueMap {
-  psalt: { current: string; previous: string };
+  saltCurrent: string;
+  saltPrevious: string;
   tokenSecret: string;
   algorithm: string;
-
   type: string;
 }
 
@@ -46,7 +46,7 @@ interface AuthSecretValueMap {
  */
 export const secretRotator: SecretsManagerRotationHandler = async (event, context) => {
   const logger = getLogger("secretRotate", _logger);
-  logger.debug("event", event);
+  logger.info("event=", event, "context=", context);
 
   const describeCmd = new DescribeSecretCommand({
     SecretId: event.SecretId,
@@ -66,7 +66,7 @@ export const secretRotator: SecretsManagerRotationHandler = async (event, contex
     logger.warn("Secret version [" + event.ClientRequestToken + "] already set as AWSCURRENT for secret [" + event.SecretId + "].");
     return;
   }
-  if (describeResult.VersionIdsToStages[event.ClientRequestToken].includes("AWSPENDING")) {
+  if (!describeResult.VersionIdsToStages[event.ClientRequestToken].includes("AWSPENDING")) {
     logger.warn("Secret version [" + event.ClientRequestToken + "] already set as AWSPENDING for secret [" + event.SecretId + "].");
     throw new Error("Secret version [" + event.ClientRequestToken + "] already set as AWSPENDING for secret [" + event.SecretId + "].");
   }
@@ -104,7 +104,7 @@ const createSecret = async (event: SecretsManagerRotationEvent) => {
     });
     const getValueResult = await client.send(getValueCmd);
     const obj = utils.getJsonObj<AuthSecretValueMap>(getValueResult.SecretString as string);
-    if (!obj || !obj.tokenSecret || !obj.psalt.current || obj.psalt.current === obj.psalt.previous) {
+    if (!obj || !obj.tokenSecret || !obj.saltCurrent || obj.saltCurrent === obj.saltPrevious) {
       throw new Error("create proper format for auth secret with all required value");
     }
     logger.info("successfully retrieved secret for [" + event.SecretId + "].");
@@ -159,15 +159,19 @@ const testSecret = async (event: SecretsManagerRotationEvent) => {
   const decoded = jwt.verify(token, secretObj.tokenSecret) as jwt.JwtPayload;
   logger.info("decrypted", decoded);
 
-  const saltSecret = (secretObj as AuthSecretValueMap).psalt;
-  if (!saltSecret.current || saltSecret.current === saltSecret.previous) {
+  const saltSecret = secretObj as AuthSecretValueMap;
+  logger.info("saltSecret curr", saltSecret);
+  if (!saltSecret.saltCurrent || saltSecret.saltCurrent === saltSecret.saltPrevious) {
     throw new ValidationError([{ path: "salt-current", message: "same value as previous" }]);
   }
-  const hash = bcrypt.hashSync("testpassword", saltSecret.current);
+  const hash = bcrypt.hashSync("testpassword", saltSecret.saltCurrent);
+  logger.info("hash", hash);
   const currSalt = bcrypt.getSalt(hash);
-  if (currSalt !== saltSecret.current) {
+  if (currSalt !== saltSecret.saltCurrent) {
+    logger.warn("retrieved salt[", currSalt, "] from hash is not the same as secretSalt.current");
     throw new ValidationError([{ path: "salt-current", message: "incorrect salt value" }]);
   }
+  logger.info("salt test successful");
 };
 
 /**
@@ -223,8 +227,8 @@ const generatePassword = async (event: SecretsManagerRotationEvent, loggerBase: 
   templatedObj.tokenSecret = await getRandomToken(generateTokenConfiguration, logger);
 
   // generate random salt
-  templatedObj.psalt.previous = templatedObj.psalt.current;
-  templatedObj.psalt.current = getRandomSalt(generateTokenConfiguration, logger);
+  templatedObj.saltPrevious = templatedObj.saltCurrent;
+  templatedObj.saltCurrent = getRandomSalt(templatedObj.saltPrevious, logger);
 
   logger.info("templatedObj result", templatedObj);
   return JSON.stringify(templatedObj);
@@ -235,16 +239,12 @@ const getTemplateObject = async (event: SecretsManagerRotationEvent, generateTok
   const getValueCmd = new GetSecretValueCommand({ SecretId: event.SecretId });
   const getValueResult = await client.send(getValueCmd);
   logger.info("currently active secret value result is ", getValueResult);
-  let templateString = generateTokenConfiguration?.secretStringTemplate as string;
-  if (getValueResult.SecretString) {
-    templateString = getValueResult.SecretString;
-  }
-  const templatedObj = utils.getJsonObj<AuthSecretValueMap>(templateString);
-  logger.info("using env template instead of existing secret value");
+  const templatedObj = utils.getJsonObj<AuthSecretValueMap>(getValueResult.SecretString);
+  logger.info("using env template instead of existing secret value. templatedObj=", templatedObj);
   if (templatedObj) {
     return templatedObj;
   }
-  throw new Error("should never be thrown");
+  return utils.getJsonObj<AuthSecretValueMap>(generateTokenConfiguration.secretStringTemplate);
 };
 
 const getRandomToken = async (generateTokenConfiguration: SecretStringGenerator, loggerBase: LoggerBase) => {
@@ -270,8 +270,13 @@ const getRandomToken = async (generateTokenConfiguration: SecretStringGenerator,
   return getPasswordResult.RandomPassword;
 };
 
-const getRandomSalt = (generateTokenConfiguration: SecretStringGenerator, loggerBase: LoggerBase) => {
+const getRandomSalt = (previousSalt: string, loggerBase: LoggerBase): string => {
   const logger = getLogger("getRandomSalt", loggerBase);
 
-  return bcrypt.genSaltSync(generateTokenConfiguration.passwordLength);
+  // if we use the increased round value than default to generate salt, encryption takes more than 30 sec.
+  const currentSalt = bcrypt.genSaltSync();
+  if (currentSalt === previousSalt) {
+    return getRandomSalt(previousSalt, loggerBase);
+  }
+  return currentSalt;
 };

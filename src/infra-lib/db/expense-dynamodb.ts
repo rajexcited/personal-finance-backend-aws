@@ -20,10 +20,10 @@ export class ExpenseDBConstruct extends Construct {
     const db = new dynamodb.Table(this, "ExpenseTableDynamoDb", {
       tableName: buildResourceName(["expense"], AwsResourceType.Dynamodb, props),
       partitionKey: { name: "PK", type: dynamodb.AttributeType.STRING },
-      tableClass: dynamodb.TableClass.STANDARD_INFREQUENT_ACCESS,
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       pointInTimeRecovery: props.environment === InfraEnvironmentId.Production,
       timeToLiveAttribute: "ExpiresAt",
-      removalPolicy: RemovalPolicy.DESTROY,
+      removalPolicy: RemovalPolicy.DESTROY
     });
 
     const gsiProp: dynamodb.GlobalSecondaryIndexProps = {
@@ -31,20 +31,20 @@ export class ExpenseDBConstruct extends Construct {
       partitionKey: { name: "US_GSI_PK", type: dynamodb.AttributeType.STRING },
       sortKey: { name: "US_GSI_SK", type: dynamodb.AttributeType.STRING },
       projectionType: dynamodb.ProjectionType.INCLUDE,
-      nonKeyAttributes: ["US_GSI_BELONGSTO"],
+      nonKeyAttributes: ["US_GSI_BELONGSTO"]
     };
     db.addGlobalSecondaryIndex(gsiProp);
 
     this.expenseTable = {
       table: {
         ref: db,
-        name: db.tableName,
+        name: db.tableName
       },
       globalSecondaryIndexes: {
         userIdStatusIndex: {
-          name: gsiProp.indexName,
-        },
-      },
+          name: gsiProp.indexName
+        }
+      }
     };
   }
 }

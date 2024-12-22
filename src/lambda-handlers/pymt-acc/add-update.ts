@@ -80,7 +80,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
     shortName: req.shortName,
     accountIdNum: req.accountIdNum || "",
     institutionName: req.institutionName || "",
-    status: existingDbItem?.details.status === PymtAccStatus.Immutable ? PymtAccStatus.Immutable : PymtAccStatus.ENABLE,
+    status: existingDbItem?.details.status || PymtAccStatus.ENABLE,
     description: req.description,
     tags: req.tags,
     typeId: req.typeId,
@@ -107,6 +107,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   const resource: ApiPaymentAccountResource = {
     ...req,
     id: apiToDbDetails.id,
+    status: apiToDbDetails.status,
     auditDetails: apiAuditDetails,
   };
 
