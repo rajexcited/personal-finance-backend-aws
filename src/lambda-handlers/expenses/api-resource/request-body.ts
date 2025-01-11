@@ -12,7 +12,7 @@ import { getValidatedUserId } from "../../user";
 const MAX_ALLOWED_PERSON_TAGGING = 10;
 
 export const getValidatedRequestToUpdateExpenseDetails = async (event: APIGatewayProxyEvent, logger: LoggerBase) => {
-  const req: ApiResourceExpense | null = utils.getJsonObj(event.body as string);
+  const req = utils.getJsonObj<ApiResourceExpense>(event.body as string);
   logger.info("request =", req);
 
   if (!req) {

@@ -5,7 +5,7 @@ export {
   deleteUserDetails as userDetailsDelete,
   userLogin,
   userLogout,
-  userSignup,
+  userSignup
 } from "./user";
 
 export { authorizer, secretRotator } from "./auth";
@@ -19,7 +19,7 @@ export {
   updateConfigTypes as configTypeDetailsAddUpdate,
   deleteConfigType as configTypeDelete,
   updateConfigTypeStatus as configTypeStatusUpdate,
-  ConfigStatus,
+  ConfigStatus
 } from "./config-type";
 
 export {
@@ -28,7 +28,7 @@ export {
   getPaymentAccount as pymtAccGet,
   updatePaymentAccount as pymtAccDetailsAddUpdate,
   deletePaymentAccount as pymtAccDelete,
-  updatePaymentAccountStatus as pymtAccStatusUpdate,
+  updatePaymentAccountStatus as pymtAccStatusUpdate
 } from "./pymt-acc";
 
 export {
@@ -37,8 +37,8 @@ export {
   getExpenseTagList as expenseTagListGet,
   getExpenseDetails as expenseDetailsGet,
   addUpdateDetails as expenseDetailsAddUpdate,
-  deleteExpenseDetails as expenseDetailsDelete,
+  deleteExpenseDetails as expenseDetailsDelete
   // updateStatus as expenseStatusUpdate,
 } from "./expenses";
 
-export { purchaseStats as purchaseStatsGet, refundStats as refundStatsGet, incomeStats as incomeStatsGet } from "./stats";
+export { purchaseStats as purchaseStatsGet, refundStats as refundStatsGet, incomeStats as incomeStatsGet, belongsToStats as statsGet } from "./stats";

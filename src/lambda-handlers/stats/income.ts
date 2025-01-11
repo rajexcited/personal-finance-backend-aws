@@ -13,12 +13,12 @@ import {
   getApiStatsResourceByTags,
   getApiStatsResourceByTypeTags,
   getApiStatsResourceDetails,
-  groupDetailsMonthly,
+  groupDetailsMonthly
 } from "./base-config";
 
 const rootLogger = getLogger("stats.income");
 
-export const incomeStats = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
+export const incomeStatsHandler = async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("handler", rootLogger);
 
   const authUser = getAuthorizeUser(event);
@@ -65,8 +65,10 @@ export const incomeStats = apiGatewayHandlerWrapper(async (event: APIGatewayProx
     byTypeTags: statsByTypeTags,
     byPersonTags: statsByPersonId,
     byPymtAcc: statsByPymtAcc,
-    auditDetails: await utils.parseAuditDetails({ createdOn: "", updatedOn: "" }, authUser.userId, authUser),
+    auditDetails: await utils.parseAuditDetails({ createdOn: "", updatedOn: "" }, authUser.userId, authUser)
   };
 
   return apiResource as unknown as JSONObject;
-});
+};
+
+export const incomeStats = apiGatewayHandlerWrapper(incomeStatsHandler);

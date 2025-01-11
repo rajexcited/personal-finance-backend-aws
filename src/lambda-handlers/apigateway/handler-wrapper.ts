@@ -8,13 +8,13 @@ import { StopWatch } from "stopwatch-node";
 const _logger = getLogger("handler-wrapper");
 
 export enum RequestBodyContentType {
-  JSON = "application/json",
+  JSON = "application/json"
 }
 
 export const resourceCreated = (result: JSONValue) => {
   const resp = {
     statusCode: HTTP_STATUS_CODE.CREATED,
-    body: result,
+    body: result
   };
   return resp as JSONValue;
 };
@@ -92,24 +92,24 @@ const convertToAPIGatewayEventResult = (result: JSONValue | APIGatewayProxyResul
   if (result === null || result === undefined || result === "") {
     return {
       statusCode: Number(HTTP_STATUS_CODE.EMPTY_RESPONSE_CONTENT),
-      body: "",
+      body: ""
     };
   }
 
   if (isInstanceofAPIGatewayProxyResult(result)) {
-    let statusCode: number | null = null;
+    let stCode = statusCode;
     const res = result as APIGatewayProxyResult;
 
     const code = Number(res.statusCode);
     if (isValidStatusCode(code)) {
-      statusCode = code;
+      stCode = code;
     }
 
     const resp = convertToAPIGatewayEventResult(res.body);
     return {
-      statusCode: statusCode ? statusCode : resp.statusCode,
+      statusCode: stCode ? stCode : resp.statusCode,
       body: resp.body,
-      headers: res.headers,
+      headers: res.headers
     };
   }
   let body: string;
@@ -120,7 +120,7 @@ const convertToAPIGatewayEventResult = (result: JSONValue | APIGatewayProxyResul
   }
   return {
     statusCode: Number(statusCode || HTTP_STATUS_CODE.SUCCESS),
-    body,
+    body
   };
 };
 
