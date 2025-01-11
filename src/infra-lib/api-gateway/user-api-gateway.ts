@@ -29,12 +29,12 @@ enum UserLambdaHandler {
   Refresh = "index.userTokenRefresh",
   GetDetails = "index.userDetailsGet",
   UpdateDetails = "index.userDetailsUpdate",
-  DeleteDetails = "index.userDetailsDelete",
+  DeleteDetails = "index.userDetailsDelete"
 }
 
 enum ModelId {
   UserLoginModel = "UserLoginModel",
-  UserSignupModel = "UserSignupModel",
+  UserSignupModel = "UserSignupModel"
 }
 
 export class UserApiConstruct extends BaseApiConstruct {
@@ -55,18 +55,19 @@ export class UserApiConstruct extends BaseApiConstruct {
     //  request validator setup
     // https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-method-request-validation.html
     const userLoginResource = userResource.addResource("login");
-    const loginlambdaFunction = this.buildApi(userLoginResource, HttpMethod.POST, UserLambdaHandler.Login);
+    // password decryption needs more memory to prevent performance delay
+    const loginlambdaFunction = this.buildApi(userLoginResource, HttpMethod.POST, UserLambdaHandler.Login, 512);
     props.userTable.table.ref.grantReadWriteData(loginlambdaFunction);
 
     const userSignupResource = userResource.addResource("signup");
-    const signuplambdaFunction = this.buildApi(userSignupResource, HttpMethod.POST, UserLambdaHandler.Signup);
+    const signuplambdaFunction = this.buildApi(userSignupResource, HttpMethod.POST, UserLambdaHandler.Signup, 256);
     props.userTable.table.ref.grantReadWriteData(signuplambdaFunction);
     props.configTypeTable.table.ref.grantReadWriteData(signuplambdaFunction);
     props.paymentAccountTable.table.ref.grantWriteData(signuplambdaFunction);
     props.configBucket.grantRead(signuplambdaFunction);
 
     const userLogoutResource = userResource.addResource("logout");
-    const logoutlambdaFunction = this.buildApi(userLogoutResource, HttpMethod.POST, UserLambdaHandler.Logout);
+    const logoutlambdaFunction = this.buildApi(userLogoutResource, HttpMethod.POST, UserLambdaHandler.Logout, 256);
     props.userTable.table.ref.grantReadWriteData(logoutlambdaFunction);
 
     const userRenewResource = userResource.addResource("refresh");
@@ -84,13 +85,23 @@ export class UserApiConstruct extends BaseApiConstruct {
     props.userTable.table.ref.grantReadWriteData(deleteDetailsLambdaFunction);
   }
 
-  private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: UserLambdaHandler) {
+  /**
+   * creates apigateway resource with synchronous lambda integration
+   *
+   * @param resource api resource endpoint
+   * @param method Http method
+   * @param lambdaHandlerName
+   * @param timeoutSec optional. default value is 30 sec
+   * @param memoryMb optional.
+   * @returns lambda instance
+   */
+  private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: UserLambdaHandler, memoryMb?: number, timeoutSec?: number) {
     const useAuthSecret = [
       UserLambdaHandler.Login,
       UserLambdaHandler.Signup,
       UserLambdaHandler.Refresh,
       UserLambdaHandler.UpdateDetails,
-      UserLambdaHandler.DeleteDetails,
+      UserLambdaHandler.DeleteDetails
     ].includes(lambdaHandlerName);
 
     const props = this.props as UserApiProps;
@@ -98,10 +109,6 @@ export class UserApiConstruct extends BaseApiConstruct {
     if (useAuthSecret) {
       additionalEnvs.AUTH_SECRET_ID = props.authSecret.secretName;
     }
-
-    // if (usePsaltSecret) {
-    //   additionalEnvs.PSALT_SECRET_ID = this.pSaltSecret.secretName;
-    // }
 
     if (lambdaHandlerName === UserLambdaHandler.Signup) {
       additionalEnvs.CONFIG_DATA_BUCKET_NAME = props.configBucket.bucketName;
@@ -124,23 +131,20 @@ export class UserApiConstruct extends BaseApiConstruct {
         USER_TABLE_NAME: props.userTable.table.name,
         USER_EMAIL_GSI_NAME: props.userTable.globalSecondaryIndexes.emailIdIndex.name,
         DEFAULT_LOG_LEVEL: this.props.environment === InfraEnvironmentId.Development ? "debug" : "undefined",
-        ...additionalEnvs,
+        ...additionalEnvs
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
-      timeout: Duration.seconds(30),
+      timeout: Duration.seconds(timeoutSec || 30),
+      memorySize: memoryMb
     });
 
     if (useAuthSecret) {
       props.authSecret.grantRead(userLambdaFunction);
     }
 
-    // if (usePsaltSecret) {
-    //   this.pSaltSecret.grantRead(userLambdaFunction);
-    // }
-
     const userLambdaIntegration = new apigateway.LambdaIntegration(userLambdaFunction, {
       proxy: true,
-      passthroughBehavior: apigateway.PassthroughBehavior.NEVER,
+      passthroughBehavior: apigateway.PassthroughBehavior.NEVER
     });
 
     const applyAuthorize = ![UserLambdaHandler.Login, UserLambdaHandler.Signup].includes(lambdaHandlerName);
@@ -148,110 +152,17 @@ export class UserApiConstruct extends BaseApiConstruct {
     const userMethod = resource.addMethod(String(method), userLambdaIntegration, {
       authorizationType: this.getAuthorizationType(applyAuthorize),
       authorizer: applyAuthorize ? props.authorizer : undefined,
-      ...baseMethodOption,
+      ...baseMethodOption
     });
 
     return userLambdaFunction;
   }
 
   getJsonRequestModel(lambdaHandlerName: string): apigateway.Model | undefined {
-    // if (lambdaHandlerName === UserLambdaHandler.Login) {
-    //   return this.getLoginModel();
-    // }
-    // if (lambdaHandlerName === UserLambdaHandler.Signup) {
-    //   return this.getSignupModel();
-    // }
     return undefined;
   }
 
   private getAuthorizationType = (authorize?: boolean) => {
     return !!authorize ? apigateway.AuthorizationType.CUSTOM : apigateway.AuthorizationType.NONE;
-  };
-
-  /**
-   * https://json-schema.org/draft-07/schema#
-   *
-   * @returns
-   */
-  private getLoginModel = () => {
-    const props = this.props as RestApiProps;
-    const userModel: apigateway.Model = props.restApi.addModel(ModelId.UserLoginModel, {
-      modelName: ModelId.UserLoginModel,
-      contentType: "application/json",
-      description: "model for user login",
-      schema: {
-        schema: apigateway.JsonSchemaVersion.DRAFT7,
-        title: "Login Schema",
-        type: apigateway.JsonSchemaType.OBJECT,
-        required: ["emailId", "password"],
-        properties: {
-          emailId: {
-            type: apigateway.JsonSchemaType.STRING,
-            minLength: 8,
-            maxLength: 50,
-            pattern: "^\\w+([\\.-]?\\w+)*@\\w+([\\.-]?\\w+)*(\\.\\w{2,3})+$",
-          },
-          password: {
-            type: apigateway.JsonSchemaType.STRING,
-            minLength: 8,
-            maxLength: 25,
-            pattern: "^(?=.*[\\d])(?=.*[A-Z])(?=.*[!@#$%^&*])[\\w!@#$%^&\\(\\)\\=*]{8,25}$",
-          },
-        },
-      },
-    });
-    return userModel;
-  };
-
-  /**
-   * https://json-schema.org/draft-07/schema#
-   *
-   * @returns
-   */
-  private getSignupModel = () => {
-    const props = this.props as RestApiProps;
-    const userModel: apigateway.Model = props.restApi.addModel(ModelId.UserSignupModel, {
-      modelName: ModelId.UserSignupModel,
-      contentType: "application/json",
-      description: "model for user signup",
-      schema: {
-        schema: apigateway.JsonSchemaVersion.DRAFT7,
-        title: "Signup Schema",
-        type: apigateway.JsonSchemaType.OBJECT,
-        required: ["firstName", "lastName", "emailId", "password", "countryCode"],
-        properties: {
-          firstName: {
-            type: apigateway.JsonSchemaType.STRING,
-            minLength: 2,
-            maxLength: 25,
-            pattern: "^[\\w\\s]+$",
-          },
-          lastName: {
-            type: apigateway.JsonSchemaType.STRING,
-            minLength: 2,
-            maxLength: 25,
-            pattern: "^[\\w\\s]+$",
-          },
-          emailId: {
-            type: apigateway.JsonSchemaType.STRING,
-            minLength: 8,
-            maxLength: 50,
-            pattern: "^\\w+([\\.-]?\\w+)*@\\w+([\\.-]?\\w+)*(\\.\\w{2,3})+$",
-          },
-          password: {
-            type: apigateway.JsonSchemaType.STRING,
-            minLength: 8,
-            maxLength: 25,
-            pattern: "^(?=.*[\\d])(?=.*[A-Z])(?=.*[!@#$%^&*])[\\w!@#$%^&\\(\\)\\=*]{8,25}$",
-          },
-          countryCode: {
-            type: apigateway.JsonSchemaType.STRING,
-            maxLength: 5,
-            pattern: "[A-Z]+",
-          },
-        },
-      },
-    });
-    return userModel;
   };
 }

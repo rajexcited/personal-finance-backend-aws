@@ -2,15 +2,7 @@ import { APIGatewayProxyEvent } from "aws-lambda";
 import { v4 as uuidv4 } from "uuid";
 import { AuthRole } from "../common";
 import { getSignedToken } from "../auth";
-import {
-  apiGatewayHandlerWrapper,
-  RequestBodyContentType,
-  ValidationError,
-  InvalidField,
-  NotFoundError,
-  convertToCreatedResponse,
-  MissingError,
-} from "../apigateway";
+import { apiGatewayHandlerWrapper, RequestBodyContentType, ValidationError, InvalidField, NotFoundError, convertToCreatedResponse, MissingError } from "../apigateway";
 import { getLogger, utils, LoggerBase, validations, dbutil, s3utils } from "../utils";
 import {
   _logger as userLogger,
@@ -20,9 +12,9 @@ import {
   getEmailGsiPk,
   getTokenTablePk,
   UserResourcePath,
-  ErrorMessage,
+  ErrorMessage
 } from "./base-config";
-import { encrypt } from "./pcrypt";
+import { encrypt, initiate } from "./pcrypt";
 import { DbUserDetails, DbItemUser, DbItemToken, ApiUserResource, AuthorizeUser, DbUserStatus } from "./resource-type";
 import { ConfigBelongsTo, DbConfigTypeDetails, DefaultConfigData, _configDataBucketName, addDefaultConfigTypes } from "../config-type";
 import { DefaultPaymentAccounts } from "../pymt-acc/resource-type";
@@ -36,6 +28,7 @@ const _logger = getLogger("signup", userLogger);
 const COUNTRY_CODE_MAX_LENGTH = 5;
 
 const signupHandler = async (event: APIGatewayProxyEvent) => {
+  initiate();
   const logger = getLogger("handler", _logger);
   const stopwatch = new StopWatch("signupHandler");
 
@@ -48,7 +41,7 @@ const signupHandler = async (event: APIGatewayProxyEvent) => {
     const userId = uuidv4();
     const primaryUser: AuthorizeUser = {
       role: AuthRole.PRIMARY,
-      userId: userId,
+      userId: userId
     };
     const auditDetails = utils.updateAuditDetailsFailIfNotExists(null, primaryUser);
     const apiToDbDetails: DbUserDetails = {
@@ -58,12 +51,12 @@ const signupHandler = async (event: APIGatewayProxyEvent) => {
       lastName: req.lastName as string,
       phash: phash,
       auditDetails: auditDetails,
-      status: DbUserStatus.ACTIVE_USER,
+      status: DbUserStatus.ACTIVE_USER
     };
     const dbDetailItem: DbItemUser = {
       PK: getDetailsTablePk(apiToDbDetails.id),
       E_GSI_PK: getEmailGsiPk(apiToDbDetails.emailId),
-      details: apiToDbDetails,
+      details: apiToDbDetails
     };
     transactionWriter.putItems(dbDetailItem as unknown as JSONObject, _userTableName);
 
@@ -84,8 +77,8 @@ const signupHandler = async (event: APIGatewayProxyEvent) => {
       ExpiresAt: accessTokenObj.getExpiresAt().toSeconds(),
       details: {
         iat: accessTokenObj.iat,
-        tokenExpiresAt: accessTokenObj.getExpiresAt().toMillis(),
-      },
+        tokenExpiresAt: accessTokenObj.getExpiresAt().toMillis()
+      }
     };
 
     transactionWriter.putItems(dbTokenItem as unknown as JSONObject, _userTableName);
@@ -94,9 +87,13 @@ const signupHandler = async (event: APIGatewayProxyEvent) => {
 
     logger.info("accessTokenObj", accessTokenObj);
     const result = {
-      accessToken: accessTokenObj.token,
-      expiresIn: accessTokenObj.expiresIn(),
-      expiryTime: accessTokenObj.getExpiresAt().toMillis(),
+      headers: {
+        Authorization: `Bearer ${accessTokenObj.token}`
+      },
+      body: {
+        expiresIn: accessTokenObj.expiresIn(),
+        expiryTime: accessTokenObj.getExpiresAt().toMillis()
+      }
     };
 
     return convertToCreatedResponse(result);
@@ -147,8 +144,8 @@ const getValidatedRequestForSignup = async (event: APIGatewayProxyEvent, loggerB
     IndexName: _userEmailGsiName,
     KeyConditionExpression: "E_GSI_PK = :pk",
     ExpressionAttributeValues: {
-      ":pk": getEmailGsiPk(req.emailId as string),
-    },
+      ":pk": getEmailGsiPk(req.emailId as string)
+    }
   };
   const output = await dbutil.queryOnce(cmdInput, logger);
   logger.info("query completed");
@@ -166,12 +163,7 @@ const getValidatedRequestForSignup = async (event: APIGatewayProxyEvent, loggerB
  *
  * @param userDetails
  */
-const initUserConfigurations = async (
-  authUser: AuthorizeUser,
-  countryCode: string,
-  stopwatch: StopWatch,
-  transactionWriter: dbutil.TransactionWriter
-) => {
+const initUserConfigurations = async (authUser: AuthorizeUser, countryCode: string, stopwatch: StopWatch, transactionWriter: dbutil.TransactionWriter) => {
   const logger = getLogger("initUserConfigurations", _logger);
   const confInit: Partial<Record<ConfigBelongsTo, DbConfigTypeDetails[]>> = {};
 
@@ -205,12 +197,7 @@ const initUserConfigurations = async (
   return confInit;
 };
 
-const addDefaultConfig = async (
-  belongsTo: ConfigBelongsTo,
-  authUser: AuthorizeUser,
-  baseLogger: LoggerBase,
-  transactionWriter: dbutil.TransactionWriter
-) => {
+const addDefaultConfig = async (belongsTo: ConfigBelongsTo, authUser: AuthorizeUser, baseLogger: LoggerBase, transactionWriter: dbutil.TransactionWriter) => {
   const logger = getLogger(belongsTo, baseLogger);
 
   const s3Key = `default/${belongsTo}.json`;
@@ -232,12 +219,7 @@ const addDefaultConfig = async (
   return [];
 };
 
-const addCurrencyConfig = async (
-  countryCode: string,
-  authUser: AuthorizeUser,
-  baseLogger: LoggerBase,
-  transactionWriter: dbutil.TransactionWriter
-) => {
+const addCurrencyConfig = async (countryCode: string, authUser: AuthorizeUser, baseLogger: LoggerBase, transactionWriter: dbutil.TransactionWriter) => {
   const belongsTo = ConfigBelongsTo.CurrencyProfile;
   const logger = getLogger(belongsTo, baseLogger);
 
@@ -254,7 +236,7 @@ const addCurrencyConfig = async (
     name: matchingCurrencyProfile.country.code,
     value: matchingCurrencyProfile.currency.code,
     tags: [],
-    description: `currency profile for country, ${matchingCurrencyProfile.country.name} and currency, ${matchingCurrencyProfile.currency.name}`,
+    description: `currency profile for country, ${matchingCurrencyProfile.country.name} and currency, ${matchingCurrencyProfile.currency.name}`
   };
 
   const configs = await addDefaultConfigTypes([configData], belongsTo, authUser, transactionWriter);

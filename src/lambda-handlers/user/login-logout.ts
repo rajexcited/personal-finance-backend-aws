@@ -3,20 +3,14 @@ import { getSignedToken } from "../auth";
 import { AuthRole } from "../common";
 import { UnAuthorizedError, apiGatewayHandlerWrapper, RequestBodyContentType, InvalidField, ValidationError, JSONObject } from "../apigateway";
 import { LoggerBase, getLogger, utils, validations, dbutil } from "../utils";
-import {
-  _logger,
-  _userTableName,
-  _userEmailGsiName,
-  getEmailGsiPk,
-  UserResourcePath,
-  ErrorMessage,
-  getTokenTablePk,
-  getValidatedUserId,
-} from "./base-config";
+import { _logger, _userTableName, _userEmailGsiName, getEmailGsiPk, UserResourcePath, ErrorMessage, getTokenTablePk, getValidatedUserId } from "./base-config";
 import { ApiUserResource, DbItemUser, DbItemToken, AuthorizeUser } from "./resource-type";
-import { encrypt, verifyCurrPrev } from "./pcrypt";
+import { encrypt, initiate, verifyCurrPrev } from "./pcrypt";
+import { DeleteCommandInput } from "@aws-sdk/lib-dynamodb";
+import { ReturnValue } from "@aws-sdk/client-dynamodb";
 
 const loginHandler = async (event: APIGatewayProxyEvent) => {
+  initiate();
   const logger = getLogger("login", _logger);
   const req = getValidatedRequestForLogin(event, logger);
   const cmdInput = {
@@ -24,8 +18,8 @@ const loginHandler = async (event: APIGatewayProxyEvent) => {
     IndexName: _userEmailGsiName,
     KeyConditionExpression: "E_GSI_PK = :pk",
     ExpressionAttributeValues: {
-      ":pk": getEmailGsiPk(req.emailId as string),
-    },
+      ":pk": getEmailGsiPk(req.emailId as string)
+    }
   };
   const gsioutput = await dbutil.queryOnce(cmdInput, logger);
   logger.info("getItem by EmailId");
@@ -35,7 +29,7 @@ const loginHandler = async (event: APIGatewayProxyEvent) => {
 
   const getcmdInput = {
     TableName: _userTableName,
-    Key: { PK: gsioutput.Items[0].PK },
+    Key: { PK: gsioutput.Items[0].PK }
   };
   const output = await dbutil.getItem(getcmdInput, logger);
   const dbDetailsItem = output.Item as DbItemUser;
@@ -52,7 +46,7 @@ const loginHandler = async (event: APIGatewayProxyEvent) => {
 
     const primaryUser: AuthorizeUser = {
       role: AuthRole.PRIMARY,
-      userId: dbDetailsItem.details.id,
+      userId: dbDetailsItem.details.id
     };
     const updatedUserAuditDetails = utils.updateAuditDetailsFailIfNotExists(dbDetailsItem.details.auditDetails, primaryUser);
     const dbDetailItem: DbItemUser = {
@@ -61,8 +55,8 @@ const loginHandler = async (event: APIGatewayProxyEvent) => {
       details: {
         ...dbDetailsItem.details,
         auditDetails: updatedUserAuditDetails,
-        phash,
-      },
+        phash
+      }
     };
     transactionWriter.putItems(dbDetailItem as unknown as JSONObject, _userTableName);
   }
@@ -73,8 +67,8 @@ const loginHandler = async (event: APIGatewayProxyEvent) => {
     ExpiresAt: accessTokenObj.getExpiresAt().toSeconds(),
     details: {
       iat: accessTokenObj.iat,
-      tokenExpiresAt: accessTokenObj.getExpiresAt().toMillis(),
-    },
+      tokenExpiresAt: accessTokenObj.getExpiresAt().toMillis()
+    }
   };
   // const putcmdInput = {
   //   TableName: _userTableName,
@@ -87,9 +81,13 @@ const loginHandler = async (event: APIGatewayProxyEvent) => {
   logger.info("updateResult", "accessTokenObj", accessTokenObj);
 
   return {
-    accessToken: accessTokenObj.token,
-    expiresIn: accessTokenObj.expiresIn(),
-    expiryTime: accessTokenObj.getExpiresAt().toMillis(),
+    headers: {
+      Authorization: `Bearer ${accessTokenObj.token}`
+    },
+    body: {
+      expiresIn: accessTokenObj.expiresIn(),
+      expiryTime: accessTokenObj.getExpiresAt().toMillis()
+    }
   };
 };
 export const login = apiGatewayHandlerWrapper(loginHandler, RequestBodyContentType.JSON);
@@ -98,9 +96,10 @@ export const logout = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEven
   const logger = getLogger("logout", _logger);
   const userId = getValidatedUserId(event);
   logger.info("received request for userId", userId);
-  const delCmdInput = {
+  const delCmdInput: DeleteCommandInput = {
     TableName: _userTableName,
     Key: { PK: getTokenTablePk(userId) },
+    ReturnValues: ReturnValue.NONE
   };
   const updateResult = await dbutil.deleteItem(delCmdInput, logger);
   logger.info("deleted token");

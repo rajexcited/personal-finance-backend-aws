@@ -16,19 +16,23 @@ export const renewToken = apiGatewayHandlerWrapper(async (event: APIGatewayProxy
     ExpiresAt: accessTokenObj.getExpiresAt().toSeconds(),
     details: {
       iat: accessTokenObj.iat,
-      tokenExpiresAt: accessTokenObj.getExpiresAt().toMillis(),
-    },
+      tokenExpiresAt: accessTokenObj.getExpiresAt().toMillis()
+    }
   };
   const cmdInput = {
     TableName: _userTableName,
-    Item: dbTokenItem,
+    Item: dbTokenItem
   };
   const updateResult = await dbutil.putItem(cmdInput, logger);
   logger.info("updated Result", "accessTokenObj", accessTokenObj);
 
   return {
-    accessToken: accessTokenObj.token,
-    expiresIn: accessTokenObj.expiresIn(),
-    expiryTime: accessTokenObj.getExpiresAt().toMillis(),
+    headers: {
+      Authorization: `Bearer ${accessTokenObj.token}`
+    },
+    body: {
+      expiresIn: accessTokenObj.expiresIn(),
+      expiryTime: accessTokenObj.getExpiresAt().toMillis()
+    }
   };
 });

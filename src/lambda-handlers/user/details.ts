@@ -2,7 +2,7 @@ import { APIGatewayProxyEvent } from "aws-lambda";
 import { InvalidError, InvalidField, JSONObject, RequestBodyContentType, ValidationError, apiGatewayHandlerWrapper } from "../apigateway";
 import { utils, validations, getLogger, LoggerBase, dbutil, dateutil } from "../utils";
 import { DbUserDetails, ApiUserResource, DbItemUser, DbUserStatus, ApiUserAccountStatus } from "./resource-type";
-import { encrypt, verifyCurrPrev } from "./pcrypt";
+import { encrypt, initiate, verifyCurrPrev } from "./pcrypt";
 import {
   ErrorMessage,
   UserResourcePath,
@@ -12,14 +12,14 @@ import {
   getAuthorizeUser,
   getDetailsTablePk,
   getEmailGsiPk,
-  getValidatedUserId,
+  getValidatedUserId
 } from "./base-config";
 import { caching } from "cache-manager";
 import ms from "ms";
 
 const userDetailsMemoryCache = caching("memory", {
   max: 5,
-  ttl: ms("5 min"),
+  ttl: ms("5 min")
 });
 
 const DELETE_USER_EXPIRES_IN_SEC = Number(process.env.DELETE_USER_EXPIRES_IN_SEC);
@@ -29,7 +29,7 @@ export const getDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxy
   const userId = getValidatedUserId(event);
   const cmdInput = {
     TableName: _userTableName,
-    Key: { PK: getDetailsTablePk(userId) },
+    Key: { PK: getDetailsTablePk(userId) }
   };
   const output = await dbutil.getItem(cmdInput, logger);
   logger.info("retrieved user item result");
@@ -41,18 +41,19 @@ export const getDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxy
     firstName: dbDetails.firstName,
     lastName: dbDetails.lastName,
     emailId: dbDetails.emailId,
-    status: convertUserStatusDbtoApi(dbDetails),
+    status: convertUserStatusDbtoApi(dbDetails)
   };
   return result as unknown as JSONObject;
 });
 
 const updateDetailsHandler = async (event: APIGatewayProxyEvent) => {
+  initiate();
   const logger = getLogger("updateDetails", _logger);
   const authUser = getAuthorizeUser(event);
   const req = getValidatedRequestForUpdateDetails(event, logger);
   const getCmdInput = {
     TableName: _userTableName,
-    Key: { PK: getDetailsTablePk(authUser.userId) },
+    Key: { PK: getDetailsTablePk(authUser.userId) }
   };
   const output = await dbutil.getItem(getCmdInput, logger);
   logger.info("getUserDetails", output);
@@ -74,7 +75,7 @@ const updateDetailsHandler = async (event: APIGatewayProxyEvent) => {
       emailId: dbDetails.emailId,
       phash: await encrypt(req.newPassword as string),
       auditDetails: utils.updateAuditDetailsFailIfNotExists(dbDetails.auditDetails, authUser),
-      status: dbDetails.status,
+      status: dbDetails.status
     };
   } else {
     apiToDbDetails = {
@@ -84,18 +85,18 @@ const updateDetailsHandler = async (event: APIGatewayProxyEvent) => {
       emailId: dbDetails.emailId,
       phash: dbDetails.phash,
       auditDetails: utils.updateAuditDetailsFailIfNotExists(dbDetails.auditDetails, authUser),
-      status: dbDetails.status,
+      status: dbDetails.status
     };
   }
 
   const dbItem: DbItemUser = {
     PK: getDetailsTablePk(authUser.userId),
     E_GSI_PK: getEmailGsiPk(dbDetails.emailId),
-    details: apiToDbDetails,
+    details: apiToDbDetails
   };
   const putCmdInput = {
     TableName: _userTableName,
-    Item: dbItem,
+    Item: dbItem
   };
   const updateResult = await dbutil.putItem(putCmdInput, logger);
 
@@ -104,13 +105,14 @@ const updateDetailsHandler = async (event: APIGatewayProxyEvent) => {
 export const updateDetails = apiGatewayHandlerWrapper(updateDetailsHandler, RequestBodyContentType.JSON);
 
 export const deleteDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
+  initiate();
   const logger = getLogger("deleteDetails", _logger);
   const authUser = getAuthorizeUser(event);
   const { emailIdHeader, passwordHeader } = getValidatedRequestHeaders(event, logger);
 
   const cmdInput = {
     TableName: _userTableName,
-    Key: { PK: getDetailsTablePk(authUser.userId) },
+    Key: { PK: getDetailsTablePk(authUser.userId) }
   };
   const output = await dbutil.getItem(cmdInput, logger);
   logger.info("retrieved user item result");
@@ -132,8 +134,8 @@ export const deleteDetails = apiGatewayHandlerWrapper(async (event: APIGatewayPr
     details: {
       ...dbItem.details,
       status: DbUserStatus.DELETE_USER,
-      auditDetails: dbAuditDetails,
-    },
+      auditDetails: dbAuditDetails
+    }
   };
 
   const deleteResult = await dbutil.putItem({ TableName: _userTableName, Item: deletingDbItem }, logger);
@@ -143,7 +145,7 @@ export const deleteDetails = apiGatewayHandlerWrapper(async (event: APIGatewayPr
     emailId: deletingDbItem.details.emailId,
     firstName: deletingDbItem.details.firstName,
     lastName: deletingDbItem.details.lastName,
-    status: ApiUserAccountStatus.DELETED_USER,
+    status: ApiUserAccountStatus.DELETED_USER
   };
   return deleteResponse as unknown as JSONObject;
 });
@@ -210,7 +212,7 @@ export const getUserDetailsById = async (userId: string) => {
     }
     const cmdInput = {
       TableName: _userTableName,
-      Key: { PK: getDetailsTablePk(userId) },
+      Key: { PK: getDetailsTablePk(userId) }
     };
     const output = await dbutil.getItem(cmdInput, logger);
     logger.info("retrieved user item ");
@@ -223,7 +225,7 @@ export const getUserDetailsById = async (userId: string) => {
       firstName: dbDetails.firstName,
       lastName: dbDetails.lastName,
       emailId: dbDetails.emailId,
-      status: dbDetails.status,
+      status: dbDetails.status
     } as DbUserDetails;
   });
   return await detailsPromise;

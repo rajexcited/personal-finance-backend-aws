@@ -1,12 +1,4 @@
-import {
-  Delete,
-  DynamoDBClient,
-  KeysAndAttributes,
-  ProvisionedThroughputExceededException,
-  Put,
-  ReturnValue,
-  Update
-} from "@aws-sdk/client-dynamodb";
+import { Delete, DynamoDBClient, KeysAndAttributes, ProvisionedThroughputExceededException, Put, ReturnValue, Update } from "@aws-sdk/client-dynamodb";
 import {
   BatchWriteCommandInput,
   DynamoDBDocument,
@@ -31,7 +23,7 @@ import { isKeywordDynamoDbReserve } from "./dynamodb-config";
 
 const getItemMemoryCache = caching("memory", {
   max: 25,
-  ttl: ms("60 sec")
+  ttl: ms("5 min")
 });
 
 const DdbTranslateConfig: TranslateConfig = {
@@ -50,7 +42,7 @@ export const getItem = async (input: GetCommandInput, _logger: LoggerBase, notFr
   const logger = getLogger("getItem", _logger);
   try {
     stopwatch.start();
-    logger.info("getting results from cache if available", "input =", input);
+    logger.info("getting results from cache if available", "input =", input, "notFromCache=", notFromCache);
     const cache = await getItemMemoryCache;
     const cacheKey = JSON.stringify(input);
     if (notFromCache) {
