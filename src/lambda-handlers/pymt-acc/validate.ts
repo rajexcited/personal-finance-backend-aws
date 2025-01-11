@@ -6,7 +6,7 @@ import {
   NAME_MIN_LENGTH,
   _pymtAccTableName,
   getDetailsTablePk,
-  getUserIdStatusShortnameGsiPk,
+  getUserIdStatusShortnameGsiPk
 } from "./base-config";
 import { DbItemPymtAcc } from "./resource-type";
 import { DbConfigTypeDetails } from "../config-type";
@@ -15,7 +15,7 @@ export const isValidAccountIdNum = (accountIdNum: string | undefined | null) => 
   const validLength = validations.isValidLength(accountIdNum, NAME_MIN_LENGTH, ACCOUNT_ID_NUM_MAX_LENGTH);
   if (!validLength) return false;
 
-  const accountIdNumRegex = new RegExp("^[\\w\\.,|\\+-]+$");
+  const accountIdNumRegex = new RegExp("^[\\w\\.\\s,|\\+-]+$");
   return accountIdNumRegex.test(accountIdNum as string);
 };
 
@@ -48,7 +48,7 @@ export const isPaymentAccountExists = async (
   }
   const getCmdInput: GetCommandInput = {
     TableName: _pymtAccTableName,
-    Key: { PK: getDetailsTablePk(paymentAccountId) },
+    Key: { PK: getDetailsTablePk(paymentAccountId) }
   };
   const output = await dbutil.getItem(getCmdInput, logger);
   logger.info("retrieved payment account Item from DB. validating whether user is authorized");

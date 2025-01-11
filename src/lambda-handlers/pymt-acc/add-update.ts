@@ -6,7 +6,7 @@ import {
   UnAuthorizedError,
   ValidationError,
   apiGatewayHandlerWrapper,
-  convertToCreatedResponse,
+  convertToCreatedResponse
 } from "../apigateway";
 import {
   ErrorMessage,
@@ -19,7 +19,7 @@ import {
   _userIdStatusShortnameIndex,
   getDetailsTablePk,
   getUserIdStatusShortnameGsiPk,
-  getUserIdStatusShortnameGsiSk,
+  getUserIdStatusShortnameGsiSk
 } from "./base-config";
 import { LoggerBase, dbutil, getLogger, utils, validations } from "../utils";
 import { getAuthorizeUser, getValidatedUserId } from "../user";
@@ -41,7 +41,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   if (req.id) {
     const cmdInput: GetCommandInput = {
       TableName: _pymtAccTableName,
-      Key: { PK: getDetailsTablePk(req.id) },
+      Key: { PK: getDetailsTablePk(req.id) }
     };
 
     const output = await dbutil.getItem(cmdInput, logger);
@@ -62,8 +62,8 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
         KeyConditionExpression: "UP_GSI_PK = :pkv and UP_GSI_SK = :skv",
         ExpressionAttributeValues: {
           ":pkv": getUserIdStatusShortnameGsiPk(authUser.userId, PymtAccStatus.ENABLE, currencyProfile),
-          ":skv": getUserIdStatusShortnameGsiSk(req.shortName),
-        },
+          ":skv": getUserIdStatusShortnameGsiSk(req.shortName)
+        }
       };
       const result = await dbutil.queryOnce(queryCmdInput, logger);
       if (result.Items?.length) {
@@ -85,19 +85,19 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
     tags: req.tags,
     typeId: req.typeId,
     auditDetails: auditDetails,
-    currencyProfileId: currencyProfile.id,
+    currencyProfileId: currencyProfile.id
   };
 
   const dbItem: DbItemPymtAcc = {
     PK: getDetailsTablePk(pymtAccId),
     UP_GSI_PK: getUserIdStatusShortnameGsiPk(authUser.userId, apiToDbDetails.status, currencyProfile),
     UP_GSI_SK: getUserIdStatusShortnameGsiSk(req.shortName),
-    details: apiToDbDetails,
+    details: apiToDbDetails
   };
 
   const cmdInput = {
     TableName: _pymtAccTableName,
-    Item: dbItem,
+    Item: dbItem
   };
   const updateResult = await dbutil.putItem(cmdInput, logger);
   logger.debug("Result updated");
@@ -108,7 +108,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
     ...req,
     id: apiToDbDetails.id,
     status: apiToDbDetails.status,
-    auditDetails: apiAuditDetails,
+    auditDetails: apiAuditDetails
   };
 
   const result = resource as unknown as JSONObject;
@@ -122,7 +122,7 @@ export const addUpdateDetails = apiGatewayHandlerWrapper(addUpdateDetailsHandler
 const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, loggerBase: LoggerBase) => {
   const logger = getLogger("validateRequest", loggerBase);
 
-  const req: ApiPaymentAccountResource | null = utils.getJsonObj(event.body as string);
+  const req = utils.getJsonObj<ApiPaymentAccountResource>(event.body as string);
   logger.info("request =", req);
 
   if (!req) {
