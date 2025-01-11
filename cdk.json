@@ -61,7 +61,7 @@
       },
       "apigateway": {
         "deleteUserExpiration": "1 hour",
-        "secretRotatingDuration": "2 days"
+        "secretRotatingDuration": "1 month"
       },
       "cloudfront": {
         "geoRestriction": {

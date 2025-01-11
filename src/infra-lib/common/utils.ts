@@ -32,7 +32,7 @@ export const parsedDuration = (formatted: string) => {
   trimmed.split(" ").forEach((st) => {
     if (st) {
       const match =
-        /^(-?(?:\d+)?\.?\d+)* *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(st);
+        /^(-?(?:\d+)?\.?\d+)* *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|months?|mnths?|years?|yrs?|y)?$/i.exec(st);
       let tm: Nullable<string> = null;
       if (match) {
         tm = match[2] ? match[2].trim() : null;
@@ -91,6 +91,13 @@ export const parsedDuration = (formatted: string) => {
             parts[0] += 7 * Number(num);
             num = null;
             break;
+          case "months":
+          case "month":
+          case "mnths":
+          case "mnth":
+            parts[0] += 30.42 * Number(num);
+            num = null;
+            break;
           case "years":
           case "year":
           case "yrs":
@@ -103,5 +110,11 @@ export const parsedDuration = (formatted: string) => {
     }
   });
 
-  return Duration.parse(`P${parts[0]}DT${parts[1]}H${parts[2]}M${parts[3]}.${parts[4]}S`);
+  const durationFormat = ["DT", "H", "M", ".", "S"].reduce((formatted, unit, ind) => {
+    const partnum = Math.ceil(parts[ind]);
+    return formatted + partnum + unit;
+  }, "P");
+
+  // return Duration.parse(`P${parts[0]}DT${parts[1]}H${parts[2]}M${parts[3]}.${parts[4]}S`);
+  return Duration.parse(durationFormat);
 };

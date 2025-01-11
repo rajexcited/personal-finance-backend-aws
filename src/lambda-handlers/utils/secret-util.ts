@@ -10,7 +10,7 @@ const _logger = getLogger("secret.utils", null, null, "DEBUG");
 
 const secretMemoryCache = caching("memory", {
   max: 5,
-  ttl: ms("5 min")
+  ttl: ms("30 min")
 });
 
 export const getSecret = async <T>(secretId: string, fromCache: boolean, loggerBase: LoggerBase) => {

@@ -34,7 +34,8 @@ export class TokenAuthorizerConstruct extends Construct {
         ROOT_PATH: props.restApiPathPrefix,
         DEFAULT_LOG_LEVEL: props.environment === InfraEnvironmentId.Development ? "debug" : "undefined"
       },
-      logRetention: logs.RetentionDays.ONE_MONTH
+      logRetention: logs.RetentionDays.ONE_MONTH,
+      memorySize: 256
     });
     props.tokenSecret.grantRead(tokenAuthorizerFunction);
     props.userTable.table.ref.grantReadData(tokenAuthorizerFunction);

@@ -10,6 +10,8 @@ import { _logger, _userTableName, _rootPath, _tokenSecretId } from "./base-confi
 
 export const authorizer: APIGatewayTokenAuthorizerHandler = async (event, context) => {
   const logger = getLogger("authorizer", _logger);
+  // calling early to cache to reduce secret api time delay
+  getSecret(logger);
   logger.debug("event", event);
   logger.debug("context", context);
 
@@ -45,7 +47,7 @@ const authenticate = async (token: string) => {
     const tokenPayload = getTokenPayload(token);
 
     logger.info("token headers", tokenHeaders, "token payload", tokenPayload);
-    const secret = await secretutil.getSecret<TokenSecret>(_tokenSecretId, true, logger);
+    const secret = await getSecret(logger);
     const decoded = jwt.verify(token, secret.tokenSecret) as jwt.JwtPayload;
     logger.info("decoded result", decoded);
 
@@ -67,9 +69,7 @@ const authenticate = async (token: string) => {
       throw new UnAuthenticatedError("It is expired. expiringTime [" + expiringTime + "(" + new Date(expiringTime) + ")]");
     }
     if (tokenHeaders.alg !== secret.algorithm) {
-      throw new UnAuthenticatedError(
-        "algorithm used in token is not supported. actual [" + tokenHeaders.alg + "], but expected [" + secret.algorithm + "]"
-      );
+      throw new UnAuthenticatedError("algorithm used in token is not supported. actual [" + tokenHeaders.alg + "], but expected [" + secret.algorithm + "]");
     }
     if (tokenHeaders.typ !== secret.type) {
       throw new UnAuthenticatedError("incorrect type in tokenHeader. actual [" + tokenHeaders.typ + "], but expected [" + secret.type + "]");
@@ -229,4 +229,9 @@ const getResourceParts = (resourceArn: string, baseLogger: LoggerBase) => {
     stageName: methodParts[1],
     resourceArnPrefix: resourceParts.slice(0, -1).join(":")
   };
+};
+
+const getSecret = async (loggerBase?: LoggerBase) => {
+  const logger = getLogger("getSecret", loggerBase);
+  return await secretutil.getSecret<TokenSecret>(_tokenSecretId, true, logger);
 };
