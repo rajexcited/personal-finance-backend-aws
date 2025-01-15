@@ -1,12 +1,5 @@
 import { LoggerBase, dbutil, getLogger, validations } from "../utils";
-import {
-  BelongsTo,
-  CONFIG_NAME_VALUE_MAX_LENGTH,
-  CONFIG_NAME_VALUE_MIN_LENGTH,
-  _configTypeTableName,
-  getBelongsToGsiPk,
-  getDetailsTablePk,
-} from "./base-config";
+import { BelongsTo, CONFIG_NAME_VALUE_MAX_LENGTH, CONFIG_NAME_VALUE_MIN_LENGTH, _configTypeTableName, getBelongsToGsiPk, getDetailsTablePk } from "./base-config";
 import { DbItemConfigType } from "./resource-type";
 
 export const isConfigIdExists = async (cfgId: string | null | undefined, belongsTo: BelongsTo, userId: string, _logger: LoggerBase) => {
@@ -25,11 +18,11 @@ const getConfigItem = async (cfgId: string | null | undefined, _logger: LoggerBa
   const logger = getLogger("getConfigDetails", _logger);
   const cmdInput = {
     TableName: _configTypeTableName,
-    Key: { PK: getDetailsTablePk(cfgId as string) },
+    Key: { PK: getDetailsTablePk(cfgId as string) }
   };
-  const getOutput = await dbutil.getItem(cmdInput, logger);
+  const getOutput = await dbutil.getItem(cmdInput, logger, dbutil.CacheAction.FROM_CACHE);
   logger.info("retrieved get Output");
-  const item = getOutput.Item as DbItemConfigType | null;
+  const item = getOutput?.Item as DbItemConfigType | null;
   return item;
 };
 

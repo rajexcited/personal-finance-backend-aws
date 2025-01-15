@@ -36,12 +36,7 @@ export const isValidInstitutionName = (institutionName: string | undefined | nul
  * @param _logger
  * @returns true if valid otherwise false
  */
-export const isPaymentAccountExists = async (
-  paymentAccountId: string | undefined,
-  userId: string,
-  currencyProfile: DbConfigTypeDetails,
-  _logger: LoggerBase
-) => {
+export const isPaymentAccountExists = async (paymentAccountId: string | undefined, userId: string, currencyProfile: DbConfigTypeDetails, _logger: LoggerBase) => {
   const logger = getLogger("isPaymentAccountExists", _logger);
   if (!validations.isValidUuid(paymentAccountId) || !paymentAccountId) {
     return false;
@@ -50,10 +45,10 @@ export const isPaymentAccountExists = async (
     TableName: _pymtAccTableName,
     Key: { PK: getDetailsTablePk(paymentAccountId) }
   };
-  const output = await dbutil.getItem(getCmdInput, logger);
+  const output = await dbutil.getItem(getCmdInput, logger, dbutil.CacheAction.FROM_CACHE);
   logger.info("retrieved payment account Item from DB. validating whether user is authorized");
 
-  if (!output.Item) {
+  if (!output?.Item) {
     return false;
   }
   const item = output.Item as DbItemPymtAcc;

@@ -15,7 +15,7 @@ import {
   getGsiAttrDetailsPurchaseBelongsTo,
   getGsiSkPurchaseDate,
   getTablePkDetails,
-  getTablePkItems,
+  getTablePkItems
 } from "./db-config";
 import { v4 as uuidv4 } from "uuid";
 
@@ -70,7 +70,7 @@ const putDbPurchase = (
     belongsTo: ExpenseBelongsTo.Purchase,
     recordType: ExpenseRecordType.Details,
     personIds: req.personIds,
-    profileId: currencyProfile.id,
+    profileId: currencyProfile.id
   };
 
   const dbItemPrch: DbItemExpense<DbDetailsPurchase> = {
@@ -78,7 +78,7 @@ const putDbPurchase = (
     US_GSI_PK: getGsiPkDetails(authUser.userId, apiToDbDetails.status, currencyProfile, logger),
     US_GSI_SK: getGsiSkPurchaseDate(apiToDbDetails.purchaseDate, logger),
     US_GSI_BELONGSTO: getGsiAttrDetailsPurchaseBelongsTo(logger),
-    details: apiToDbDetails,
+    details: apiToDbDetails
   };
 
   transactWriter.putItems(dbItemPrch as unknown as JSONObject, ExpenseTableName, logger);
@@ -106,7 +106,7 @@ const putDbPurchaseItems = async (
         tags: ei.tags,
         amount: ei.amount,
         description: ei.description,
-        purchaseTypeId: ei.purchaseTypeId,
+        purchaseTypeId: ei.purchaseTypeId
       };
       return expenseItem;
     });
@@ -124,8 +124,8 @@ const putDbPurchaseItems = async (
         id: purchaseId,
         auditDetails,
         items: purchaseItems,
-        recordType: ExpenseRecordType.Items,
-      },
+        recordType: ExpenseRecordType.Items
+      }
     };
     transactWriter.putItems(dbItemXpnsItems as unknown as JSONObject, ExpenseTableName, logger);
     return dbItemXpnsItems;
@@ -144,12 +144,12 @@ export const retrieveDbPurchaseItems = async (dbPurchase: DbItemExpense<DbDetail
   const purchaseId = dbPurchase.details.id;
   const cmdInput = {
     TableName: ExpenseTableName,
-    Key: { PK: getTablePkItems(purchaseId, logger) },
+    Key: { PK: getTablePkItems(purchaseId, logger) }
   };
-  const prchItmsOutput = await dbutil.getItem(cmdInput, logger);
+  const prchItmsOutput = await dbutil.getItem(cmdInput, logger, dbutil.CacheAction.FROM_CACHE);
 
   logger.info("retrieved purchase items from DB");
-  const dbPurchaseItem = prchItmsOutput.Item as DbItemExpense<DbDetailsPurchaseItem> | null;
+  const dbPurchaseItem = prchItmsOutput?.Item as DbItemExpense<DbDetailsPurchaseItem> | null;
 
   if (!dbPurchaseItem) {
     return null;

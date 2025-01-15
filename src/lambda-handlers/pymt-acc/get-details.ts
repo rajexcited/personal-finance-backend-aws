@@ -1,14 +1,7 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { JSONObject, NotFoundError, UnAuthorizedError, apiGatewayHandlerWrapper } from "../apigateway";
 import { dbutil, getLogger, utils } from "../utils";
-import {
-  _logger,
-  _pymtAccTableName,
-  _userIdStatusShortnameIndex,
-  getDetailsTablePk,
-  getUserIdStatusShortnameGsiPk,
-  getValidatedPymtAccId,
-} from "./base-config";
+import { _logger, _pymtAccTableName, _userIdStatusShortnameIndex, getDetailsTablePk, getUserIdStatusShortnameGsiPk, getValidatedPymtAccId } from "./base-config";
 import { getAuthorizeUser, getValidatedUserId } from "../user";
 import { ApiPaymentAccountResource, DbItemPymtAcc } from "./resource-type";
 import { getDefaultCurrencyProfile } from "../config-type";
@@ -21,12 +14,12 @@ export const getPaymentAccount = apiGatewayHandlerWrapper(async (event: APIGatew
   logger.info("request, pymtAccId =", pymtAccId);
   const getCmdInput = {
     TableName: _pymtAccTableName,
-    Key: { PK: getDetailsTablePk(pymtAccId) },
+    Key: { PK: getDetailsTablePk(pymtAccId) }
   };
-  const getOutput = await dbutil.getItem(getCmdInput, logger);
+  const getOutput = await dbutil.getItem(getCmdInput, logger, dbutil.CacheAction.FROM_CACHE);
   logger.info("retrieved db result output");
 
-  const dbItem = getOutput.Item as DbItemPymtAcc;
+  const dbItem = getOutput?.Item as DbItemPymtAcc;
   if (!dbItem) {
     throw new NotFoundError("db item not exists");
   }
@@ -52,7 +45,7 @@ export const getPaymentAccount = apiGatewayHandlerWrapper(async (event: APIGatew
     description: details.description,
     tags: details.tags,
     auditDetails: auditDetails,
-    currencyProfileId: details.currencyProfileId,
+    currencyProfileId: details.currencyProfileId
   };
 
   return resource as unknown as JSONObject;

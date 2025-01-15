@@ -12,14 +12,14 @@ import {
   getValidatedBelongsTo,
   getBelongsToGsiPk,
   getValidatedConfigId,
-  getDetailsTablePk,
+  getDetailsTablePk
 } from "./base-config";
 import { caching } from "cache-manager";
 import ms from "ms";
 
 const belongsToConfigListMemoryCache = caching("memory", {
   max: 3,
-  ttl: ms("60 sec"),
+  ttl: ms("60 sec")
 });
 
 /**
@@ -37,12 +37,12 @@ export const getDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxy
   logger.info("request, belongsTo =", belongsTo, ", configId =", configId);
   const getCmdInput = {
     TableName: _configTypeTableName,
-    Key: { PK: getDetailsTablePk(configId) },
+    Key: { PK: getDetailsTablePk(configId) }
   };
-  const getOutput = await dbutil.getItem(getCmdInput, logger);
+  const getOutput = await dbutil.getItem(getCmdInput, logger, dbutil.CacheAction.FROM_CACHE);
   logger.info("retrieved db result output");
 
-  const dbItem = getOutput.Item as DbItemConfigType;
+  const dbItem = getOutput?.Item as DbItemConfigType;
   if (!dbItem) {
     throw new NotFoundError("db item not found");
   }
@@ -64,7 +64,7 @@ export const getDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxy
     belongsTo: details.belongsTo,
     auditDetails: auditDetails,
     color: details.color,
-    description: details.description,
+    description: details.description
   };
 
   return apiResource as unknown as JSONObject;
@@ -80,8 +80,8 @@ export const getConfigId = async (configName: string, userId: string, belongsTo:
       IndexName: _belongsToGsiName,
       KeyConditionExpression: `UB_GSI_PK = :pkv`,
       ExpressionAttributeValues: {
-        ":pkv": getBelongsToGsiPk(null, logger, userId, belongsTo),
-      },
+        ":pkv": getBelongsToGsiPk(null, logger, userId, belongsTo)
+      }
     });
 
     return await Promise.all(itemPromises);

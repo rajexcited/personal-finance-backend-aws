@@ -30,10 +30,10 @@ export const getGsiSkTagsYear = (dateOrYear: string | number, _logger: LoggerBas
 export const retrieveDbTags = async (expenseId: string, belongsTo: ExpenseBelongsTo, logger: LoggerBase) => {
   const cmdInput = {
     TableName: ExpenseTableName,
-    Key: { PK: getTablePkTags(expenseId, belongsTo, logger) },
+    Key: { PK: getTablePkTags(expenseId, belongsTo, logger) }
   };
-  const output = await dbutil.getItem(cmdInput, logger);
-  if (output.Item) {
+  const output = await dbutil.getItem(cmdInput, logger, dbutil.CacheAction.FROM_CACHE);
+  if (output?.Item) {
     logger.info("retrieved tags from DB not null");
     return output.Item as DbItemExpense<DbTagsType>;
   }

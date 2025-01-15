@@ -1,13 +1,5 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
-import {
-  InvalidField,
-  JSONObject,
-  RequestBodyContentType,
-  UnAuthorizedError,
-  ValidationError,
-  apiGatewayHandlerWrapper,
-  convertToCreatedResponse
-} from "../apigateway";
+import { InvalidField, JSONObject, RequestBodyContentType, UnAuthorizedError, ValidationError, apiGatewayHandlerWrapper, convertToCreatedResponse } from "../apigateway";
 import {
   ErrorMessage,
   NAME_MIN_LENGTH,
@@ -44,10 +36,10 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
       Key: { PK: getDetailsTablePk(req.id) }
     };
 
-    const output = await dbutil.getItem(cmdInput, logger);
+    const output = await dbutil.getItem(cmdInput, logger, dbutil.CacheAction.FROM_CACHE);
 
     logger.info("retrieved pymt account from DB");
-    if (output.Item) {
+    if (output?.Item) {
       existingDbItem = output.Item as DbItemPymtAcc;
       // validate user access to config details
       const gsiPkForReq = getUserIdStatusShortnameGsiPk(authUser.userId, PymtAccStatus.ENABLE, currencyProfile);
@@ -65,8 +57,8 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
           ":skv": getUserIdStatusShortnameGsiSk(req.shortName)
         }
       };
-      const result = await dbutil.queryOnce(queryCmdInput, logger);
-      if (result.Items?.length) {
+      const result = await dbutil.queryOnce(queryCmdInput, logger, dbutil.CacheAction.NOT_FROM_CACHE);
+      if (result?.Items?.length) {
         throw new ValidationError([{ path: PymtAccResourcePath.SHORTNAME, message: ErrorMessage.DUPLICATE_VALUE }]);
       }
     }

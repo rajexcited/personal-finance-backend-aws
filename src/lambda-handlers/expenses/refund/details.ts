@@ -57,7 +57,7 @@ const putDbRefund = (
     recordType: ExpenseRecordType.Details,
     purchaseId: req.purchaseId,
     personIds: req.personIds,
-    profileId: currencyProfile.id,
+    profileId: currencyProfile.id
   };
 
   const dbItemRfd: DbItemExpense<DbDetailsRefund> = {
@@ -65,7 +65,7 @@ const putDbRefund = (
     US_GSI_PK: getGsiPkDetails(authUser.userId, apiToDbDetails.status, currencyProfile, logger),
     US_GSI_SK: getGsiSkDetailsExpenseDate(apiToDbDetails.refundDate, logger),
     US_GSI_BELONGSTO: getGsiAttrDetailsRefundBelongsTo(logger),
-    details: apiToDbDetails,
+    details: apiToDbDetails
   };
 
   transactWriter.putItems(dbItemRfd as unknown as JSONObject, ExpenseTableName, logger);
@@ -92,10 +92,10 @@ export const retrieveDbRefundToApiResource = async (refundId: string, authUser: 
 export const retrieveDbRefundDetails = async (refundId: string, logger: LoggerBase) => {
   const cmdInput = {
     TableName: ExpenseTableName,
-    Key: { PK: getTablePkDetails(refundId, logger) },
+    Key: { PK: getTablePkDetails(refundId, logger) }
   };
-  const refundOutput = await dbutil.getItem(cmdInput, logger);
-  if (refundOutput.Item) {
+  const refundOutput = await dbutil.getItem(cmdInput, logger, dbutil.CacheAction.FROM_CACHE);
+  if (refundOutput?.Item) {
     logger.info("retrieved refund from DB not null");
     return refundOutput.Item as DbItemExpense<DbDetailsRefund>;
   }

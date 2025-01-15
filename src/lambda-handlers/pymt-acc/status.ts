@@ -8,7 +8,7 @@ import {
   _pymtAccTableName,
   getDetailsTablePk,
   getUserIdStatusShortnameGsiPk,
-  getValidatedPymtAccId,
+  getValidatedPymtAccId
 } from "./base-config";
 import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils } from "../utils";
 import { AuthorizeUser, getAuthorizeUser } from "../user";
@@ -33,7 +33,7 @@ export const deletePaymentAccount = apiGatewayHandlerWrapper(async (event: APIGa
     tags: details.tags,
     auditDetails: auditDetails,
     description: details.description,
-    currencyProfileId: details.currencyProfileId,
+    currencyProfileId: details.currencyProfileId
   };
 
   return apiResource as unknown as JSONObject;
@@ -58,7 +58,7 @@ export const updatePaymentAccountStatus = apiGatewayHandlerWrapper(async (event:
     tags: details.tags,
     auditDetails: auditDetails,
     description: details.description,
-    currencyProfileId: details.currencyProfileId,
+    currencyProfileId: details.currencyProfileId
   };
 
   return apiResource as unknown as JSONObject;
@@ -70,12 +70,12 @@ export const updateStatus = async (authUser: AuthorizeUser, pymtAccId: string, s
   logger.info("request, pymtAccId =", pymtAccId, ", status =", status);
   const getCmdInput = {
     TableName: _pymtAccTableName,
-    Key: { PK: getDetailsTablePk(pymtAccId) },
+    Key: { PK: getDetailsTablePk(pymtAccId) }
   };
-  const getOutput = await dbutil.getItem(getCmdInput, logger);
+  const getOutput = await dbutil.getItem(getCmdInput, logger, dbutil.CacheAction.NOT_FROM_CACHE);
   logger.info("retrieved db result output");
 
-  const dbItem = getOutput.Item as DbItemPymtAcc;
+  const dbItem = getOutput?.Item as DbItemPymtAcc;
   if (!dbItem) {
     throw new NotFoundError("db item not exists");
   }
@@ -101,13 +101,13 @@ export const updateStatus = async (authUser: AuthorizeUser, pymtAccId: string, s
     details: {
       ...dbItem.details,
       auditDetails: auditDetails as AuditDetailsType,
-      status: status,
-    },
+      status: status
+    }
   };
 
   const putCmdInput = {
     TableName: _pymtAccTableName,
-    Item: updateDbItem,
+    Item: updateDbItem
   };
   await dbutil.putItem(putCmdInput, logger);
 

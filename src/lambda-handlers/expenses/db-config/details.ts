@@ -80,10 +80,10 @@ export const validateExpenseAuthorization = (
 export const retrieveDbExpenseDetails = async (expenseId: string, belongsTo: ExpenseBelongsTo, logger: LoggerBase) => {
   const cmdInput = {
     TableName: ExpenseTableName,
-    Key: { PK: getTablePkExpenseDetails(expenseId, belongsTo, logger) },
+    Key: { PK: getTablePkExpenseDetails(expenseId, belongsTo, logger) }
   };
-  const expenseOutput = await dbutil.getItem(cmdInput, logger);
-  if (expenseOutput.Item) {
+  const expenseOutput = await dbutil.getItem(cmdInput, logger, dbutil.CacheAction.FROM_CACHE);
+  if (expenseOutput?.Item) {
     logger.info("retrieved " + belongsTo + " from DB not null");
     return expenseOutput.Item as DbItemExpense<DbDetailsType>;
   }

@@ -26,6 +26,13 @@ const getItemMemoryCache = caching("memory", {
   ttl: ms("5 min")
 });
 
+export enum CacheAction {
+  FROM_CACHE = "from-cache",
+  NOT_FROM_CACHE = "not-from-cache",
+  CLEAR_CACHE_AFTER_RESULT = "clear-cache-after-result",
+  CLEAR_CACHE_NO_CALL = "clear-cache-only"
+}
+
 const DdbTranslateConfig: TranslateConfig = {
   marshallOptions: {
     convertClassInstanceToMap: true,
@@ -37,25 +44,41 @@ const DdbTranslateConfig: TranslateConfig = {
 
 const ddbClient = DynamoDBDocument.from(new DynamoDBClient(), DdbTranslateConfig);
 
-export const getItem = async (input: GetCommandInput, _logger: LoggerBase, notFromCache?: boolean) => {
+/**
+ *
+ * @param input
+ * @param _logger
+ * @param cacheAction default is from cache
+ * @returns
+ */
+export const getItem = async (input: GetCommandInput, _logger: LoggerBase, cacheAction: CacheAction) => {
   const stopwatch = new StopWatch("getItem");
   const logger = getLogger("getItem", _logger);
   try {
     stopwatch.start();
-    logger.info("getting results from cache if available", "input =", input, "notFromCache=", notFromCache);
+    logger.info("getting results from cache if available", "input =", input, "notFromCache=", cacheAction);
     const cache = await getItemMemoryCache;
     const cacheKey = JSON.stringify(input);
-    if (notFromCache) {
+    if (cacheAction === CacheAction.NOT_FROM_CACHE || cacheAction === CacheAction.CLEAR_CACHE_NO_CALL) {
       await cache.del(cacheKey);
     }
-    const outputPromise = cache.wrap(cacheKey, async () => {
-      logger.info("calling db api call");
-      const dbOutput = await ddbClient.get(input);
-      return dbOutput;
-    });
+    if (cacheAction !== CacheAction.CLEAR_CACHE_NO_CALL) {
+      const outputPromise = cache.wrap(cacheKey, async () => {
+        logger.info("calling db api call");
+        const dbOutput = await ddbClient.get(input);
+        return dbOutput;
+      });
 
-    logger.info("output =", await outputPromise);
-    return await outputPromise;
+      logger.info("output =", await outputPromise);
+      const output = await outputPromise;
+      if (cacheAction === CacheAction.CLEAR_CACHE_AFTER_RESULT) {
+        scheduler.wait(ms("10 msecs")).then(() => {
+          cache.del(cacheKey);
+        });
+      }
+      return output;
+    }
+    return null;
   } finally {
     stopwatch.stop();
     logger.info("stopwatch summary", stopwatch.shortSummary());
@@ -111,16 +134,35 @@ export const deleteItem = async (input: DeleteCommandInput, _logger: LoggerBase)
   }
 };
 
-export const queryOnce = async (input: QueryCommandInput, _logger: LoggerBase) => {
+export const queryOnce = async (input: QueryCommandInput, _logger: LoggerBase, cacheAction: CacheAction) => {
   const stopwatch = new StopWatch("queryOnce");
   const logger = getLogger("queryOnce", _logger);
   try {
     stopwatch.start();
     logger.info("input =", input);
+    const cache = await getItemMemoryCache;
+    const cacheKey = JSON.stringify(input);
+    if (cacheAction === CacheAction.NOT_FROM_CACHE || cacheAction === CacheAction.CLEAR_CACHE_NO_CALL) {
+      await cache.del(cacheKey);
+    }
+    if (cacheAction !== CacheAction.CLEAR_CACHE_NO_CALL) {
+      const outputPromise = cache.wrap(cacheKey, async () => {
+        logger.info("calling db api call");
+        const dbOutput = await ddbClient.query(input);
+        return dbOutput;
+      });
 
-    const output = await ddbClient.query(input);
-    logger.info("output =", output);
-    return output;
+      logger.info("output =", await outputPromise);
+      const output = await outputPromise;
+      if (cacheAction === CacheAction.CLEAR_CACHE_AFTER_RESULT) {
+        scheduler.wait(ms("10 msecs")).then(() => {
+          cache.del(cacheKey);
+        });
+      }
+
+      return output;
+    }
+    return null;
   } finally {
     stopwatch.stop();
     logger.info("stopwatch summary", stopwatch.shortSummary());
@@ -168,7 +210,7 @@ export const batchGet = async <T>(
 
         if (err instanceof ProvisionedThroughputExceededException) {
           logger.info("re-attempting the batchget after 1 sec sleep");
-          await scheduler.wait(1000);
+          await scheduler.wait(ms("1 sec"));
           continue;
         }
 
@@ -223,7 +265,7 @@ const batchWriteWithRetry = async (batchWriteItemsInput: BatchWriteCommandInput,
     const remainingRetryAttempt = retryAttempt - 1;
     logger.error("batchWrite failed. remaining retry attempt: " + remainingRetryAttempt, err);
     if (err instanceof ProvisionedThroughputExceededException && remainingRetryAttempt > 0) {
-      await scheduler.wait(1000);
+      await scheduler.wait(ms("1 sec"));
       results = await batchWriteWithRetry(batchWriteItemsInput, logger, remainingRetryAttempt);
     }
     throw err;

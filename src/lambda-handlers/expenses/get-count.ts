@@ -6,7 +6,7 @@ import {
   getValidatedBelongsToQueryParam,
   getValidatedPageMonthsQueryParam,
   getValidatedPageNumberQueryParam,
-  getValidatedStatusQueryParam,
+  getValidatedStatusQueryParam
 } from "./api-resource/query-param";
 import { getEndDateAfterMonths, getStartDateBeforeMonths } from "./base-config";
 import { ExpenseTableName, getGsiAttrDetailsBelongsTo, getGsiPkDetails, getGsiSkDetailsExpenseDate, UserIdStatusIndex } from "./db-config";
@@ -40,13 +40,13 @@ export const getExpenseCount = apiGatewayHandlerWrapper(async (event: APIGateway
         ":gpkv": getGsiPkDetails(authUser.userId, statusParam, currencyProfile, logger),
         ":gskv1": getGsiSkDetailsExpenseDate(searchStartDate, logger),
         ":gskv2": getGsiSkDetailsExpenseDate(searchEndDate, logger),
-        ...belongsToAttrVal,
+        ...belongsToAttrVal
       },
-      Select: Select.COUNT,
+      Select: Select.COUNT
     },
-    logger
+    logger,
+    dbutil.CacheAction.FROM_CACHE
   );
 
-  //todo verify if querying once will get me the count result or do i need to use queryAll.
-  return result.Count;
+  return result?.Count || 0;
 });

@@ -1,13 +1,5 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
-import {
-  InvalidField,
-  JSONObject,
-  RequestBodyContentType,
-  UnAuthorizedError,
-  ValidationError,
-  apiGatewayHandlerWrapper,
-  convertToCreatedResponse,
-} from "../apigateway";
+import { InvalidField, JSONObject, RequestBodyContentType, UnAuthorizedError, ValidationError, apiGatewayHandlerWrapper, convertToCreatedResponse } from "../apigateway";
 import { getAuthorizeUser } from "../user";
 import { AuditDetailsType, LoggerBase, dbutil, getLogger, utils, validations } from "../utils";
 import {
@@ -22,7 +14,7 @@ import {
   getDetailsTablePk,
   getValidatedBelongsTo,
   BelongsTo,
-  ConfigStatus,
+  ConfigStatus
 } from "./base-config";
 import { ApiConfigTypeResource, DbConfigTypeDetails, DbItemConfigType } from "./resource-type";
 import { v4 as uuidv4 } from "uuid";
@@ -43,12 +35,12 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   if (req.id) {
     const cmdInput = {
       TableName: _configTypeTableName,
-      Key: { PK: getDetailsTablePk(req.id) },
+      Key: { PK: getDetailsTablePk(req.id) }
     };
-    const output = await dbutil.getItem(cmdInput, logger);
+    const output = await dbutil.getItem(cmdInput, logger, dbutil.CacheAction.FROM_CACHE);
 
     logger.info("retrieved config from DB");
-    if (output.Item) {
+    if (output?.Item) {
       existingDbItem = output.Item as DbItemConfigType;
       // validate user access to config details
       const gsiPkForReq = getBelongsToGsiPk(null, logger, authUser.userId, belongsTo);
@@ -70,19 +62,19 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
     description: req.description,
     tags: req.tags,
     color: req.color,
-    auditDetails: auditDetails as AuditDetailsType,
+    auditDetails: auditDetails as AuditDetailsType
   };
 
   const dbItem: DbItemConfigType = {
     PK: getDetailsTablePk(configId),
     UB_GSI_PK: getBelongsToGsiPk(event, logger),
     UB_GSI_SK: getBelongsToGsiSk(apiToDbDetails.status),
-    details: apiToDbDetails,
+    details: apiToDbDetails
   };
 
   const cmdInput = {
     TableName: _configTypeTableName,
-    Item: dbItem,
+    Item: dbItem
   };
   const updateResult = await dbutil.putItem(cmdInput, logger);
   logger.debug("Result updated");
@@ -96,12 +88,12 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
     const matching = currencyCountryData.find((ccd) => ccd.country.code === req.name && ccd.currency.code === req.value) as CountryCurrencyRelation;
     currencyCountryResource.country = {
       name: matching.country.name,
-      code: matching.country.code,
+      code: matching.country.code
     };
     currencyCountryResource.currency = {
       name: matching.currency.name,
       code: matching.currency.code,
-      symbol: matching.currency.symbol,
+      symbol: matching.currency.symbol
     };
   }
   const resource = {
@@ -109,7 +101,7 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
     id: apiToDbDetails.id,
     belongsTo: apiToDbDetails.belongsTo,
     auditDetails: apiAuditDetails,
-    ...currencyCountryResource,
+    ...currencyCountryResource
   };
 
   const result = resource as unknown as JSONObject;

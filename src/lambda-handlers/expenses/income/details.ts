@@ -56,7 +56,7 @@ const putDbIncome = (
     belongsTo: ExpenseBelongsTo.Income,
     recordType: ExpenseRecordType.Details,
     personIds: req.personIds,
-    profileId: currencyProfile.id,
+    profileId: currencyProfile.id
   };
 
   const dbItemPrch: DbItemExpense<DbDetailsIncome> = {
@@ -64,7 +64,7 @@ const putDbIncome = (
     US_GSI_PK: getGsiPkDetails(authUser.userId, apiToDbDetails.status, currencyProfile, logger),
     US_GSI_SK: getGsiSkIncomeDate(apiToDbDetails.incomeDate, logger),
     US_GSI_BELONGSTO: getGsiAttrDetailsIncomeBelongsTo(logger),
-    details: apiToDbDetails,
+    details: apiToDbDetails
   };
 
   transactWriter.putItems(dbItemPrch as unknown as JSONObject, ExpenseTableName, logger);
@@ -94,10 +94,10 @@ export const retrieveDbIncomeToApiResource = async (incomeId: string, authUser: 
 export const retrieveDbIncomeDetails = async (incomeId: string, logger: LoggerBase) => {
   const cmdInput = {
     TableName: ExpenseTableName,
-    Key: { PK: getTablePkDetails(incomeId, logger) },
+    Key: { PK: getTablePkDetails(incomeId, logger) }
   };
-  const incomeOutput = await dbutil.getItem(cmdInput, logger);
-  if (incomeOutput.Item) {
+  const incomeOutput = await dbutil.getItem(cmdInput, logger, dbutil.CacheAction.FROM_CACHE);
+  if (incomeOutput?.Item) {
     logger.info("retrieved income from DB not null");
     return incomeOutput.Item as DbItemExpense<DbDetailsIncome>;
   }

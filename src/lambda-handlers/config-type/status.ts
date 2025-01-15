@@ -14,7 +14,7 @@ import {
   getValidatedBelongsTo,
   ConfigStatus,
   _belongsToGsiName,
-  getValidatedConfigId,
+  getValidatedConfigId
 } from "./base-config";
 import { ApiConfigTypeResource, DbItemConfigType } from "./resource-type";
 
@@ -37,7 +37,7 @@ export const deleteDetails = apiGatewayHandlerWrapper(async (event: APIGatewayPr
     belongsTo: details.belongsTo,
     auditDetails: auditDetails,
     color: details.color,
-    description: details.description,
+    description: details.description
   };
 
   return apiResource as unknown as JSONObject;
@@ -62,7 +62,7 @@ export const updateStatusDetails = apiGatewayHandlerWrapper(async (event: APIGat
     belongsTo: details.belongsTo,
     auditDetails: auditDetails,
     color: details.color,
-    description: details.description,
+    description: details.description
   };
 
   return apiResource as unknown as JSONObject;
@@ -74,12 +74,12 @@ export const updateStatus = async (belongsTo: BelongsTo, authUser: AuthorizeUser
   logger.info("request, belongsTo =", belongsTo, ", configId =", configId, ", status =", status);
   const getCmdInput = {
     TableName: _configTypeTableName,
-    Key: { PK: getDetailsTablePk(configId) },
+    Key: { PK: getDetailsTablePk(configId) }
   };
-  const getOutput = await dbutil.getItem(getCmdInput, logger);
+  const getOutput = await dbutil.getItem(getCmdInput, logger, dbutil.CacheAction.NOT_FROM_CACHE);
   logger.info("retrieved db result output");
 
-  const dbItem = getOutput.Item as DbItemConfigType;
+  const dbItem = getOutput?.Item as DbItemConfigType;
   if (!dbItem) {
     throw new NotFoundError("db item not found");
   }
@@ -101,13 +101,13 @@ export const updateStatus = async (belongsTo: BelongsTo, authUser: AuthorizeUser
     details: {
       ...dbItem.details,
       auditDetails: auditDetails,
-      status: status,
-    },
+      status: status
+    }
   };
 
   const putCmdInput = {
     TableName: _configTypeTableName,
-    Item: updateDbItem,
+    Item: updateDbItem
   };
   await dbutil.putItem(putCmdInput, logger);
 
@@ -140,8 +140,8 @@ const validateDeleteConfig = async (belongsTo: BelongsTo, userId: string, status
       KeyConditionExpression: `UB_GSI_PK = :pkv and UB_GSI_SK = :stv`,
       ExpressionAttributeValues: {
         ":pkv": getBelongsToGsiPk(null, logger, userId, belongsTo),
-        ":stv": getBelongsToGsiSk(status),
-      },
+        ":stv": getBelongsToGsiSk(status)
+      }
     });
     logger.info("retrieved", items.length, "items for status [", status, "]");
     if (items.length < 2) {

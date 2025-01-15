@@ -1,12 +1,5 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
-import {
-  JSONObject,
-  RequestBodyContentType,
-  UnAuthorizedError,
-  ValidationError,
-  apiGatewayHandlerWrapper,
-  convertToCreatedResponse,
-} from "../apigateway";
+import { JSONObject, RequestBodyContentType, UnAuthorizedError, ValidationError, apiGatewayHandlerWrapper, convertToCreatedResponse } from "../apigateway";
 import { LoggerBase, dbutil, getLogger, utils } from "../utils";
 import { AuthorizeUser, getAuthorizeUser } from "../user";
 import { v4 as uuidv4 } from "uuid";
@@ -21,7 +14,7 @@ import {
   ExpenseTableName,
   getGsiAttrDetailsBelongsTo,
   getGsiPkExpenseTags,
-  getTablePkExpenseTags,
+  getTablePkExpenseTags
 } from "./db-config";
 import { ExpenseStatus, ExpenseBelongsTo } from "./base-config";
 import {
@@ -30,22 +23,10 @@ import {
   retrieveDbPurchaseDetails,
   getGsiSkPurchaseDate,
   getValidatedRequestToUpdatePurchaseDetails,
-  DbDetailsPurchase,
+  DbDetailsPurchase
 } from "./purchase";
-import {
-  getValidatedRequestToUpdateRefundDetails,
-  ApiResourceRefundDetails,
-  DbDetailsRefund,
-  retrieveDbRefundDetails,
-  addDbRefundTransactions,
-} from "./refund";
-import {
-  ApiResourceIncomeDetails,
-  getValidatedRequestToUpdateIncomeDetails,
-  addDbIncomeTransactions,
-  retrieveDbIncomeDetails,
-  DbDetailsIncome,
-} from "./income";
+import { getValidatedRequestToUpdateRefundDetails, ApiResourceRefundDetails, DbDetailsRefund, retrieveDbRefundDetails, addDbRefundTransactions } from "./refund";
+import { ApiResourceIncomeDetails, getValidatedRequestToUpdateIncomeDetails, addDbIncomeTransactions, retrieveDbIncomeDetails, DbDetailsIncome } from "./income";
 import { DbConfigTypeDetails, getDefaultCurrencyProfile } from "../config-type";
 import { validateExpenseAuthorization } from "./db-config/details";
 
@@ -96,27 +77,9 @@ const addUpdateHandler = async (event: APIGatewayProxyEvent) => {
       logger
     );
   } else if (req.belongsTo === ExpenseBelongsTo.Refund) {
-    apiResource = await addDbRefundTransactions(
-      req,
-      dbItem as DbItemExpense<DbDetailsRefund>,
-      dbReceipts,
-      purchaseId,
-      currencyProfile,
-      authUser,
-      transactWriter,
-      logger
-    );
+    apiResource = await addDbRefundTransactions(req, dbItem as DbItemExpense<DbDetailsRefund>, dbReceipts, purchaseId, currencyProfile, authUser, transactWriter, logger);
   } else if (req.belongsTo === ExpenseBelongsTo.Income) {
-    apiResource = await addDbIncomeTransactions(
-      req,
-      dbItem as DbItemExpense<DbDetailsIncome>,
-      dbReceipts,
-      purchaseId,
-      currencyProfile,
-      authUser,
-      transactWriter,
-      logger
-    );
+    apiResource = await addDbIncomeTransactions(req, dbItem as DbItemExpense<DbDetailsIncome>, dbReceipts, purchaseId, currencyProfile, authUser, transactWriter, logger);
   }
   if (apiResource) {
     await putExpenseTags(apiResource, dbItem, authUser, transactWriter, logger);
@@ -156,8 +119,7 @@ const putExpenseTags = async (
   const existingExpenseDbTags = await getExistingDbPurchaseTags(existingDbExpense?.details.id, apiResource.belongsTo, logger);
 
   // find difference from old tags to new updating tags. if not found any, skipping db call
-  const shouldUpdateWithNewTags =
-    existingExpenseDbTags?.tags.length === newTagSet.size ? !!existingExpenseDbTags.tags.find((tg) => !newTagSet.has(tg)) : true;
+  const shouldUpdateWithNewTags = existingExpenseDbTags?.tags.length === newTagSet.size ? !!existingExpenseDbTags.tags.find((tg) => !newTagSet.has(tg)) : true;
   if (!shouldUpdateWithNewTags) {
     return null;
   }
@@ -184,8 +146,8 @@ const putExpenseTags = async (
       belongsTo: apiResource.belongsTo,
       recordType: ExpenseRecordType.Tags,
       auditDetails: auditDetails,
-      tags: [...newTagSet],
-    },
+      tags: [...newTagSet]
+    }
   };
 
   transactWriter.putItems(dbExpenseTags as unknown as JSONObject, ExpenseTableName, logger);
@@ -264,12 +226,12 @@ const getExistingDbPurchaseTags = async (existingDbPurchaseId: string | null | u
 
   const cmdInput = {
     TableName: ExpenseTableName,
-    Key: { PK: getTablePkExpenseTags(existingDbPurchaseId, belongsTo, logger) },
+    Key: { PK: getTablePkExpenseTags(existingDbPurchaseId, belongsTo, logger) }
   };
-  const prchTagsOutput = await dbutil.getItem(cmdInput, logger);
+  const prchTagsOutput = await dbutil.getItem(cmdInput, logger, dbutil.CacheAction.FROM_CACHE);
 
   logger.info("retrieved purchase tags from DB");
-  const dbPurchaseTags = prchTagsOutput.Item as DbItemExpense<DbTagsType> | null;
+  const dbPurchaseTags = prchTagsOutput?.Item as DbItemExpense<DbTagsType> | null;
 
   if (!dbPurchaseTags) {
     return null;
