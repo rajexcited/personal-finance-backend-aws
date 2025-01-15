@@ -1,18 +1,12 @@
 import { ExpenseBelongsTo } from "../expenses/base-config";
 import { dateutil, getLogger, LoggerBase } from "../utils";
-import {
-  DbItemProjectedConfigType,
-  DbItemProjectedIncome,
-  DbItemProjectedPurchase,
-  DbItemProjectedPymtAcc,
-  DbItemProjectedRefund,
-} from "./db-config";
+import { DbItemProjectedConfigType, DbItemProjectedIncome, DbItemProjectedPurchase, DbItemProjectedPymtAcc, DbItemProjectedRefund } from "./db-config";
 import {
   ApiMonthlyStatResource,
   ApiResourceStatisticsBase,
   ApiResourceStatisticsConfigType,
   ApiResourceStatisticsPymtAcc,
-  ApiResourceStatisticsTag,
+  ApiResourceStatisticsTag
 } from "./resource-type";
 
 export type _ApiMonthlyStatResource = Omit<ApiMonthlyStatResource, "total" | "monthName"> & { total: number };
@@ -38,7 +32,7 @@ export const groupDetailsMonthly = <T extends DbItemProjectedExpense>(dbExpnsLis
       date = dbExpns.details.incomeDate;
     }
     logger.debug("expenseDate = ", date, " for belongsTo =", dbExpns.details.belongsTo, " dbExpense =", dbExpns);
-    const key = dateutil.parseTimestamp(date).getMonth().toString().padStart(2, "0");
+    const key = (dateutil.parseTimestamp(date).getMonth() + 1).toString().padStart(2, "0");
     logger.debug("month id key =", key, " adding dbExpense to group map list.");
     monthlyMap[key].push(dbExpns);
   });
@@ -68,7 +62,7 @@ export const getApiStatsResourceDetails = (groupedMap: Record<string, DbItemProj
       total: monthlyTotalAmount.toFixed(2),
       count: xpnsForMonth.length,
       monthNo: month + 1,
-      monthName: getMonthName(year, month),
+      monthName: getMonthName(year, month)
     };
   });
 
@@ -76,7 +70,7 @@ export const getApiStatsResourceDetails = (groupedMap: Record<string, DbItemProj
     count: totalCount,
     description: "statistics for year " + year,
     total: totalAmount.toFixed(2),
-    monthlyTotal: monthlyTotal,
+    monthlyTotal: monthlyTotal
   };
 
   return apiResource;
@@ -109,7 +103,7 @@ export const getApiStatsResourceByConfigType = <T extends DbItemProjectedExpense
           configTypeStatDetailMapById[configId] = {
             totalAmount: 0,
             totalCount: 0,
-            monthlyData: {},
+            monthlyData: {}
           };
         }
 
@@ -122,7 +116,7 @@ export const getApiStatsResourceByConfigType = <T extends DbItemProjectedExpense
           configTypeStatDtl.monthlyData[monthKey] = {
             count: 0,
             total: 0,
-            monthNo: Number(monthKey),
+            monthNo: Number(monthKey)
           };
         }
         const monthlyStat = configTypeStatDtl.monthlyData[monthKey];
@@ -139,7 +133,7 @@ export const getApiStatsResourceByConfigType = <T extends DbItemProjectedExpense
         total: monthlyData.total.toFixed(2),
         count: monthlyData.count,
         monthNo: monthlyData.monthNo + 1,
-        monthName: getMonthName(year, monthlyData.monthNo),
+        monthName: getMonthName(year, monthlyData.monthNo)
       };
       return resp;
     });
@@ -151,7 +145,7 @@ export const getApiStatsResourceByConfigType = <T extends DbItemProjectedExpense
       total: confStats.totalAmount.toFixed(2),
       description: "stats for year [" + year + "] and config name [" + configTypeDetail.details.name + "]",
       status: configTypeDetail.details.status,
-      monthlyTotal: confMonthlyData,
+      monthlyTotal: confMonthlyData
     };
     return response;
   });
@@ -175,7 +169,7 @@ export const getApiStatsResourceByTags = (groupedMap: Record<string, DbItemProje
             monthlyData: {},
             tag: tag,
             totalAmount: 0,
-            totalCount: 0,
+            totalCount: 0
           };
         }
         const tagStatDtl = tagStatMap[tag];
@@ -188,7 +182,7 @@ export const getApiStatsResourceByTags = (groupedMap: Record<string, DbItemProje
           tagStatDtl.monthlyData[monthKey] = {
             total: 0,
             count: 0,
-            monthNo: Number(monthKey),
+            monthNo: Number(monthKey)
           };
         }
         const monthlyTagStat = tagStatDtl.monthlyData[monthKey];
@@ -205,7 +199,7 @@ export const getApiStatsResourceByTags = (groupedMap: Record<string, DbItemProje
         total: monthlyData.total.toFixed(2),
         count: monthlyData.count,
         monthNo: monthlyData.monthNo + 1,
-        monthName: getMonthName(year, monthlyData.monthNo),
+        monthName: getMonthName(year, monthlyData.monthNo)
       };
       return resp;
     });
@@ -214,7 +208,7 @@ export const getApiStatsResourceByTags = (groupedMap: Record<string, DbItemProje
       count: tagStatDetail.totalCount,
       total: tagStatDetail.totalAmount.toFixed(2),
       description: "stats for year [" + year + "] and tag [" + tagStatDetail.tag + "]",
-      monthlyTotal: tagMonthlyData,
+      monthlyTotal: tagMonthlyData
     };
     return response;
   });
@@ -250,7 +244,7 @@ export const getApiStatsResourceByTypeTags = (
           totalAmount: 0,
           totalCount: 0,
           monthlyData: {},
-          tag: tag,
+          tag: tag
         };
       } else {
         const tagStatMap = purchaseTypeStatDetailMapByTag[tag];
@@ -273,7 +267,7 @@ export const getApiStatsResourceByTypeTags = (
         total: typeMonthlyData.total.toFixed(2),
         count: typeMonthlyData.count,
         monthNo: typeMonthlyData.monthNo,
-        monthName: getMonthName(year, typeMonthlyData.monthNo - 1),
+        monthName: getMonthName(year, typeMonthlyData.monthNo - 1)
       };
       return response;
     });
@@ -282,7 +276,7 @@ export const getApiStatsResourceByTypeTags = (
       count: purchaseTypeTagStat.totalCount,
       total: purchaseTypeTagStat.totalAmount.toFixed(2),
       description: "stats for year [" + year + "] and purchaseType tag [" + purchaseTypeTagStat.tag + "]",
-      monthlyTotal: purchaseTypeTagMonthlyData,
+      monthlyTotal: purchaseTypeTagMonthlyData
     };
     return response;
   });
@@ -317,7 +311,7 @@ export const getApiStatsResourceByPymtAcc = <T extends DbItemProjectedExpense>(
             pymtAcc: pymtAccMapById[xpnsDtl.details.paymentAccountId],
             totalAmount: 0,
             totalCount: 0,
-            monthlyData: {},
+            monthlyData: {}
           };
         }
 
@@ -330,7 +324,7 @@ export const getApiStatsResourceByPymtAcc = <T extends DbItemProjectedExpense>(
           pymtAccStatDtl.monthlyData[monthKey] = {
             count: 0,
             total: 0,
-            monthNo: Number(monthKey),
+            monthNo: Number(monthKey)
           };
         }
         const monthlyStat = pymtAccStatDtl.monthlyData[monthKey];
@@ -346,7 +340,7 @@ export const getApiStatsResourceByPymtAcc = <T extends DbItemProjectedExpense>(
         total: monthlyData.total.toFixed(2),
         count: monthlyData.count,
         monthNo: monthlyData.monthNo + 1,
-        monthName: getMonthName(year, monthlyData.monthNo),
+        monthName: getMonthName(year, monthlyData.monthNo)
       };
       return resp;
     });
@@ -357,7 +351,7 @@ export const getApiStatsResourceByPymtAcc = <T extends DbItemProjectedExpense>(
       total: statDetail.totalAmount.toFixed(2),
       description: "stats for year [" + year + "] and config name [" + statDetail.pymtAcc.details.shortName + "]",
       status: statDetail.pymtAcc.details.status,
-      monthlyTotal: pymtAccMonthlyData,
+      monthlyTotal: pymtAccMonthlyData
     };
     return response;
   });
