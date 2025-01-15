@@ -3,10 +3,12 @@ import * as jwt from "jsonwebtoken";
 import { TokenHeader, TokenPayload, TokenSecret } from "./auth-type";
 import { RoleAuthConfigList } from "./role-config";
 import { utils, getLogger, validations, dbutil, LoggerBase, secretutil } from "../utils";
-import { DbItemToken, getTokenTablePk } from "../user";
+import { DbItemToken } from "../user";
 import { AuthRole } from "../common";
 import { UnAuthenticatedError, ValidationError } from "../apigateway";
 import { _logger, _userTableName, _rootPath, _tokenSecretId } from "./base-config";
+import { GetCommandInput, QueryCommandInput } from "@aws-sdk/lib-dynamodb";
+import { _userEmailGsiName, getTokenGsiPk } from "../user/base-config";
 
 export const authorizer: APIGatewayTokenAuthorizerHandler = async (event, context) => {
   const logger = getLogger("authorizer", _logger);
@@ -22,16 +24,18 @@ export const authorizer: APIGatewayTokenAuthorizerHandler = async (event, contex
   let iamPolicyDocument = denyPolicy(event.methodArn);
   const authenticatedResponse = await authenticate(token);
   logger.info("authenticate response", authenticatedResponse);
+  let authorizeResponse: AuthorizeResponse = { isAuthorized: false, clearCacheAfter: false };
   if (authenticatedResponse.isAuthenticated && authenticatedResponse.decoded) {
-    const isAuthorized = await authorize(payload, event.methodArn, authenticatedResponse.decoded as jwt.JwtPayload);
-    logger.info("isAuthorized", isAuthorized);
-    if (isAuthorized) {
+    authorizeResponse = await authorize(payload, event.methodArn, authenticatedResponse.decoded as jwt.JwtPayload);
+    logger.info("isAuthorized response=", authorizeResponse);
+    if (authorizeResponse.isAuthorized) {
       iamPolicyDocument = allowPolicy(event.methodArn, payload.role as AuthRole, logger);
     }
   }
+  const dbTokenDetails = await queryDbToken(payload, logger, authorizeResponse.clearCacheAfter);
   const resp: APIGatewayAuthorizerResult = {
     policyDocument: iamPolicyDocument,
-    principalId: payload.id,
+    principalId: dbTokenDetails?.userId || "unknown",
     context: {
       role: payload.role
     }
@@ -88,14 +92,15 @@ const authenticate = async (token: string) => {
   }
 };
 
-const authorize = async (payload: TokenPayload, resourceArn: string, jwtPayload: jwt.JwtPayload) => {
+type AuthorizeResponse = Record<"isAuthorized" | "clearCacheAfter", boolean>;
+const authorize = async (payload: TokenPayload, resourceArn: string, jwtPayload: jwt.JwtPayload): Promise<AuthorizeResponse> => {
   const logger = getLogger("authorize", _logger);
 
   // verify if role is allowed for rest
   const roles = Object.values(AuthRole) as string[];
   if (!roles.includes(payload.role)) {
     logger.info("given role [" + payload.role + "] in token is not supported");
-    return false;
+    return { isAuthorized: false, clearCacheAfter: false };
   }
 
   const { methodUri, httpMethod } = getResourceParts(resourceArn, logger);
@@ -117,7 +122,7 @@ const authorize = async (payload: TokenPayload, resourceArn: string, jwtPayload:
 
   if (filteredCfg.length !== 1) {
     logger.info("length of filteredCfg array is not equal to 1");
-    return false;
+    return { isAuthorized: false, clearCacheAfter: false };
   }
 
   if (filteredCfg[0].role.length) {
@@ -125,36 +130,26 @@ const authorize = async (payload: TokenPayload, resourceArn: string, jwtPayload:
     logger.info("rolesAllowed", rolesAllowed);
     if (!rolesAllowed.length) {
       logger.info("role is not allowed");
-      return false;
+      return { isAuthorized: false, clearCacheAfter: false };
     }
   }
 
-  // verify if user is valid
-  const cmdInput = {
-    TableName: _userTableName,
-    Key: { PK: getTokenTablePk(payload.id) }
-  };
-  const result = await dbutil.getItem(cmdInput, logger, filteredCfg[0].clearCache);
-
-  logger.debug("retrieved user");
-  if (!result.Item) {
-    logger.info("there isn't any token details found in db");
-    return false;
+  const dbTokenDetails = await queryDbToken(payload, logger, false);
+  if (!dbTokenDetails) {
+    return { isAuthorized: false, clearCacheAfter: !!filteredCfg[0].clearCache };
   }
-
-  const userItem = result.Item as DbItemToken;
-  if (Date.now() > userItem.details.tokenExpiresAt) {
-    logger.info("token is expired. expiredAt [" + userItem.details.tokenExpiresAt + "( " + new Date(userItem.details.tokenExpiresAt) + " )]");
-    return false;
+  if (Date.now() > dbTokenDetails.tokenExpiresAt) {
+    logger.info("token is expired. expiredAt [" + dbTokenDetails.tokenExpiresAt + "( " + new Date(dbTokenDetails.tokenExpiresAt) + " )]");
+    return { isAuthorized: false, clearCacheAfter: !!filteredCfg[0].clearCache };
   }
 
   // making sure that old token is not used to authorize
-  if (userItem.details.iat !== jwtPayload.iat) {
-    logger.info("iat is not same. actual in token [" + jwtPayload.iat + "], but expected in db [" + userItem.details.iat + "]");
-    return false;
+  if (dbTokenDetails.initializedAt !== jwtPayload.iat) {
+    logger.info("iat is not same. actual in token [" + jwtPayload.iat + "], but expected in db [" + dbTokenDetails.initializedAt + "]");
+    return { isAuthorized: false, clearCacheAfter: !!filteredCfg[0].clearCache };
   }
 
-  return true;
+  return { isAuthorized: true, clearCacheAfter: !!filteredCfg[0].clearCache };
 };
 
 const getTokenHeader = (token: string) => {
@@ -234,4 +229,51 @@ const getResourceParts = (resourceArn: string, baseLogger: LoggerBase) => {
 const getSecret = async (loggerBase?: LoggerBase) => {
   const logger = getLogger("getSecret", loggerBase);
   return await secretutil.getSecret<TokenSecret>(_tokenSecretId, true, logger);
+};
+
+const queryDbToken = async (tokenPayload: TokenPayload, loggerBase: LoggerBase, clearCacheAfter: boolean) => {
+  const logger = getLogger("queryDbToken", loggerBase);
+  const cmdInput: QueryCommandInput = {
+    TableName: _userTableName,
+    IndexName: _userEmailGsiName,
+    KeyConditionExpression: "E_GSI_PK = :pk",
+    ExpressionAttributeValues: {
+      ":pk": getTokenGsiPk(tokenPayload)
+    }
+  };
+
+  const result = await dbutil.queryOnce(cmdInput, logger, dbutil.CacheAction.FROM_CACHE);
+  if (clearCacheAfter) {
+    dbutil.queryOnce(cmdInput, logger, dbutil.CacheAction.CLEAR_CACHE_NO_CALL);
+  }
+  if (!result?.Items || result.Items.length === 0) {
+    logger.info("there isn't any token details found in db");
+    return null;
+  }
+  const tokenItem = result.Items[0] as Pick<DbItemToken, "PK" | "E_GSI_PK">;
+  const getItemCmdInput: GetCommandInput = {
+    TableName: _userTableName,
+    Key: { PK: tokenItem.PK }
+  };
+  let response = await dbutil.getItem(getItemCmdInput, logger, dbutil.CacheAction.FROM_CACHE);
+  logger.debug("retrieved db token details from cache");
+  let item = response?.Item as DbItemToken;
+
+  if (tokenPayload.id !== item.details.sessionId) {
+    logger.debug("found removed session in cache.");
+    const cachedCmdInput: QueryCommandInput = {
+      TableName: _userTableName,
+      IndexName: _userEmailGsiName,
+      KeyConditionExpression: "E_GSI_PK = :pk",
+      ExpressionAttributeValues: {
+        ":pk": getTokenGsiPk(item.details)
+      }
+    };
+    dbutil.queryOnce(cachedCmdInput, logger, dbutil.CacheAction.CLEAR_CACHE_NO_CALL);
+    response = await dbutil.getItem(getItemCmdInput, logger, dbutil.CacheAction.NOT_FROM_CACHE);
+    logger.debug("retrieved db token details throug dynamodb api call. clearing queryOnce cache as well.");
+    item = response?.Item as DbItemToken;
+  }
+
+  return item.details;
 };

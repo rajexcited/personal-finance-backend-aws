@@ -12,7 +12,16 @@ import {
   getEmailGsiPk,
   getTokenTablePk,
   UserResourcePath,
-  ErrorMessage
+  ErrorMessage,
+  getBrowser,
+  getBrowserVersion,
+  getCity,
+  getCountryCode,
+  getDeviceType,
+  getPlatForm,
+  getState,
+  getUserAgent,
+  getTokenGsiPk
 } from "./base-config";
 import { encrypt, initiate } from "./pcrypt";
 import { DbUserDetails, DbItemUser, DbItemToken, ApiUserResource, AuthorizeUser, DbUserStatus } from "./resource-type";
@@ -54,8 +63,8 @@ const signupHandler = async (event: APIGatewayProxyEvent) => {
       status: DbUserStatus.ACTIVE_USER
     };
     const dbDetailItem: DbItemUser = {
-      PK: getDetailsTablePk(apiToDbDetails.id),
-      E_GSI_PK: getEmailGsiPk(apiToDbDetails.emailId),
+      PK: getDetailsTablePk(apiToDbDetails),
+      E_GSI_PK: getEmailGsiPk(apiToDbDetails),
       details: apiToDbDetails
     };
     transactionWriter.putItems(dbDetailItem as unknown as JSONObject, _userTableName);
@@ -71,19 +80,32 @@ const signupHandler = async (event: APIGatewayProxyEvent) => {
     stopwatch.stop();
 
     stopwatch.start("addingNewUser");
-    const accessTokenObj = await getSignedToken(apiToDbDetails.id, AuthRole.PRIMARY);
+    const accessTokenObj = await getSignedToken(AuthRole.PRIMARY);
     const dbTokenItem: DbItemToken = {
-      PK: getTokenTablePk(apiToDbDetails.id),
+      PK: getTokenTablePk(apiToDbDetails),
+      E_GSI_PK: getTokenGsiPk(accessTokenObj.getTokenPayload()),
       ExpiresAt: accessTokenObj.getExpiresAt().toSeconds(),
       details: {
-        iat: accessTokenObj.iat,
+        userId: apiToDbDetails.id,
+        sessionId: accessTokenObj.getSessionId(),
+        userRole: accessTokenObj.getUserRole(),
+        platform: getPlatForm(event),
+        browser: getBrowser(event),
+        userAgent: getUserAgent(event),
+        browserVersion: getBrowserVersion(event),
+        deviceType: getDeviceType(event),
+        activeAddress: {
+          city: getCity(event),
+          state: getState(event),
+          country: getCountryCode(event)
+        },
+        initializedAt: accessTokenObj.initializedAt,
         tokenExpiresAt: accessTokenObj.getExpiresAt().toMillis()
       }
     };
 
     transactionWriter.putItems(dbTokenItem as unknown as JSONObject, _userTableName);
     await transactionWriter.executeTransaction();
-    // await dbutil.batchAddUpdate([dbDetailItem, dbTokenItem], _userTableName, logger);
 
     logger.info("accessTokenObj", accessTokenObj);
     const result = {
@@ -144,14 +166,14 @@ const getValidatedRequestForSignup = async (event: APIGatewayProxyEvent, loggerB
     IndexName: _userEmailGsiName,
     KeyConditionExpression: "E_GSI_PK = :pk",
     ExpressionAttributeValues: {
-      ":pk": getEmailGsiPk(req.emailId as string)
+      ":pk": getEmailGsiPk(req)
     }
   };
-  const output = await dbutil.queryOnce(cmdInput, logger);
+  const output = await dbutil.queryOnce(cmdInput, logger, dbutil.CacheAction.NOT_FROM_CACHE);
   logger.info("query completed");
 
   // error if count value is greater than 0
-  if (output.Count) {
+  if (output?.Count) {
     throw new ValidationError([{ path: UserResourcePath.EMAILID, message: ErrorMessage.EMAIL_ALREADY_EXISTS }]);
   }
 

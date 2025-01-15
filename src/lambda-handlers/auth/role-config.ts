@@ -44,8 +44,7 @@ const UserUriAuthConfigList: RoleAuthorizeConfigType[] = [
   {
     apiPath: "/user/login",
     method: MethodType.POST,
-    role: [],
-    clearCache: true
+    role: []
   }
 ];
 

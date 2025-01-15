@@ -3,19 +3,10 @@ import { InvalidError, InvalidField, JSONObject, RequestBodyContentType, Validat
 import { utils, validations, getLogger, LoggerBase, dbutil, dateutil } from "../utils";
 import { DbUserDetails, ApiUserResource, DbItemUser, DbUserStatus, ApiUserAccountStatus } from "./resource-type";
 import { encrypt, initiate, verifyCurrPrev } from "./pcrypt";
-import {
-  ErrorMessage,
-  UserResourcePath,
-  _logger,
-  _userEmailGsiName,
-  _userTableName,
-  getAuthorizeUser,
-  getDetailsTablePk,
-  getEmailGsiPk,
-  getValidatedUserId
-} from "./base-config";
+import { ErrorMessage, UserResourcePath, _logger, _userEmailGsiName, _userTableName, getAuthorizeUser, getDetailsTablePk, getEmailGsiPk } from "./base-config";
 import { caching } from "cache-manager";
 import ms from "ms";
+import { AuthRole } from "../common";
 
 const userDetailsMemoryCache = caching("memory", {
   max: 5,
@@ -26,14 +17,14 @@ const DELETE_USER_EXPIRES_IN_SEC = Number(process.env.DELETE_USER_EXPIRES_IN_SEC
 
 export const getDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("getDetails", _logger);
-  const userId = getValidatedUserId(event);
+  const authUser = getAuthorizeUser(event);
   const cmdInput = {
     TableName: _userTableName,
-    Key: { PK: getDetailsTablePk(userId) }
+    Key: { PK: getDetailsTablePk(authUser) }
   };
-  const output = await dbutil.getItem(cmdInput, logger);
+  const output = await dbutil.getItem(cmdInput, logger, dbutil.CacheAction.FROM_CACHE);
   logger.info("retrieved user item result");
-  if (!output.Item) {
+  if (!output?.Item) {
     throw new ValidationError([{ message: ErrorMessage.UNKNOWN_USER, path: UserResourcePath.USER }]);
   }
   const dbDetails: DbUserDetails = output.Item.details;
@@ -53,11 +44,11 @@ const updateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   const req = getValidatedRequestForUpdateDetails(event, logger);
   const getCmdInput = {
     TableName: _userTableName,
-    Key: { PK: getDetailsTablePk(authUser.userId) }
+    Key: { PK: getDetailsTablePk(authUser) }
   };
-  const output = await dbutil.getItem(getCmdInput, logger);
+  const output = await dbutil.getItem(getCmdInput, logger, dbutil.CacheAction.FROM_CACHE);
   logger.info("getUserDetails", output);
-  if (!output.Item) {
+  if (!output?.Item) {
     throw new ValidationError([{ message: ErrorMessage.UNKNOWN_USER, path: UserResourcePath.USER }]);
   }
   const dbDetails = output.Item.details as DbUserDetails;
@@ -90,8 +81,8 @@ const updateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   }
 
   const dbItem: DbItemUser = {
-    PK: getDetailsTablePk(authUser.userId),
-    E_GSI_PK: getEmailGsiPk(dbDetails.emailId),
+    PK: getDetailsTablePk(dbDetails),
+    E_GSI_PK: getEmailGsiPk(dbDetails),
     details: apiToDbDetails
   };
   const putCmdInput = {
@@ -112,11 +103,11 @@ export const deleteDetails = apiGatewayHandlerWrapper(async (event: APIGatewayPr
 
   const cmdInput = {
     TableName: _userTableName,
-    Key: { PK: getDetailsTablePk(authUser.userId) }
+    Key: { PK: getDetailsTablePk(authUser) }
   };
-  const output = await dbutil.getItem(cmdInput, logger);
+  const output = await dbutil.getItem(cmdInput, logger, dbutil.CacheAction.FROM_CACHE);
   logger.info("retrieved user item result");
-  if (!output.Item) {
+  if (!output?.Item) {
     throw new ValidationError([{ message: ErrorMessage.UNKNOWN_USER, path: UserResourcePath.USER }]);
   }
   const dbItem = output.Item as DbItemUser;
@@ -212,11 +203,11 @@ export const getUserDetailsById = async (userId: string) => {
     }
     const cmdInput = {
       TableName: _userTableName,
-      Key: { PK: getDetailsTablePk(userId) }
+      Key: { PK: getDetailsTablePk({ userId, role: AuthRole.PRIMARY }) }
     };
-    const output = await dbutil.getItem(cmdInput, logger);
+    const output = await dbutil.getItem(cmdInput, logger, dbutil.CacheAction.FROM_CACHE);
     logger.info("retrieved user item ");
-    if (!output.Item) {
+    if (!output?.Item) {
       return null;
     }
     const dbDetails: DbUserDetails = output.Item.details;

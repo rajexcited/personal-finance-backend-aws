@@ -35,7 +35,7 @@ export const apiGatewayHandlerWrapper = (callback: LambdaHandler, requiredBodyTy
       validateEvent(event, requiredBodyType);
       const result = await callback(event);
       const resp = convertToAPIGatewayEventResult(result);
-      logger.debug("responding success message", resp.body);
+      logger.debug("responding success message", resp);
       return resp;
     } catch (err) {
       if (err instanceof ValidationError) {
@@ -89,6 +89,7 @@ export const convertToCreatedResponse = (result: JSONValue) => {
 };
 
 const convertToAPIGatewayEventResult = (result: JSONValue | APIGatewayProxyResult, statusCode?: HTTP_STATUS_CODE | null): APIGatewayProxyResult => {
+  const logger = getLogger("convertToAPIGatewayEventResult", _logger);
   if (result === null || result === undefined || result === "") {
     return {
       statusCode: Number(HTTP_STATUS_CODE.EMPTY_RESPONSE_CONTENT),
@@ -97,6 +98,7 @@ const convertToAPIGatewayEventResult = (result: JSONValue | APIGatewayProxyResul
   }
 
   if (isInstanceofAPIGatewayProxyResult(result)) {
+    logger.debug("found apigateway formatted response", result);
     let stCode = statusCode;
     const res = result as APIGatewayProxyResult;
 
@@ -104,6 +106,7 @@ const convertToAPIGatewayEventResult = (result: JSONValue | APIGatewayProxyResul
     if (isValidStatusCode(code)) {
       stCode = code;
     }
+    logger.debug("converted http code=", code, " and stCode=", stCode, "while param statusCode=", statusCode);
 
     const resp = convertToAPIGatewayEventResult(res.body);
     return {

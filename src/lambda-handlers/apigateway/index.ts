@@ -8,7 +8,7 @@ export {
   IllegelArgumentError,
   IncorrectValueError,
   InvalidError,
-  MissingError,
+  MissingError
 } from "./errors";
 export { JSONValue, JSONObject, JSONArray, LambdaHandler } from "./wrapper-types";
-export { MethodType } from "./http-method-type";
+export { MethodType, HTTP_STATUS_CODE } from "./http-method-type";

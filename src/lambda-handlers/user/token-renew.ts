@@ -1,21 +1,51 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
+import { v4 as uuidv4 } from "uuid";
 import { getSignedToken } from "../auth";
 import { apiGatewayHandlerWrapper } from "../apigateway";
 import { getLogger, dbutil } from "../utils";
-import { _logger, _userTableName, getValidatedUserId, getTokenTablePk } from "./base-config";
+import {
+  _logger,
+  _userTableName,
+  getValidatedUserId,
+  getTokenTablePk,
+  getBrowser,
+  getBrowserVersion,
+  getCity,
+  getCountryCode,
+  getDeviceType,
+  getPlatForm,
+  getState,
+  getUserAgent,
+  getAuthorizeUser,
+  getTokenGsiPk
+} from "./base-config";
 import { DbItemToken } from "./resource-type";
 
 export const renewToken = apiGatewayHandlerWrapper(async (event: APIGatewayProxyEvent) => {
   const logger = getLogger("renewToken", _logger);
-  const userId = getValidatedUserId(event);
+  const authUser = getAuthorizeUser(event);
   const role = event.requestContext.authorizer?.role;
 
-  const accessTokenObj = await getSignedToken(userId, role);
+  const accessTokenObj = await getSignedToken(role);
   const dbTokenItem: DbItemToken = {
-    PK: getTokenTablePk(userId),
+    PK: getTokenTablePk(authUser),
+    E_GSI_PK: getTokenGsiPk(accessTokenObj.getTokenPayload()),
     ExpiresAt: accessTokenObj.getExpiresAt().toSeconds(),
     details: {
-      iat: accessTokenObj.iat,
+      userId: authUser.userId,
+      sessionId: accessTokenObj.getSessionId(),
+      userRole: accessTokenObj.getUserRole(),
+      platform: getPlatForm(event),
+      browser: getBrowser(event),
+      userAgent: getUserAgent(event),
+      browserVersion: getBrowserVersion(event),
+      deviceType: getDeviceType(event),
+      activeAddress: {
+        city: getCity(event),
+        state: getState(event),
+        country: getCountryCode(event)
+      },
+      initializedAt: accessTokenObj.initializedAt,
       tokenExpiresAt: accessTokenObj.getExpiresAt().toMillis()
     }
   };
@@ -24,7 +54,7 @@ export const renewToken = apiGatewayHandlerWrapper(async (event: APIGatewayProxy
     Item: dbTokenItem
   };
   const updateResult = await dbutil.putItem(cmdInput, logger);
-  logger.info("updated Result", "accessTokenObj", accessTokenObj);
+  logger.info("updated Result", updateResult, "accessTokenObj", accessTokenObj);
 
   return {
     headers: {

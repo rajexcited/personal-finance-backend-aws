@@ -30,6 +30,7 @@ export class TokenAuthorizerConstruct extends Construct {
       layers: [props.layer],
       environment: {
         USER_TABLE_NAME: props.userTable.table.name,
+        USER_EMAIL_GSI_NAME: props.userTable.globalSecondaryIndexes.emailIdIndex.name,
         AUTH_SECRET_ID: props.tokenSecret.secretName,
         ROOT_PATH: props.restApiPathPrefix,
         DEFAULT_LOG_LEVEL: props.environment === InfraEnvironmentId.Development ? "debug" : "undefined"

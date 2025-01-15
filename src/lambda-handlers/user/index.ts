@@ -8,4 +8,4 @@ export { signup as userSignup } from "./signup";
 
 export { renewToken } from "./token-renew";
 
-export { DbItemToken, DbUserDetails, DbUserTokenDetails, AuthorizeUser } from "./resource-type";
+export { DbItemToken, DbUserDetails, AuthorizeUser } from "./resource-type";

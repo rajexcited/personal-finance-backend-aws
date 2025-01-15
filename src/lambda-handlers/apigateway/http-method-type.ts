@@ -7,11 +7,12 @@ export enum HTTP_STATUS_CODE {
   NOT_FOUND = 404,
   UNAUTHORIZED = 401,
   UNKNOWN_ERROR = 500,
+  CONFLICT = 409
 }
 
 export enum MethodType {
   "POST" = "POST",
   "PUT" = "PUT",
   "DELETE" = "DELETE",
-  "GET" = "GET",
+  "GET" = "GET"
 }
