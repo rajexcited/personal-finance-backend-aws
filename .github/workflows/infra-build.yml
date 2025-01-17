@@ -1,0 +1,96 @@
+# This workflow performs basic steps
+# build, compile, synth and unit test
+name: AWS Infra Build
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: npm Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node Latest
+        uses: actions/setup-node@v4
+        with:
+          node-version: "latest"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build
+
+  unittest:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node Latest
+        uses: actions/setup-node@v4
+        with:
+          node-version: "latest"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run test
+
+  synth_prod:
+    name: Synthesize Stacks
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    environment: aws-infra-master
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node Latest
+        uses: actions/setup-node@v4
+        with:
+          node-version: "latest"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build
+      - name: setup layer and UI assets
+        run: |
+          mkdir -p dist/lambda_layer/nodejs
+          jq "del(.devDependencies, .scripts, .bin)" package.json > dist/lambda_layer/nodejs/package.json
+          mkdir -p dist/ui
+      - name: cdk synth
+        uses: youyo/aws-cdk-github-actions@v2
+        with:
+          cdk_subcommand: "synth"
+          actions_comment: true
+        env:
+          INFRA_ENV: ${{ vars.INFRA_ENV }}
+
+  synth:
+    name: Synthesize Stacks
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    environment: aws-infra
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node Latest
+        uses: actions/setup-node@v4
+        with:
+          node-version: "latest"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build
+      - name: cdk synth
+        uses: youyo/aws-cdk-github-actions@v2
+        with:
+          cdk_subcommand: "synth"
+          actions_comment: true
+        env:
+          INFRA_ENV: ${{ vars.INFRA_ENV }}
