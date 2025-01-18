@@ -75,7 +75,7 @@ jobs:
         uses: youyo/aws-cdk-github-actions@v2
         with:
           cdk_subcommand: "synth"
-          actions_comment: true
+          actions_comment: false
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
 
@@ -102,6 +102,6 @@ jobs:
         uses: youyo/aws-cdk-github-actions@v2
         with:
           cdk_subcommand: "synth"
-          actions_comment: true
+          actions_comment: false
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}

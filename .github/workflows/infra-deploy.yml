@@ -99,11 +99,11 @@ jobs:
           # setup cicd role through instructions from aws-manual branch.
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: cdkSession
-      - name: cdk diff
+      - name: cdk deploy
         uses: youyo/aws-cdk-github-actions@v2
         with:
           cdk_subcommand: "deploy"
-          actions_comment: true
-          cdk_args: "MyFinanceInfraStack --require-approval never"
+          actions_comment: false
+          cdk_args: "MyFinanceInfraStack --exclusively --require-approval never"
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}

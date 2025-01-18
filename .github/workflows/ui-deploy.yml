@@ -101,6 +101,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.event.client_payload.ui_repository }}
           run-id: ${{ github.event.client_payload.repo_run_id }}
+      - run: ls -lrt dist/ui/
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
