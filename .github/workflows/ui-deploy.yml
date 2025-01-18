@@ -47,7 +47,7 @@ jobs:
           run-id: ${{ github.event.client_payload.repo_run_id }}
       - run: ls -lrt dist/${{ github.event.client_payload.artifact_name }}
       - name: Copy artifact files to UI asset directory
-        run: cp -r dist/$ARTIFACT_NAME dist/ui
+        run: cp -r dist/$ARTIFACT_NAME/ dist/ui
         env:
           ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
       - name: validate UI asset directory structure
