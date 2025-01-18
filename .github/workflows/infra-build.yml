@@ -85,7 +85,7 @@ jobs:
     needs:
       - build
     environment: aws-infra
-    if: github.ref != 'refs/heads/master'
+    if: github.ref != 'refs/heads/master' && github.event_name != 'pull_request'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
