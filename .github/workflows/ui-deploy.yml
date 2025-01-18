@@ -126,6 +126,7 @@ jobs:
         with:
           node-version: "latest"
           cache: "npm"
+      - run: npm --version
       - run: npm ci
       - run: npm run build
       - run: mkdir -p dist/lambda_layer/nodejs
@@ -158,6 +159,8 @@ jobs:
         with:
           cdk_subcommand: "deploy"
           actions_comment: false
-          cdk_args: "MyFinanceUiDeployStack --exclusively --require-approval never"
+          debug_log: true
+          cdk_stack: "MyFinanceUiDeployStack"
+          cdk_args: "--require-approval never --exclusively"
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
