@@ -33,6 +33,35 @@ jobs:
         # env:
         # GITHUB_CONTEXT_JSON: ${{ toJSON(github) }}
 
+  verify_artifact:
+    name: Download and Verify UI Artifact
+    runs-on: ubuntu-latest
+    steps:
+      - run: mkdir -p dist/ui
+      - name: download UI artifact
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.event.client_payload.ui_repository }}
+          run-id: ${{ github.event.client_payload.repo_run_id }}
+      - run: ls -lrt dist/${{ github.event.client_payload.artifact_name }}
+      - name: Copy artifact files to UI asset directory
+        run: cp -r dist/$ARTIFACT_NAME dist/ui
+        env:
+          ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
+      - name: validate UI asset directory structure
+        run: |
+          ls -lrt dist/ui
+          ls dist/ui/index.html
+          ls -lrt dist/ui/static
+          ls dist/ui/logo.jpeg
+          ls dist/ui/logo192.png
+          ls -lrt dist/ui/static/css
+          ls -lrt dist/ui/static/js
+          ls -lrt dist/ui/static/media
+          ls -lrt dist/ui/favicon.ico
+
   awsauth:
     name: Verify AWS Access
     runs-on: ubuntu-latest
@@ -87,6 +116,7 @@ jobs:
       - print_client_payload
       - awsauth
       - diff
+      - verify_artifact
     environment: aws-infra-master
     steps:
       - name: Checkout
@@ -109,10 +139,13 @@ jobs:
           run-id: ${{ github.event.client_payload.repo_run_id }}
       - run: ls -lrt dist/${{ github.event.client_payload.artifact_name }}
       - name: Copy artifact files to UI asset directory
-        run: cp -r dist/$ARTIFACT_NAME/ dist/ui/
+        run: cp -r dist/$ARTIFACT_NAME dist/ui
         env:
           ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
-      - run: ls -lrt dist/ui
+      - name: validate UI asset directory structure
+        run: |
+          ls -lrt dist/ui
+          ls dist/ui/index.html
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
