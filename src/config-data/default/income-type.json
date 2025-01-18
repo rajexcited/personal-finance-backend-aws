@@ -1,0 +1,50 @@
+[
+  {
+    "name": "salary",
+    "value": "salary",
+    "tags": ["earning", "necessary"],
+    "description": "regular job salary which considers as constant income source."
+  },
+  {
+    "name": "interest",
+    "value": "interest",
+    "tags": ["earning", "wants"],
+    "description": "interest earned from savings account, HYSA, CD, etc."
+  },
+  {
+    "name": "investment",
+    "value": "investment",
+    "tags": ["earning", "necessary"],
+    "description": "realized profit or loss from investment. \n investing can be made for options, stocks, buying properties, passive investor or angel investor to business, bonds, govt schemes, CD, etc."
+  },
+  {
+    "name": "passive income",
+    "value": "passive income",
+    "tags": ["earning"],
+    "description": "getting earning from investment or business, where you don't work much, it is not the salary"
+  },
+  {
+    "name": "nri transfer",
+    "value": "nri transfer",
+    "tags": ["earning"],
+    "description": "currency remittence from other country. this is not actually income, but simply consider as currency converter/transfer."
+  },
+  {
+    "name": "gift",
+    "value": "gift",
+    "tags": ["earning"],
+    "description": "this is giving myself. Someone or me gives gifts, on special occasions such as festival, birthday, anniversaries, rakshabandhan, Diwali, Christmas, get together after, welcome home party, wedding, donation, family functions, events, etc."
+  },
+  {
+    "name": "tax",
+    "value": "tax",
+    "tags": ["earning"],
+    "description": "receiving tax credit from goverment"
+  },
+  {
+    "name": "business",
+    "value": "business",
+    "tags": ["earning"],
+    "description": "earning from business such as renting a room, airBnB, vending machine etc."
+  }
+]

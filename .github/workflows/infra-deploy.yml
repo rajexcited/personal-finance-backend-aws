@@ -1,0 +1,109 @@
+# This workflow performs basic steps
+# build, compile, synth and unit test
+name: AWS Infra Deploy
+
+on:
+  workflow_run:
+    workflows: ["AWS Infra Build"]
+    types: [completed]
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  awsauth:
+    name: Verify AWS Access
+    runs-on: ubuntu-latest
+    environment: aws-infra-master
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          # setup cicd role through instructions from aws-manual branch.
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: cdkSession
+
+  diff:
+    name: Infra stack Diff
+    runs-on: ubuntu-latest
+    needs:
+      - awsauth
+    environment: aws-infra-master
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node Latest
+        uses: actions/setup-node@v4
+        with:
+          node-version: "latest"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build
+      - name: setup lambda layer directory
+        run: |
+          mkdir -p dist/lambda_layer/nodejs
+          jq "del(.devDependencies, .scripts, .bin)" package.json > dist/lambda_layer/nodejs/package.json
+      - run: mkdir -p dist/ui
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          # setup cicd role through instructions from aws-manual branch.
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: cdkSession
+      - name: cdk diff
+        uses: youyo/aws-cdk-github-actions@v2
+        with:
+          cdk_subcommand: "diff"
+          actions_comment: false
+        env:
+          INFRA_ENV: ${{ vars.INFRA_ENV }}
+
+  deployment:
+    name: deploy infra stack
+    runs-on: ubuntu-latest
+    needs:
+      - awsauth
+      - diff
+    environment: aws-infra-master
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node Latest
+        uses: actions/setup-node@v4
+        with:
+          node-version: "latest"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build
+      - name: setup lambda layer asset
+        run: |
+          mkdir -p dist/lambda_layer/nodejs
+          jq "del(.devDependencies, .scripts, .bin)" package.json > dist/lambda_layer/nodejs/package.json
+          cd dist/lambda_layer/nodejs
+          npm install .
+      - run: mkdir -p dist/ui
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          # setup cicd role through instructions from aws-manual branch.
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: cdkSession
+      - name: cdk diff
+        uses: youyo/aws-cdk-github-actions@v2
+        with:
+          cdk_subcommand: "deploy"
+          actions_comment: true
+          cdk_args: "MyFinanceInfraStack --require-approval never"
+        env:
+          INFRA_ENV: ${{ vars.INFRA_ENV }}

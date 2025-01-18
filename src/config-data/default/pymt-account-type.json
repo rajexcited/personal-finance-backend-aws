@@ -1,0 +1,32 @@
+[
+  {
+    "name": "checking",
+    "value": "checking",
+    "tags": [],
+    "description": "type of deposit account that allows you to access your money for daily transactions, such as paying bills or making purchases"
+  },
+  {
+    "name": "savings",
+    "value": "savings",
+    "tags": [],
+    "description": "type of deposit account that allows you to store your money and earn interest. \n e.g. HYSA (High Yield Savings Account), CD, FD, T-Bill, personal Savings, MMA (money market account), HSA (health savings account), FSA (flexible spending account), 502 college savings account, etc."
+  },
+  {
+    "name": "credit card",
+    "value": "credit card",
+    "tags": [],
+    "description": "credit card account is a revolving credit account that allows users to borrow money and pay it back over time. Credit cards can be used to make purchases, balance transfers, and cash advances. They can also help users build credit when used responsibly."
+  },
+  {
+    "name": "loan",
+    "value": "loan",
+    "tags": [],
+    "description": "A loan is a type of debt, and debt is money owed by other party. It is an agreement where one party lends money to another, and the lender sets the repayment terms. \n Debt can involve money, real property, services, or other consideration."
+  },
+  {
+    "name": "gift card",
+    "value": "gift card",
+    "tags": [],
+    "description": "Card with pre-filled cash."
+  }
+]
