@@ -22,6 +22,8 @@ jobs:
         run: |
           artifact_url=${{ github.event.client_payload.artifact_url }}
           echo "Artifact Url: $artifact_url"
+          artifact_name=${{ github.event.client_payload.artifact_name }}
+          echo "Artifact Name: $artifact_name"
           ui_repo_run_id=${{ github.event.client_payload.repo_run_id }}
           echo "UI Repository Run Id: $ui_repo_run_id where artifact can be found"
           ui_repository=${{ github.event.client_payload.ui_repository }}
@@ -101,11 +103,16 @@ jobs:
       - name: download UI artifact
         uses: actions/download-artifact@v4
         with:
-          path: dist/ui/
+          path: dist/
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.event.client_payload.ui_repository }}
           run-id: ${{ github.event.client_payload.repo_run_id }}
-      - run: ls -lrt dist/ui/
+      - run: ls -lrt dist/${{ github.event.client_payload.artifact_name }}
+      - name: Copy artifact files to UI asset directory
+        run: cp -r dist/$ARTIFACT_NAME/ dist/ui/
+        env:
+          ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
+      - run: ls -lrt dist/ui
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
