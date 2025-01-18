@@ -110,7 +110,7 @@ jobs:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
 
   deployment:
-    name: deploy infra stack
+    name: deploy UI stack
     runs-on: ubuntu-latest
     needs:
       - print_client_payload
@@ -166,7 +166,7 @@ jobs:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
 
   invalidate_cache:
-    name: Post Deploy - invalidate cf cache
+    name: Invalidate cf cache
     runs-on: ubuntu-latest
     needs:
       - deployment
@@ -180,7 +180,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: cdkSession
       - run: |
-          DISTRIBUTION_ID=$(aws cloudformation describe-stacks --stack-name prsfin-$INFRA_ENV-infra-stack --query "Stacks[0].Outputs[?starts_with(OutputKey,`DistributionId`) == `true`].OutputValue" --output text)
+          DISTRIBUTION_ID=$(aws cloudformation describe-stacks --stack-name prsfin-$INFRA_ENV-infra-stack --query "Stacks[0].Outputs[?starts_with(OutputKey,'DistributionId') == 'true'].OutputValue" --output text)
           echo Distribution Id = $DISTRIBUTION_ID
           INVALIDATION_ID=$(aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/personal-finance/index.html" --query "Invalidation.Id" --output text)
           echo Invalidation Id = $INVALIDATION_ID
