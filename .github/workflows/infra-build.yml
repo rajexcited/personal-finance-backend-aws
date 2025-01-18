@@ -58,11 +58,8 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run build
-      - name: setup layer and UI assets
-        run: |
-          mkdir -p dist/lambda_layer/nodejs
-          jq "del(.devDependencies, .scripts, .bin)" package.json > dist/lambda_layer/nodejs/package.json
-          mkdir -p dist/ui
+      - run: mkdir -p dist/lambda_layer/nodejs
+      - run: mkdir -p dist/ui
       - name: cdk synth
         uses: youyo/aws-cdk-github-actions@v2
         with:
@@ -77,6 +74,7 @@ jobs:
     needs:
       - build
     environment: aws-infra
+    if: github.ref != 'refs/heads/master'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -87,6 +85,8 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run build
+      - run: mkdir -p dist/lambda_layer/nodejs
+      - run: mkdir -p dist/ui
       - name: cdk synth
         uses: youyo/aws-cdk-github-actions@v2
         with:
