@@ -180,6 +180,12 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: cdkSession
       - run: |
+          aws cloudformation describe-stacks --stack-name prsfin-$INFRA_ENV-infra-stack --query "Stacks[0].Outputs"
+          aws cloudformation describe-stacks --stack-name prsfin-$INFRA_ENV-infra-stack --query 'Stacks[0].Outputs[?starts_with(OutputKey,"DistributionId") == true].OutputValue' --output text || echo distributionId error
+          aws cloudformation describe-stacks --stack-name prsfin-$INFRA_ENV-infra-stack --query 'Stacks[0].Outputs[?starts_with(OutputKey,"DistributionId") == "true"].OutputValue' --output text || echo distributionId error
+          aws cloudformation describe-stacks --stack-name prsfin-$INFRA_ENV-infra-stack --query "Stacks[0].Outputs[?starts_with(OutputKey,'DistributionId') == true].OutputValue" --output text || echo distributionId error
+          aws cloudformation describe-stacks --stack-name prsfin-$INFRA_ENV-infra-stack --query "Stacks[0].Outputs[?starts_with(OutputKey,'DistributionId') == true].OutputValue" --output text || echo distributionId error
+          aws cloudformation describe-stacks --stack-name prsfin-$INFRA_ENV-infra-stack --query 'Stacks[0].Outputs[?starts_with(OutputKey,`DistributionId`) == `true`].OutputValue' --output text || echo distributionId error
           echo aws cloudformation describe-stacks --stack-name prsfin-$INFRA_ENV-infra-stack --query "Stacks[0].Outputs[?starts_with(OutputKey,'DistributionId') == 'true'].OutputValue" --output text
           DISTRIBUTION_ID=`aws cloudformation describe-stacks --stack-name prsfin-$INFRA_ENV-infra-stack --query "Stacks[0].Outputs[?starts_with(OutputKey,'DistributionId') == 'true'].OutputValue" --output text`
           echo Distribution Id = $DISTRIBUTION_ID
