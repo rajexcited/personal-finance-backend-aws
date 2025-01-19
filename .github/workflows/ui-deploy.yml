@@ -190,7 +190,7 @@ jobs:
           until [ "$INVALIDATION_STATUS" == "Completed" ]; do
             echo aws cloudfront get-invalidation --id $INVALIDATION_ID --distribution-id $DISTRIBUTION_ID --query "Invalidation.Status" --output text
             INVALIDATION_STATUS=`aws cloudfront get-invalidation --id $INVALIDATION_ID --distribution-id $DISTRIBUTION_ID --query "Invalidation.Status" --output text`
-            echo invalidation status = $INVALIDATION_STATUS
+            echo invalidation status = $INVALIDATION_STATUS, sleeping 20 sec if inprogress
             sleep 15
           done
           echo The task, to invalidate cache for index.html, is now completed.
