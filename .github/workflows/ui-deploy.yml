@@ -180,13 +180,16 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: cdkSession
       - run: |
-          DISTRIBUTION_ID=$(aws cloudformation describe-stacks --stack-name prsfin-$INFRA_ENV-infra-stack --query "Stacks[0].Outputs[?starts_with(OutputKey,'DistributionId') == 'true'].OutputValue" --output text)
+          echo aws cloudformation describe-stacks --stack-name prsfin-$INFRA_ENV-infra-stack --query "Stacks[0].Outputs[?starts_with(OutputKey,'DistributionId') == 'true'].OutputValue" --output text
+          DISTRIBUTION_ID=`aws cloudformation describe-stacks --stack-name prsfin-$INFRA_ENV-infra-stack --query "Stacks[0].Outputs[?starts_with(OutputKey,'DistributionId') == 'true'].OutputValue" --output text`
           echo Distribution Id = $DISTRIBUTION_ID
-          INVALIDATION_ID=$(aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/personal-finance/index.html" --query "Invalidation.Id" --output text)
+          echo aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/personal-finance/index.html" --query "Invalidation.Id" --output text
+          INVALIDATION_ID=`aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/personal-finance/index.html" --query "Invalidation.Id" --output text`
           echo Invalidation Id = $INVALIDATION_ID
           INVALIDATION_STATUS="inprogress"
           until [ "$INVALIDATION_STATUS" == "Completed" ]; do
-            INVALIDATION_STATUS=$(aws cloudfront get-invalidation --id $INVALIDATION_ID --distribution-id $DISTRIBUTION_ID --query "Invalidation.Status" --output text)
+            echo aws cloudfront get-invalidation --id $INVALIDATION_ID --distribution-id $DISTRIBUTION_ID --query "Invalidation.Status" --output text
+            INVALIDATION_STATUS=`aws cloudfront get-invalidation --id $INVALIDATION_ID --distribution-id $DISTRIBUTION_ID --query "Invalidation.Status" --output text`
             echo invalidation status = $INVALIDATION_STATUS
             sleep 15
           done
