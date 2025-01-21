@@ -5,6 +5,7 @@ name: AWS Infra Build
 on:
   push:
   pull_request:
+  create:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -57,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - build
-    environment: aws-infra-master
+    environment: aws-infra-prod
     if: github.ref == 'refs/heads/master'
     steps:
       - name: Checkout
@@ -84,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - build
-    environment: aws-infra
+    environment: aws-infra-test
     if: github.ref != 'refs/heads/master' && github.event_name != 'pull_request'
     steps:
       - name: Checkout

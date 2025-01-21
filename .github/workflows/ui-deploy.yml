@@ -6,12 +6,15 @@ on:
       - on-demand-deploy-ui
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.client_payload.env_suffix }}
   cancel-in-progress: true
 
 permissions:
   id-token: write
   contents: read
+
+env:
+  SUPPORTED_ENVS: (test, prod)
 
 jobs:
   print_client_payload:
@@ -28,14 +31,26 @@ jobs:
           echo "UI Repository Run Id: $ui_repo_run_id where artifact can be found"
           ui_repository=${{ github.event.client_payload.ui_repository }}
           echo "UI Repository: $ui_repository"
+          Env Suffix=${{ github.event.client_payload.env_suffix }}
+          echo "UI Repository: $ui_repository"
       - name: print github context
         run: echo github context json values = $GITHUB_CONTEXT_JSON
         # env:
         # GITHUB_CONTEXT_JSON: ${{ toJSON(github) }}
+  validate_env_suffix:
+    name: Validate env in client payload
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo env_suffix in client request payload is not supported
+          exit 1
+        if: ${{ !contains(env.SUPPORTED_ENVS, github.event.client_payload.env_suffix) }}
+      - run: echo env_suffix in client request payload is supported
 
   verify_artifact:
     name: Download and Verify UI Artifact
     runs-on: ubuntu-latest
+    needs: validate_env_suffix
     steps:
       - run: mkdir -p dist/ui
       - name: download UI artifact
@@ -65,8 +80,9 @@ jobs:
   awsauth:
     name: Verify AWS Access
     runs-on: ubuntu-latest
-    environment: aws-infra-master
-    if: github.ref == 'refs/heads/master'
+    needs: validate_env_suffix
+    environment: 
+      name: aws-infra-${{github.event.client_payload.env_suffix}}
     steps:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -80,7 +96,8 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - awsauth
-    environment: aws-infra-master
+    environment:
+      name: aws-infra-${{github.event.client_payload.env_suffix}}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -109,6 +126,49 @@ jobs:
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
 
+  infra_stack:
+    name: Infra Stack
+    runs-on: ubuntu-latest
+    needs: 
+      - awsauth
+      - verify_artifact
+    environment: 
+      name: aws-infra-test
+    outputs:
+      exists: ${{ steps.validate_deployment.outputs.stack_exists }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          # setup cicd role through instructions from aws-manual branch.
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: cdkSession
+      - name: verify infra stacks exists
+        id: validate_deployment
+        run: |
+          stackExists=true
+          if [[ "$ENV" == "test" ]]; then
+            aws cloudformation describe-stacks --stack-name prsfin-tst-infra-stack
+            RET_CODE=$?
+            if [[ "$RET_CODE" != "0" ]]; then
+              stackExists=false
+            fi
+          fi
+          echo stack_exists=$stackExists >> $GITHUB_OUTPUT
+        env:
+          INFRA_ENV: ${{ vars.INFRA_ENV }}
+          ENV: ${{ github.event.client_payload.env_suffix }}
+      - run: echo is infra stack exists, value=${{ steps.validate_deployment.outputs.stack_exists }}
+      - run: echo is infra stack exists with because boolean true condition check is fulfilled 
+        if: ${{ steps.validate_deployment.outputs.stack_exists }}
+      - run: echo is infra stack exists with because 'true' equal condition check is fulfilled
+        if: ${{ steps.validate_deployment.outputs.stack_exists == 'true' }}
+      - run: echo is infra stack not exists with because boolean false condition is fulfilled
+        if: ${{ !steps.validate_deployment.outputs.stack_exists }}
+      - run: echo is infra stack not exists with because 'false' equal condition is fulfilled
+        if: ${{ steps.validate_deployment.outputs.stack_exists == 'false'}}
+
   deployment:
     name: deploy UI stack
     runs-on: ubuntu-latest
@@ -117,7 +177,9 @@ jobs:
       - awsauth
       - diff
       - verify_artifact
-    environment: aws-infra-master
+      - infra_stack
+    environment:
+      name: aws-infra-${{github.event.client_payload.env_suffix}}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -131,6 +193,24 @@ jobs:
       - run: npm run build
       - run: mkdir -p dist/lambda_layer/nodejs
       - run: mkdir -p dist/ui
+      - name: setup lambda layer asset
+        if: ${{ !needs.infra_stack.outputs.exists }}
+        run: |
+          mkdir -p dist/lambda_layer/nodejs
+          jq "del(.devDependencies, .scripts, .bin)" package.json > dist/lambda_layer/nodejs/package.json
+          cd dist/lambda_layer/nodejs
+          npm install .
+      - name: cdk deploy
+        if: ${{ !needs.infra_stack.outputs.exists }}
+        uses: youyo/aws-cdk-github-actions@v2
+        with:
+          cdk_subcommand: "deploy"
+          cdk_stack: "MyFinanceInfraStack"
+          debug_log: true
+          actions_comment: false
+          cdk_args: "--require-approval never --exclusively"
+        env:
+          INFRA_ENV: ${{ vars.INFRA_ENV }}
       - name: download UI artifact
         uses: actions/download-artifact@v4
         with:
@@ -170,7 +250,8 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - deployment
-    environment: aws-infra-master
+    environment:
+      name: aws-infra-${{github.event.client_payload.env_suffix}}
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
