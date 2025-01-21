@@ -140,6 +140,7 @@ jobs:
       exists: ${{ steps.validate_deployment.outputs.stack_exists }}
     steps:
       - name: Configure AWS credentials
+        if: ${{ github.event.client_payload.env_suffix == 'test' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ vars.AWS_REGION }}
