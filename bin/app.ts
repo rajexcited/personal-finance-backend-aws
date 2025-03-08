@@ -6,6 +6,12 @@ import { AwsResourceType, buildResourceName, getValidInfraEnvironment } from "..
 const envId = getValidInfraEnvironment();
 const appId = "prsfin";
 
+const tagsMap = getAppTags(process.env.TAGS);
+
+tagsMap["environment"] = envId;
+tagsMap["appId"] = appId;
+tagsMap["purpose"] = "finance";
+
 const app = new App();
 const props: ConstructProps = { environment: envId, appId: appId };
 
@@ -27,8 +33,8 @@ const myFinanceStack = new MyFinanceAppStack(app, "MyFinanceInfraStack", {
   // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
   ...props,
   synthesizer: new DefaultStackSynthesizer({
-    qualifier: appId + envId,
-  }),
+    qualifier: appId + envId
+  })
   // webAclId: webAclStack.webAclId,
   // crossRegionReferences: true,
 });
@@ -41,15 +47,30 @@ const uiDeployStack = new MyFinanceUiDeployAppStack(app, "MyFinanceUiDeployStack
   env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
   ...props,
   synthesizer: new DefaultStackSynthesizer({
-    qualifier: appId + envId,
+    qualifier: appId + envId
   }),
-  uiBucketArn: myFinanceStack.uiBucketArn,
+  uiBucketArn: myFinanceStack.uiBucketArn
 });
 
-const tags = [
-  { key: "environment", value: envId },
-  { key: "appId", value: appId },
-  { key: "purpose", value: "finance" },
-];
+Object.entries(tagsMap).forEach(([key, value]) => Tags.of(app).add(key, value));
 
-tags.forEach(({ key, value }) => Tags.of(app).add(key, value));
+function getAppTags(tagsEnv?: string) {
+  const tagMap: Record<string, string> = {};
+  try {
+    if (tagsEnv) {
+      // Parse the tags parameter
+      const tagsArray = tagsEnv.split(",");
+      console.log(`tagsArray: ${tagsArray}`);
+
+      for (let tag of tagsArray) {
+        const [key, value] = tag.split("=");
+        console.log(`key: ${key}, value: ${value}`);
+
+        tagMap[key.trim()] = value.trim();
+      }
+    }
+  } catch (error) {
+    console.error("error in getAppTags.", 'Comma-separated list of tags, set Env e.g. "TAGS=Key1=Value1,Key2=Value2"', error);
+  }
+  return tagMap;
+}

@@ -1,104 +1,120 @@
-name: UI Deploy to AWS
+name: AWS UI Stack
 
 on:
   repository_dispatch:
     types:
-      - on-demand-deploy-ui
+      - on-demand-ui-stack
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.client_payload.env_suffix }}
+  group: ${{ github.workflow }}-${{ github.event.client_payload.env_type }}
   cancel-in-progress: true
 
 permissions:
   id-token: write
   contents: read
 
-env:
-  SUPPORTED_ENVS: (test, prod)
-
 jobs:
-  print_client_payload:
+  display_output:
     name: Print client payload of dispatch event
     runs-on: ubuntu-latest
     steps:
-      - name: print artifact details
+      - name: Print Client Payload
         run: |
-          artifact_url=${{ github.event.client_payload.artifact_url }}
-          echo "Artifact Url: $artifact_url"
-          artifact_name=${{ github.event.client_payload.artifact_name }}
-          echo "Artifact Name: $artifact_name"
-          ui_repo_run_id=${{ github.event.client_payload.repo_run_id }}
-          echo "UI Repository Run Id: $ui_repo_run_id where artifact can be found"
-          ui_repository=${{ github.event.client_payload.ui_repository }}
-          echo "UI Repository: $ui_repository"
-          env_suffix=${{ github.event.client_payload.env_suffix }}
-          echo "Env Suffix: $env_suffix"
-      - name: print github context
-        run: echo github context json values = $GITHUB_CONTEXT_JSON
-        # env:
-        # GITHUB_CONTEXT_JSON: ${{ toJSON(github) }}
-  validate_env_suffix:
+          echo "Client Payload = ${{ toJson(github.event.client_payload) }}"
+      - name: Print Github Context
+        run: echo "github context json values = ${{ toJSON(github) }}"
+
+  validate_payload:
     name: Validate env in client payload
     runs-on: ubuntu-latest
+    environment:
+      name: aws-infra-${{ github.event.client_payload.env_type }}
     steps:
-      - name: invalid env suffix
+      - name: Validate env in client payload
         run: |
-          echo env_suffix in client request payload is not supported
-          exit 1
-        if: ${{ !contains(env.SUPPORTED_ENVS, github.event.client_payload.env_suffix) }}
-      - run: echo env_suffix in client request payload is supported
-
-  verify_artifact:
-    name: Download and Verify UI Artifact
-    runs-on: ubuntu-latest
-    needs: validate_env_suffix
-    steps:
-      - run: mkdir -p dist/ui
-      - name: download UI artifact
-        uses: actions/download-artifact@v4
-        with:
-          path: dist/
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.event.client_payload.ui_repository }}
-          run-id: ${{ github.event.client_payload.repo_run_id }}
-      - run: ls -lrt dist/${{ github.event.client_payload.artifact_name }}
-      - name: Copy artifact files to UI asset directory
-        run: cp -r dist/$ARTIFACT_NAME/* dist/ui
-        env:
-          ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
-      - name: validate UI asset directory structure
-        run: |
-          ls -lrt dist/ui
-          ls dist/ui/index.html
-          ls -lrt dist/ui/static
-          ls dist/ui/logo.jpeg
-          ls dist/ui/logo192.png
-          ls -lrt dist/ui/static/css
-          ls -lrt dist/ui/static/js
-          ls -lrt dist/ui/static/media
-          ls -lrt dist/ui/favicon.ico
-
-  awsauth:
-    name: Verify AWS Access
-    runs-on: ubuntu-latest
-    needs: validate_env_suffix
-    environment: 
-      name: aws-infra-${{github.event.client_payload.env_suffix}}
-    steps:
-      - uses: aws-actions/configure-aws-credentials@v4
+          AWS_REGION=${{ vars.AWS_REGION }}
+          INFRA_ENV=${{ vars.INFRA_ENV }}
+          AWS_ROLE_ARN=${{ secrets.AWS_ROLE_ARN }}
+          if [ -z "$AWS_REGION" ] || [ -z "$INFRA_ENV" ] || [ -z "$AWS_ROLE_ARN" ]; then
+            echo "One or more required environment variables are not set."
+            exit 1
+          fi
+          mkdir -p dist/ui
+      - name: Verify AWS Access
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ vars.AWS_REGION }}
           # setup cicd role through instructions from aws-manual branch.
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: cdkSession
 
-  diff:
+  validate_deployment:
+    name: Validate deployment
+    runs-on: ubuntu-latest
+    needs:
+      - validate_payload
+    if: github.event.client_payload.type == 'provision'
+    environment:
+      name: aws-infra-${{ github.event.client_payload.env_type }}
+    steps:
+      - name: download UI artifact
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.event.client_payload.ui_repository }}
+          run-id: ${{ github.event.client_payload.workflow_run_id }}
+      - name: Copy artifact files to UI asset directory
+        run: |
+          ls -lrt dist/$ARTIFACT_NAME
+          cp -r dist/$ARTIFACT_NAME/* dist/ui
+        env:
+          ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
+      - name: validate UI asset directory structure
+        run: |
+          ls -lrt dist/ui
+          ls -lrt dist/ui/index.html
+          ls -lrt dist/ui/static
+          ls -lrt dist/ui/logo.jpeg
+          ls -lrt dist/ui/logo192.png
+          ls -lrt dist/ui/static/css
+          ls -lrt dist/ui/static/js
+          ls -lrt dist/ui/static/media
+          ls -lrt dist/ui/favicon.ico
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          # setup cicd role through instructions from aws-manual branch.
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: cdkSession
+      - name: Validate UI stack status
+        env:
+          INFRA_ENV: ${{ vars.INFRA_ENV }}
+        run: |
+          UI_STACK_NAME="prsfin-$INFRA_ENV-ui-deploy-stack"
+          FAILED_REASON=""
+          DESCRIBE_UI_STACK_OUT=$(aws cloudformation describe-stacks --stack-name "$UI_STACK_NAME")
+          RET_CODE=$?
+          if [[ $RET_CODE -eq 0 ]]; then
+            # STACK_TAG_LIST=$(echo "$DESCRIBE_UI_STACK_OUT" | jq -r ".Stacks[0].Tags")
+            # echo "stack_tags=$STACK_TAG_LIST" >> $GITHUB_OUTPUT
+
+            STACK_STATUS=$(echo "$DESCRIBE_UI_STACK_OUT" | jq -r ".Stacks[0].StackStatus")
+            # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/view-stack-events.html#cfn-console-view-stack-data-resources-status-codes
+            if [[ "$STACK_STATUS" =~ ^(CREATE_IN_PROGRESS|UPDATE_IN_PROGRESS|DELETE_IN_PROGRESS|ROLLBACK_IN_PROGRESS|UPDATE_ROLLBACK_IN_PROGRESS)$ ]]; then
+              echo "UI Stack deployment is in progress. The system can not start deployment."
+              exit 1
+            fi
+          fi
+
+  diff_stack:
     name: UI stack diff
     runs-on: ubuntu-latest
     needs:
-      - awsauth
+      - validate_deployment
     environment:
-      name: aws-infra-${{github.event.client_payload.env_suffix}}
+      name: aws-infra-${{ github.event.client_payload.env_type }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -107,10 +123,11 @@ jobs:
         with:
           node-version: "latest"
           cache: "npm"
-      - run: npm ci
-      - run: npm run build
-      - run: mkdir -p dist/lambda_layer/nodejs
-      - run: mkdir -p dist/ui
+      - run: |
+          npm ci
+          npm run build
+          mkdir -p dist/lambda_layer/nodejs
+          mkdir -p dist/ui
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -126,63 +143,81 @@ jobs:
           cdk_args: "MyFinanceUiDeployStack"
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
+          TAGS: ${{ join(github.event.client_payload.stackTags, ',') }}
 
-  infra_stack:
-    name: Infra Test Stack
+  wait_infra_deploy:
+    name: Wait for Infra Stack deployment
     runs-on: ubuntu-latest
-    needs: 
-      - print_client_payload
-      - awsauth
-      - verify_artifact
-    environment: 
-      name: aws-infra-test
+    needs:
+      - validate_deployment
+    environment:
+      name: aws-infra-${{ github.event.client_payload.env_type }}
     outputs:
-      exists: ${{ steps.validate_deployment.outputs.stack_exists }}
+      distribution-id: ${{ steps.wait-stack.outputs.distribution_id }}
     steps:
       - name: Configure AWS credentials
-        if: ${{ github.event.client_payload.env_suffix == 'test' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ vars.AWS_REGION }}
           # setup cicd role through instructions from aws-manual branch.
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: cdkSession
-      - name: verify infra stacks exists
-        id: validate_deployment
-        run: |
-          stackExists=true
-          if [[ "$ENV" == "test" ]]; then
-            aws cloudformation describe-stacks --stack-name prsfin-tst-infra-stack
-            RET_CODE=$?
-            if [[ "$RET_CODE" != "0" ]]; then
-              stackExists=false
-            fi
-          fi
-          echo stack_exists=$stackExists >> $GITHUB_OUTPUT
+      - id: wait-stack
+        name: Wait for Stack Completion
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
-          ENV: ${{ github.event.client_payload.env_suffix }}
-      - run: echo is infra stack exists, value=${{ steps.validate_deployment.outputs.stack_exists }}
-      - run: echo is infra stack exists with because boolean true condition check is fulfilled 
-        if: ${{ steps.validate_deployment.outputs.stack_exists }}
-      - run: echo is infra stack exists with because 'true' equal condition check is fulfilled
-        if: ${{ steps.validate_deployment.outputs.stack_exists == 'true' }}
-      - run: echo is infra stack not exists with because boolean false condition is fulfilled
-        if: ${{ !steps.validate_deployment.outputs.stack_exists }}
-      - run: echo is infra stack not exists with because 'false' equal condition is fulfilled
-        if: ${{ steps.validate_deployment.outputs.stack_exists == 'false'}}
+        run: |
+          # Wait duration to execute the command and check status 
+          SLEEP_DURATION=3m
+          TOTAL_WAIT_DURATION=60m
+          REMAINING_ATTEMPTS=$((TOTAL_WAIT_DURATION / SLEEP_DURATION))
+          WAIT_DURATION_STACK_NOT_EXIST=15m
+          REMAINING_ATTEMPTS_STACK_NOT_EXIST=$((WAIT_DURATION_STACK_NOT_EXIST / SLEEP_DURATION))
+          API_STACK_NAME="prsfin-$INFRA_ENV-infra-stack"
+          while :; do
+            echo "Deployment is in progress. Waiting for $SLEEP_DURATION."
+            sleep $SLEEP_DURATION
+            DESCRIBE_API_STACK_OUT=$(aws cloudformation describe-stacks --stack-name "$API_STACK_NAME")
+            RET_CODE=$?
+            if [[ $RET_CODE -eq 0 ]]; then
+              STACK_STATUS=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r ".Stacks[0].StackStatus")
+              # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/view-stack-events.html#cfn-console-view-stack-data-resources-status-codes
+              if [[ "$STACK_STATUS" =~ ^(CREATE_COMPLETE|UPDATE_COMPLETE)$ ]]; then
+                echo "Infra Stack is deployed successfully."
+                break
+              elif [[ "$STACK_STATUS" =~ ^(CREATE_FAILED|UPDATE_FAILED|ROLLBACK.*|UPDATE_ROLLBACK.*|DELETE.*)$ ]]; then
+                FAILED_REASON="Infra Stack deployment failed. Stack status is $STACK_STATUS. Please check stack events."
+                break
+              fi
+            elif [[ $REMAINING_ATTEMPTS_STACK_NOT_EXIST -gt 0 ]]; then
+              REMAINING_ATTEMPTS_STACK_NOT_EXIST=$((REMAINING_ATTEMPTS_STACK_NOT_EXIST - 1))
+            fi
+            if [[ $REMAINING_ATTEMPTS -eq 0 ]]; then
+              FAILED_REASON="Infra Stack deployment is taking longer time. Please check the status manually."
+              break
+            fi
+            if [[ $REMAINING_ATTEMPTS_STACK_NOT_EXIST -eq 0 ]]; then
+              FAILED_REASON="Infra Stack deployment has not been started. Stack does not exist. Please check API request form and workflow"
+              break
+            fi
+            REMAINING_ATTEMPTS=$((REMAINING_ATTEMPTS - 1))
+          done
+
+          if [[ -n "$FAILED_REASON" ]]; then
+            echo "Failed Reason: $FAILED_REASON"
+            exit 1
+          fi
+          DISTRIBUTION_ID=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r '.Stacks[0].Outputs[?starts_with(OutputKey,`DistributionId`) == `true`].OutputValue')
+          echo "distribution_id=$DISTRIBUTION_ID" >> $GITHUB_OUTPUT
 
   deployment:
     name: deploy UI stack
     runs-on: ubuntu-latest
     needs:
-      - print_client_payload
-      - awsauth
-      - diff
-      - verify_artifact
-      - infra_stack
+      - diff_stack
+      - wait_infra_deploy
     environment:
-      name: aws-infra-${{github.event.client_payload.env_suffix}}
+      name: aws-infra-${{ github.event.client_payload.env_type }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -191,45 +226,25 @@ jobs:
         with:
           node-version: "latest"
           cache: "npm"
-      - run: npm --version
-      - run: npm ci
-      - run: npm run build
-      - run: mkdir -p dist/lambda_layer/nodejs
-      - run: mkdir -p dist/ui
-      - name: setup lambda layer asset
-        if: ${{ !needs.infra_stack.outputs.exists }}
-        run: |
+      - run: |
+          npm --version
+          npm ci
+          npm run build
           mkdir -p dist/lambda_layer/nodejs
-          jq "del(.devDependencies, .scripts, .bin)" package.json > dist/lambda_layer/nodejs/package.json
-          cd dist/lambda_layer/nodejs
-          npm install .
-      - name: cdk deploy
-        if: ${{ !needs.infra_stack.outputs.exists }}
-        uses: youyo/aws-cdk-github-actions@v2
-        with:
-          cdk_subcommand: "deploy"
-          cdk_stack: "MyFinanceInfraStack"
-          debug_log: true
-          actions_comment: false
-          cdk_args: "--require-approval never --exclusively"
-        env:
-          INFRA_ENV: ${{ vars.INFRA_ENV }}
+          mkdir -p dist/ui
       - name: download UI artifact
         uses: actions/download-artifact@v4
         with:
           path: dist/
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.event.client_payload.ui_repository }}
-          run-id: ${{ github.event.client_payload.repo_run_id }}
+          run-id: ${{ github.event.client_payload.workflow_run_id }}
       - run: ls -lrt dist/${{ github.event.client_payload.artifact_name }}
-      - name: Copy artifact files to UI asset directory
-        run: cp -r dist/$ARTIFACT_NAME/* dist/ui
+      - run: |
+          cp -r dist/$ARTIFACT_NAME/* dist/ui
+          ls -lrt dist/ui
         env:
           ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
-      - name: validate UI asset directory structure
-        run: |
-          ls -lrt dist/ui
-          ls dist/ui/index.html
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -247,37 +262,20 @@ jobs:
           cdk_args: "--require-approval never --exclusively"
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
-
-  invalidate_cache:
-    name: Invalidate cf cache
-    runs-on: ubuntu-latest
-    needs:
-      - deployment
-    environment:
-      name: aws-infra-${{github.event.client_payload.env_suffix}}
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-region: ${{ vars.AWS_REGION }}
-          # setup cicd role through instructions from aws-manual branch.
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          role-session-name: cdkSession
+          TAGS: ${{ join(github.event.client_payload.stackTags, ',') }}
       - run: |
-          echo aws cloudformation describe-stacks --stack-name prsfin-$INFRA_ENV-infra-stack --query 'Stacks[0].Outputs[?starts_with(OutputKey,`DistributionId`) == `true`].OutputValue' --output text
-          DISTRIBUTION_ID=$(aws cloudformation describe-stacks --stack-name prsfin-$INFRA_ENV-infra-stack --query 'Stacks[0].Outputs[?starts_with(OutputKey,`DistributionId`) == `true`].OutputValue' --output text)
-          echo Distribution Id = $DISTRIBUTION_ID
           echo aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/personal-finance/index.html" --query "Invalidation.Id" --output text
           INVALIDATION_ID=`aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/personal-finance/index.html" --query "Invalidation.Id" --output text`
           echo Invalidation Id = $INVALIDATION_ID
           INVALIDATION_STATUS="inprogress"
+          SLEEP_DURATION=20
           until [ "$INVALIDATION_STATUS" == "Completed" ]; do
             echo aws cloudfront get-invalidation --id $INVALIDATION_ID --distribution-id $DISTRIBUTION_ID --query "Invalidation.Status" --output text
             INVALIDATION_STATUS=`aws cloudfront get-invalidation --id $INVALIDATION_ID --distribution-id $DISTRIBUTION_ID --query "Invalidation.Status" --output text`
-            echo invalidation status = $INVALIDATION_STATUS, sleeping 20 sec if inprogress
-            sleep 15
+            echo invalidation status = $INVALIDATION_STATUS, sleeping $SLEEP_DURATION sec if inprogress
+            sleep $SLEEP_DURATION
           done
           echo The task, to invalidate cache for index.html, is now completed.
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
-    
+          DISTRIBUTION_ID: ${{ needs.wait_infra_deploy.outputs.distribution-id }}
