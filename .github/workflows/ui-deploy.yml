@@ -34,7 +34,7 @@ jobs:
         run: |
           AWS_REGION=${{ vars.AWS_REGION }}
           INFRA_ENV=${{ vars.INFRA_ENV }}
-          AWS_ROLE_ARN=${{ secrets.AWS_ROLE_ARN }}
+          AWS_ROLE_ARN=${{ secrets.AWS_CICD_ROLE_ARN }}
           if [ -z "$AWS_REGION" ] || [ -z "$INFRA_ENV" ] || [ -z "$AWS_ROLE_ARN" ]; then
             echo "One or more required environment variables are not set."
             exit 1
@@ -45,7 +45,7 @@ jobs:
         with:
           aws-region: ${{ vars.AWS_REGION }}
           # setup cicd role through instructions from aws-manual branch.
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_CICD_ROLE_ARN }}
           role-session-name: cdkSession
 
   validate_deployment:
@@ -86,7 +86,7 @@ jobs:
         with:
           aws-region: ${{ vars.AWS_REGION }}
           # setup cicd role through instructions from aws-manual branch.
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_CICD_ROLE_ARN }}
           role-session-name: cdkSession
       - name: Validate UI stack status
         env:
@@ -133,7 +133,7 @@ jobs:
         with:
           aws-region: ${{ vars.AWS_REGION }}
           # setup cicd role through instructions from aws-manual branch.
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_CICD_ROLE_ARN }}
           role-session-name: cdkSession
       - name: cdk diff
         uses: youyo/aws-cdk-github-actions@v2
@@ -160,7 +160,7 @@ jobs:
         with:
           aws-region: ${{ vars.AWS_REGION }}
           # setup cicd role through instructions from aws-manual branch.
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_CICD_ROLE_ARN }}
           role-session-name: cdkSession
       - id: wait-stack
         name: Wait for Stack Completion
@@ -250,7 +250,7 @@ jobs:
         with:
           aws-region: ${{ vars.AWS_REGION }}
           # setup cicd role through instructions from aws-manual branch.
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_CICD_ROLE_ARN }}
           role-session-name: cdkSession
       - name: cdk deploy
         uses: youyo/aws-cdk-github-actions@v2

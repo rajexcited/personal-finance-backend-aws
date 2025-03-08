@@ -137,7 +137,11 @@ jobs:
               if(foundTestplanLabel && foundProductionLabel) {
                 throw new Error("Both test plan and production labels are found in Request issue labels");
               }
-              core.setOutput("env_type", foundTestplanLabel?.name || foundProductionLabel?.name);
+              if(foundTestplanLabel) {
+                core.setOutput("env_type", "testplan");
+              } else {
+                core.setOutput("env_type", "production");
+              }
             } catch(error) {
               console.error("failed reason: ", error);
               core.setOutput("failedReason", `Error during Env request validation, reason: ${error.message}`);
@@ -270,7 +274,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ vars.AWS_REGION }}
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_CICD_ROLE_ARN }}
           role-session-name: cdkSession
       - id: provision-stack
         if: ${{ steps.request-form.outputs.request_type == 'provision' }}
@@ -392,7 +396,7 @@ jobs:
         with:
           aws-region: ${{ vars.AWS_REGION }}
           # setup cicd role through instructions from aws-manual branch.
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_CICD_ROLE_ARN }}
           role-session-name: cdkSession
       - name: cdk diff
         uses: youyo/aws-cdk-github-actions@v2
@@ -495,7 +499,7 @@ jobs:
         with:
           aws-region: ${{ vars.AWS_REGION }}
           # setup cicd role through instructions from aws-manual branch.
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_CICD_ROLE_ARN }}
           role-session-name: cdkSession
       - id: cdk-deploy
         name: cdk deploy
