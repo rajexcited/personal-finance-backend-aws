@@ -5,7 +5,7 @@
       "Sid": "VisualEditor0",
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
-      "Resource": "arn:aws:iam::${aws:PrincipalAccount}:role/cdk-prsfinprd-*"
+      "Resource": "arn:aws:iam::$aws_principal_account:role/cdk-${aws:PrincipalTag/appId}${aws:PrincipalTag/environment}-*"
     }
   ]
 }

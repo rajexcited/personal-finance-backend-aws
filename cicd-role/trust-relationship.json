@@ -2,14 +2,15 @@
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "VisualEditor0",
       "Effect": "Allow",
       "Principal": {
-        "Federated": "arn:aws:iam::${aws:PrincipalAccount}:oidc-provider/token.actions.githubusercontent.com"
+        "Federated": "arn:aws:iam::$aws_principal_account:oidc-provider/token.actions.githubusercontent.com"
       },
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {
-          "token.actions.githubusercontent.com:sub": "repo:rajexcited/${repoName}:environment:prod",
+          "token.actions.githubusercontent.com:sub": "repo:$github_owner/$github_repo:$condition_key:$condition_value",
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
         }
       }
