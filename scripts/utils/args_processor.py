@@ -24,6 +24,8 @@ class ArgumentProcessor:
             params_dict["default"] = default_value
         if not action and not isinstance(value_type, EnumType):
             params_dict["type"] = value_type
+        if default_value:
+            params_dict["help"] = f"{arg_help} Default Value: [{default_value}]"
         # if action:
         #     self.parser.add_argument(name_flag,
         #                              help=arg_help,

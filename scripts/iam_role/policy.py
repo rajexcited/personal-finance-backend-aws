@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from string import Template
 from typing import Any, Dict, List, TypedDict
-from ..utils import rootpath, Environment, app_config
+from ..utils import rootpath, Environment, app_config, aws_error_handler
 from .client import iam
 from mypy_boto3_iam.type_defs import CreatePolicyResponseTypeDef, CreatePolicyVersionResponseTypeDef, DeleteRolePolicyRequestTypeDef, DetachRolePolicyRequestTypeDef, SetDefaultPolicyVersionRequestTypeDef, DeletePolicyVersionRequestTypeDef
 
@@ -202,16 +202,21 @@ def set_default_version(manage_policies: List[Dict], delete_current_default: boo
 
 
 def get_policy(policy_name: str, aws_account_number: str | int):
+    policy_arn = f"arn:aws:iam::{aws_account_number}:policy/{policy_name}"
     try:
-        get_policy_response = iam.get_policy(
-            PolicyArn=f"arn:aws:iam::{aws_account_number}:policy/{policy_name}")
+        get_policy_response = iam.get_policy(PolicyArn=policy_arn)
         return get_policy_response
     except Exception as e:
-        print(e)
-        return None
+        # print(e)
+        errorMessage = f"{e}"
+        expected = f"An error occurred (NoSuchEntity) when calling the GetPolicy operation: Policy {policy_arn} was not found."
+        if expected in errorMessage:
+            return None
+        # unexpected error
+        raise e
 
 
-def create_custom_policies(role_base_dir: Path, aws_account_number: int | str, environment: Environment, update_if_exists: bool = True, fail_if_exists: bool = True, name_suffix: str = ""):
+def create_custom_policies(role_base_dir: Path, aws_account_number: int | str, environment: Environment, update_if_exists: bool = True, fail_if_exists: bool = True, name_suffix: str = "", name_prefix: str = ""):
     custom_policies_dir = rootpath/role_base_dir/"policies/custom"
     custom_policy_dict = prepare_policies(policy_dir=custom_policies_dir,
                                           aws_account_number=aws_account_number,
@@ -226,7 +231,8 @@ def create_custom_policies(role_base_dir: Path, aws_account_number: int | str, e
         policy_name = policy_name_key.capitalize()
         capitalize_policy_name = "".join(
             [part.capitalize() for part in policy_name.split("-")])
-        capitalize_policy_name += name_suffix
+        capitalize_policy_name = name_prefix + capitalize_policy_name + \
+            name_suffix
 
         get_policy_response = get_policy(aws_account_number=aws_account_number,
                                          policy_name=capitalize_policy_name)
@@ -278,3 +284,55 @@ def create_custom_policies(role_base_dir: Path, aws_account_number: int | str, e
         }
 
     return result
+
+
+iam_delete_policy = aws_error_handler(
+    iam.delete_policy, expected_error_code="NoSuchEntity", not_exists_type="policy")
+
+
+def delete_custom_policies(manage_policies: List[Dict]):
+    result = {}
+    for policy_details in manage_policies:
+        delete_policy_response = iam_delete_policy(
+            PolicyArn=policy_details["policy_arn"]
+        )
+        result[policy_details["policy_name"]] = {
+            "request": {
+                "PolicyArn": policy_details["policy_arn"]
+            },
+            "response": delete_policy_response
+        }
+
+    return result
+
+
+def revert_manage_policies(manage_policy_results: Dict):
+    delete_policies_request = []
+    default_version_request = []
+    for policy_name, result in manage_policy_results.items():
+        policy_response: PolicyResponseTypeDef = result["response"]
+        print("policy response:", policy_response)
+        if "is_created" in policy_response and policy_response["is_created"]:
+            delete_policies_request.append({
+                "policy_name": policy_name,
+                "policy_arn": policy_response["PolicyArn"]
+            })
+        elif "is_updated" in policy_response and policy_response["is_updated"]:
+            default_version_request.append({
+                "policy_name": policy_name,
+                "policy_arn": policy_response["PolicyArn"],
+                "new_default_version_id": policy_response["previous_default_version_id"],
+                "current_default_version_id": policy_response["aws_response"]["PolicyVersion"]["VersionId"]
+            })
+    delete_policy_response = delete_custom_policies(delete_policies_request)
+    default_version_response = set_default_version(default_version_request)
+    return {
+        "delete_custom_policy": {
+            "request": delete_policies_request,
+            "response": delete_policy_response
+        },
+        "default_version_policy": {
+            "request": default_version_request,
+            "response": default_version_response
+        }
+    }

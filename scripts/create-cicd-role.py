@@ -2,7 +2,7 @@ from pathlib import Path
 from string import Template
 from .utils import Environment, ArgumentProcessor
 from .iam_role.role import create_role, delete_role, save_json
-from .iam_role.policy import PolicyAction, delete_inline_policies, detach_manage_policies, set_default_version
+from .iam_role.policy import PolicyAction, delete_inline_policies, detach_manage_policies, revert_manage_policies
 
 
 def create_cicd_role(args: dict):
@@ -51,21 +51,12 @@ def create_cicd_role(args: dict):
         delete_role(role_base_dir=args["cicd_role_base_dir"],
                     role_name=role_name)
 
-        manage_policies_request = []
-        for policy_name, manage_policy_result in create_role_response["custom_policies"].items():
-            if manage_policy_result["response"]["previous_default_version_id"]:
-                manage_policies_request.append({
-                    "policy_name": policy_name,
-                    "policy_arn": manage_policy_result["response"]["PolicyArn"],
-                    "new_default_version_id": manage_policy_result["response"]["previous_default_version_id"],
-                    "current_default_version_id": manage_policy_result["response"]["aws_response"]["PolicyVersion"]["VersionId"]
-                })
-        default_version_response = set_default_version(
-            manage_policies=manage_policies_request)
-        save_json(data={"request": manage_policies_request, "response": default_version_response},
+        rever_manage_policy_results = revert_manage_policies(
+            create_role_response["custom_policies"])
+        save_json(data=rever_manage_policy_results,
                   role_base_dir=args["cicd_role_base_dir"],
                   role_name=role_name,
-                  save_for=f"Revert Default Policy Version"
+                  save_for=f"Revert Custom Policies"
                   )
         print("Dry run completed")
 
