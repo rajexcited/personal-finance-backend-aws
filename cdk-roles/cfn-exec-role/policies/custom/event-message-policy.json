@@ -17,7 +17,7 @@
         "sqs:ListQueueTags",
         "sqs:CreateQueue"
       ],
-      "Resource": "arn:aws:sqs:*:${aws:PrincipalAccount}:*${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*"
+      "Resource": "arn:aws:sqs:*:$aws_principal_account:*${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*"
     },
     {
       "Sid": "VisualEditor1",

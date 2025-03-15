@@ -4,7 +4,12 @@
     {
       "Sid": "VisualEditor0",
       "Effect": "Allow",
-      "Action": ["dynamodb:ListTables", "dynamodb:DescribeLimits", "dynamodb:DescribeEndpoints", "dynamodb:ListStreams"],
+      "Action": [
+        "dynamodb:ListTables",
+        "dynamodb:DescribeLimits",
+        "dynamodb:DescribeEndpoints",
+        "dynamodb:ListStreams"
+      ],
       "Resource": "*"
     },
     {
@@ -19,8 +24,8 @@
         "dynamodb:DeleteBackup"
       ],
       "Resource": [
-        "arn:aws:dynamodb:*:${aws:PrincipalAccount}:table/*${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*/stream/*",
-        "arn:aws:dynamodb:*:${aws:PrincipalAccount}:table/*${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*/backup/*"
+        "arn:aws:dynamodb:*:$aws_principal_account:table/*${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*/stream/*",
+        "arn:aws:dynamodb:*:$aws_principal_account:table/*${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*/backup/*"
       ]
     },
     {
@@ -74,7 +79,9 @@
         "dynamodb:GetResourcePolicy",
         "dynamodb:UpdateTable"
       ],
-      "Resource": ["arn:aws:dynamodb:*:${aws:PrincipalAccount}:table/*${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*"]
+      "Resource": [
+        "arn:aws:dynamodb:*:$aws_principal_account:table/*${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*"
+      ]
     },
     {
       "Sid": "VisualEditor4",

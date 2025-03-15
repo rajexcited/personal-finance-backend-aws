@@ -44,13 +44,13 @@
       "Sid": "VisualEditor1",
       "Effect": "Allow",
       "Action": ["iam:GetRole", "iam:CreateServiceLinkedRole"],
-      "Resource": "arn:aws:iam::471112824979:role/${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*"
+      "Resource": "arn:aws:iam::$aws_principal_account:role/${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*"
     },
     {
       "Sid": "VisualEditor2",
       "Effect": "Allow",
       "Action": "iam:PassRole",
-      "Resource": "arn:aws:iam::${aws:PrincipalAccount}:role/*${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*"
+      "Resource": "arn:aws:iam::$aws_principal_account:role/*${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*"
     }
   ]
 }

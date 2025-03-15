@@ -74,7 +74,7 @@
         "cloudfront:DeleteDistribution",
         "cloudfront:UpdateDistribution"
       ],
-      "Resource": "arn:aws:cloudfront::${aws:PrincipalAccount}:function/*${aws:PrincipalTag/appId}*${aws:PrincipalTag/environment}*"
+      "Resource": "arn:aws:cloudfront::$aws_principal_account:function/*${aws:PrincipalTag/appId}*${aws:PrincipalTag/environment}*"
     }
   ]
 }
