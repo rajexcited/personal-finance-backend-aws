@@ -1,75 +1,65 @@
-# personal-finance-backend-aws
+# AWS Manual Setup for Cdk deploy
 
-This is backend api services. The backend infra setup is by environment (local, test, prod).
+The backend API services infrastructure setup is environment-specific. Below are the different environments:
 
-- The `dev` environment is for development.
-- The `test` environment is experimental to test through github workflow from branch `test-pipeline`.
-- The `prod` environment is ready to be used as final production.
+- The `development` environment is for developer/local use.
+- The `testplan` environment is for executing test plans (regression, feature, etc.) to test code.
+- The `production` environment is used during release.
+- The `experiment` environment is for experimenting with AWS services, AWS access, workflow integration, etc. The `test-pipeline` branch can be useful for this.
 
-In order to use any aws services, infra stack needs to be deployed. To enable `cdk deploy`, we need to bootstrap and setup the permissions.
+The infra stack needs to be deployed for all base infrastructure changes. To enable `cdk deploy`, we need to bootstrap and setup the permissions.
 
-## Create IAM policies for CDK deployment
+## Create CI CD Role
+To enable workflow integration with your AWS account, you need to create a role following github guide lines. Created create cicd role scripts by referencing below [Ref Docs](#ref-docs)
 
-Before bootstrapping, make sure to have IAM policies for CDK deployment in an account. if you don't have, follow steps to [create IAM policy](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_create-console.html)
-
-- copy policy files located at `cfn-exec-role\policies\` to dist folder
-- replace `${aws:PrincipalAccount}` with actual awsAccountNumber in these json files of dist folder.
-- create policy with this JSON files
-- policy name and corresponding file name are listed below table.
-
-| Policy Name     | file location                                                                 |
-| --------------- | ----------------------------------------------------------------------------- |
-| CdkApiLambda    | [api-lambda-policy.json](cfn-exec-role\policies\api-lambda-policy.json)       |
-| CdkCloudfront   | [cloudfront-policy.json](cfn-exec-role\policies\cloudfront-policy.json)       |
-| CdkEventMessage | [event-message-policy.json](cfn-exec-role\policies\event-message-policy.json) |
-| CdkIam          | [iam-policy.json](cfn-exec-role\policies\iam-policy.json)                     |
-| CdkSecretParam  | [secret-param-policy.json](cfn-exec-role\policies\secret-param-policy.json)   |
-| CdkStorage      | [storage-policy.json](cfn-exec-role\policies\storage-policy.json)             |
-
-#### Cli command example
-
+Command to create ci cd role
 ```cmd
-aws iam create-policy --policy-name CdkApiLambda --policy-document file://cfn-exec-role\policies\api-lambda-policy.json
+python -m scripts.create-cicd-role --create --cicd-role-base-dir cicd-role --aws-account <aws account number> --environment <one of supported value> --github-owner <github account id> --github-repo <repository where workflow will be connecting to AWS>
+# example,
+python -m scripts.create-cicd-role --create --cicd-role-base-dir cicd-role --aws-account 111111111111 --environment testplan --github-owner rajexcited --github-repo personal-finance-backend-aws
 ```
+
+add `--dry-run` param, if you would like to simulate the role creation. Each IAM request and response are stored under `dist` directory, 
+
+### Ref Docs:
+- [Use IAM roles to connect GitHub Actions to actions in AWS](https://aws.amazon.com/blogs/security/use-iam-roles-to-connect-github-actions-to-actions-in-aws/)
+- [Github aws-actions/configure-aws-credentials](https://github.com/aws-actions/configure-aws-credentials?tab=readme-ov-file#OIDC)
+- [AWS SDKs and Tools standardized credential providers](https://docs.aws.amazon.com/sdkref/latest/guide/standardized-credentials.html)
+- [AWS security credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/security-creds.html)
+- [Apply least-privilege permissions](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege)
+- [Github - Configuring OpenID Connect in Amazon Web Services](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services)
+- [Github - About security hardening with OpenID Connect](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect)
+
+
+## IAM policies for CDK deployment
+
+The CDK bootstrap process will create or update IAM policies as required for execution role. These policies are controlling factor to permit cloudformation actions when executing `cdk deploy` command.
+
+If need to update permissions of cdk/cloudformation access, check the [cdk role directory](/cdk-roles/)
+
+### Ref Docs:
+- [create IAM policy](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_create-console.html)
+- [IAM examples using Python Boto3](https://docs.aws.amazon.com/code-library/latest/ug/python_3_iam_code_examples.html)
+- [Boto3 IAM Client](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/iam.html)
 
 ## Bootstrap for environment
 
-we will [customise the cdk bootstrap template](https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping-customizing.html) to create stack for each environment.
+Bootstrap is customize for permissions. Because same account is supporting all the environments.
 
-`cdk bootstrap --tags appId=<appId> --tags environment=<envId> --toolkit-stack-name CDKToolkit-<appId-envId> --qualifier <appId><envId> --cloudformation-execution-policies <list of policy arn seperated by comma>`
-
-bootstrap customized Command example
-
+Command to create bootstrap stack
 ```cmd
-# (for developer)
-cdk bootstrap --tags appId=prsfin --tags environment=dev --toolkit-stack-name CDKToolkit-prsfin-dev --qualifier prsfindev --cloudformation-execution-policies "arn:aws:iam::${AwsAccountNo}:policy/CdkApiLambda,arn:aws:iam::${AwsAccountNo}:policy/CdkCloudfront,arn:aws:iam::${AwsAccountNo}:policy/CdkEventMessage,arn:aws:iam::${AwsAccountNo}:policy/CdkIam,arn:aws:iam::${AwsAccountNo}:policy/CdkSecretParam,arn:aws:iam::${AwsAccountNo}:policy/CdkStorage"
+python -m scripts.bootstrap-cdk --bootstrap --aws-account <aws account number> --cdk-roles-dir cdk-roles --environment <one of supported value> 
 
-
-# (for tst env)
-cdk bootstrap --tags appId=prsfin --tags environment=tst --toolkit-stack-name CDKToolkit-prsfin-tst --qualifier prsfintst --cloudformation-execution-policies "arn:aws:iam::${AwsAccountNo}:policy/CdkApiLambda,arn:aws:iam::${AwsAccountNo}:policy/CdkCloudfront,arn:aws:iam::${AwsAccountNo}:policy/CdkEventMessage,arn:aws:iam::${AwsAccountNo}:policy/CdkIam,arn:aws:iam::${AwsAccountNo}:policy/CdkSecretParam,arn:aws:iam::${AwsAccountNo}:policy/CdkStorage"
-
-
-# (for prd env)
-cdk bootstrap --tags appId=prsfin --tags environment=prd --toolkit-stack-name CDKToolkit-prsfin-prd --qualifier prsfinprd --cloudformation-execution-policies "arn:aws:iam::${AwsAccountNo}:policy/CdkApiLambda,arn:aws:iam::${AwsAccountNo}:policy/CdkCloudfront,arn:aws:iam::${AwsAccountNo}:policy/CdkEventMessage,arn:aws:iam::${AwsAccountNo}:policy/CdkIam,arn:aws:iam::${AwsAccountNo}:policy/CdkSecretParam,arn:aws:iam::${AwsAccountNo}:policy/CdkStorage"
+# example,
+python -m scripts.bootstrap-cdk --bootstrap --aws-account 111111111111 --cdk-roles-dir cdk-roles --environment testplan
 ```
 
-#### Bootstrap Param Value Rules:
+add `--dry-run` param, if you would like to simulate the role creation. 
+add `--destroy --delete-policies` params, if you would like to delete bootstrap stack along with custom policies.
 
-**--qualifier**: there must be 9 chars according cdk bootstrap cli rules. default value is `hnb659fds`. so we are dividing into 6+3 to customize to accomodate control for app by env. the format is `<appId><envId>`
+##### Each AWS request and response are stored under `dist` directory.
 
-- 6 chars AppId (if less than 6, add some dummy/mock chars.)
-- 3 chars Environment Id
 
-**--tags**: app tag is required to identify which boootstrap is for what? also if further access control requires, can use tags in access conditions.
-
-**--custom-permissions-boundary**: attach the Iam boundary policy created in previos step. this will be attached to CFT execution role so that cdk deploy will have controlled access.
-
-**--toolkit-stack-name**: the default value is CDKToolkit. we are modifying it to ensure create stack by app and env instead of overlapping same stack. By overlapping same bootstrap stack, it can corrupt access controll and deployed resource permissions. so we are adding app and env Ids selected for qualifier param. the stack name format is `CDKToolkit-<appId>-<envId>`
-
-- 6 chars AppId (if less than 6, add some dummy/mock chars). value is same used in qualifier
-- 3 chars Environment Id. value is same used in qualifier
-
-## References:
-
+### Ref Docs:
 - [bootstrap customizing](https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping-customizing.html)
 - [cli bootstrap options](https://docs.aws.amazon.com/cdk/v2/guide/ref-cli-cmd-bootstrap.html)
