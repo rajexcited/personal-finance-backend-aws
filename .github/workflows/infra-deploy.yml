@@ -6,11 +6,7 @@ on:
   issues:
     types:
       - opened
-      - labeled
-      - locked
-      - milestoned
       - deleted
-      - closed
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.issue.milestone.number }}-${{ github.event.issue.number }}
@@ -77,16 +73,27 @@ jobs:
           echo "action: ${{ github.action }}"
           echo "event name: ${{ github.event_name }}"
           echo "event changes: ${{ github.event.changes }}"
+          echo "event action: ${{ github.event.action }}"
+      - run: |
+          echo 'github json: ${{ toJson(github) }}'
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            console.log("Context obj: ", context);
+            console.log("Github config: ", github)
+            console.log("Github Rest API config: ", github.rest)
+            console.log("Github Rest Issues API:", github.rest.issues)
 
   update_request:
     name: Start Request
     runs-on: ubuntu-latest
     if: >
       contains(github.event.issue.labels.*.name, 'deployment') &&
-      startsWith(github.event.issue.title, '[Request] Provision Test Plan Environment') &&
-      startsWith(github.event.issue.title, '[Request] Deprovision Test Plan Environment') &&
       github.event.issue.milestone != null &&
-      github.event.issue.locked == true && 
+      (
+        startsWith(github.event.issue.title, '[Request] Provision Test Plan Environment') ||
+        startsWith(github.event.issue.title, '[Request] Deprovision Test Plan Environment') 
+      ) &&
       ( 
         contains(github.event.issue.labels.*.name, 'test plan') ||
         contains(github.event.issue.labels.*.name, 'production')
@@ -98,6 +105,7 @@ jobs:
     outputs:
       failed-reason: ${{ steps.update_request.outputs.failedReason || steps.env-request.outputs.failedReason }}
       env-type: ${{ steps.env-request.outputs.env_type }}
+      original-issue-title: ${{ steps.update_issue_start.outputs.issue-title }}
     steps:
       - run: |
           echo "The issue has milestone assigned and locked.""
@@ -111,13 +119,22 @@ jobs:
         with:
           script: |
             try {
+              core.setOutput("issue-title", context.payload.issue.title);
               const updateResponse = await github.rest.issues.update({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.payload.issue.number,
-                title: "[Processing] " + context.payload.issue.title;
+                title: "[Processing] " + context.payload.issue.title
               });
               console.log("updateResponse: ", updateResponse);
+              if(!context.payload.issue.locked) {
+                const lockIssueResponse = await github.rest.issues.lock({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.payload.issue.number
+                });
+                console.log("Lock issue response:", lockIssueResponse);
+              }
             } catch (error) {
               console.error("failed reason: ", error);
               core.setOutput("failedReason", `Error during issue update, reason: ${error.message}`);
@@ -158,7 +175,8 @@ jobs:
       failed-reason: ${{ steps.get-milestone.outputs.failedReason || steps.testplan-issue.outputs.failedReason || steps.request-form.outputs.failedReason || steps.provision-stack.outputs.failedReason || steps.deprovision-stack.outputs.failedReason }}
       testplan-type: ${{ steps.testplan-issue.outputs.testplanType }}
       request-type: ${{ steps.request-form.outputs.request_type }}
-      testplan-issue-number: ${{ steps.request-form.outputs.testplan_issue_number }}
+      testplan-issue-number: ${{ steps.testplan-issue.outputs.testplanIssue.number || steps.request-form.outputs.testplan_issue_number }}
+      testplan-issue-repo: ${{ steps.testplan-issue.outputs.testplanIssue.repo }}
       stack-details: ${{ steps.provision-stack.outputs.stack_details || steps.deprovision-stack.outputs.stack_details }}
     environment:
       name: aws-infra-${{ needs.update_request.outputs.env-type }}
@@ -166,12 +184,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - id: get-milestone
+        name: Validate Milestone and Branch
         uses: actions/github-script@v7
         with:
           script: |
             try {
               // verify milestone branch exists
-              console.log("issue have milestone title: ", context.payload.issue.milestone.title);
+              console.log("issue has milestone title: ", context.payload.issue.milestone.title);
               // if milestone is open, there should be branch with milestone title
               if(context.payload.issue.milestone.state === "open") {
                 if(!context.payload.issue.milestone.due_on) {
@@ -196,8 +215,8 @@ jobs:
                 const compareResponse = await github.rest.repos.compareCommits({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  base: milestoneBranch,
-                  head: "master"
+                  base: "master",
+                  head: milestoneBranch
                 });
                 console.log("milestone branch as base and master branch as head, compareResponse: ", compareResponse);
                 if (compareResponse.data.behind_by > 0) {
@@ -224,11 +243,12 @@ jobs:
                 });
               }
             } catch (error) {
-              console.error("failed reason: "", error);
+              console.error("failed reason: ", error);
               core.setOutput("failedReason", `Error during milestone validation, reason: ${error.message}`);
               core.setFailed(error.message);
             }
       - id: testplan-issue
+        name: Validate Testplan issue
         if: contains(github.event.issue.labels.*.name, 'test plan')
         uses: actions/github-script@v7
         with:
@@ -237,10 +257,34 @@ jobs:
               // verify if regression label exists ? if so, set as output for further use
               const allowedTypes = ["regression"];
               const foundTypeLabel = context.payload.issue.labels.find(label=>allowedTypes.includes(label.name));
-              core.setOutput("testplanType", foundLabel?.name || "unknown");
-              if(!foundLabel) {
+              core.setOutput("testplanType", foundTypeLabel?.name || "unknown");
+              if(!foundTypeLabel) {
                 throw new Error("Test plan type label not found in issue labels");
               }
+              // find test plan issue with same milestone and type label
+              const testplanIssueRegex = new RegExp(".+Test Plan:.+https://github.com/"+context.repo.owner+"/([^/]+)/issues/(\\d+).+", "i");
+              if(!testplanIssueRegex.test(context.payload.issue.body)) {
+                throw new Error("Test plan issue link not found")
+              }
+              const testplanIssueRepo = testplanIssueRegex.exec(context.payload.issue.body)[1];
+              const testplanIssueNumber = testplanIssueRegex.exec(context.payload.issue.body)[2];
+              const getIssueResponse = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: testplanIssueRepo,
+                issue_number: testplanIssueNumber
+              });
+              console.log("getIssueResponse: ", getIssueResponse);
+              const allowedLabels = [foundTypeLabel.name, "test plan"];
+              const testplanLabels = getIssueResponse.data.labels.filter(label=>allowedLabels.includes(label.name));
+              if(testplanLabels.length!==allowedLabels.length ||
+                 getIssueResponse.data.state!=="open" || 
+                 getIssueResponse.data.milestone.number!==context.payload.issue.milestone.number ) {
+                 throw new Error("matching testplan issue not found")
+              }
+              core.setOutput("testplanIssue", {
+                  number: testplanIssueNumber,
+                  repo: testplanIssueRepo
+              });
             } catch(error) {
               console.error("failed reason: ", error);
               core.setOutput("failedReason", `Error during test plan validation, reason: ${error.message}`);
@@ -254,22 +298,26 @@ jobs:
       - id: request-form
         name: Validate Request form details
         env:
-          REQUEST_FORM_ISSUE_DETAIL: ${{ github.event.issue }}
           TESTPLAN_TYPE: ${{ steps.testplan-issue.outputs.testplanType || 'unknown' }}
-          BRANCH_DETAILS: ${{ steps.get-milestone.outputs.branch }}
         run: |
+          echo '${{ github.event.issue }}' > request_form_issue_details.json
+          echo '${{ steps.get-milestone.outputs.branch }}' > branch_details.json
           python --version
           pip install -r .github/scripts/requirements.txt
+          set +e
           python .github/scripts/deploy_request.py --validate \
-              --request-form-issue-details "$REQUEST_FORM_ISSUE_DETAIL" \
+              --request-form-issue-details "request_form_issue_details.json" \
               --testplan-type "$TESTPLAN_TYPE" \
-              --branch-details "$BRANCH_DETAILS" > deploy_request_output.log 2>&1
+              --branch-details "branch_details.json" > deploy_request_output.log 2>&1
           RETURN_CODE=$?
-          cat deploy_request_output.log
+          set -e
           if [ $RETURN_CODE -ne 0 ]; then
-            echo "failedReason=$(cat deploy_request_output.log)" >> $GITHUB_OUTPUT
-            exit $RETURN_CODE
+            echo "failedReason<<EOF" >> $GITHUB_OUTPUT
+            cat deploy_request_output.log >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
           fi
+          cat deploy_request_output.log
+          exit $RETURN_CODE
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -284,8 +332,10 @@ jobs:
           MILESTONE_TITLE: ${{ github.event.issue.milestone.title }}
         run: |
           INFRA_STACK_NAME="prsfin-$INFRA_ENV-infra-stack"
+          set +e
           DESCRIBE_STACK_OUT=$(aws cloudformation describe-stacks --stack-name "$INFRA_STACK_NAME")
           RET_CODE=$?
+          set -e
           if [[ $RET_CODE -ne 0 ]]; then
             echo "Infra Stack does not exist. given branch for milestone can be deployed."
             exit 0
@@ -293,7 +343,7 @@ jobs:
 
           ENV_TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].Tags[?Key=='environment'].Value")
           if [[ "$ENV_TAG_VALUE" != "$INFRA_ENV" ]]; then
-            FAILED_REASON="Stack is deployed for other environment '$ENV_TAG_VALUE' stack."
+            FAILED_REASON="Stack is deployed for other environment $ENV_TAG_VALUE stack."
             echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
             echo "Failed Reason: $FAILED_REASON"
             exit 1
@@ -301,7 +351,7 @@ jobs:
 
           MILESTONE_TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].Tags[?Key=='milestone'].Value")
           if [[ "$MILESTONE_TAG_VALUE" != "$MILESTONE_TITLE" ]]; then
-            FAILED_REASON="Other milestone branch is deployed to Test plan environment. Wait for completion of '$MILESTONE_TAG_VALUE' tests."
+            FAILED_REASON="Other milestone branch is deployed to Test plan environment. Wait for completion of $MILESTONE_TAG_VALUE tests."
             echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
             echo "Failed Reason: $FAILED_REASON"
             exit 1
@@ -312,7 +362,9 @@ jobs:
           API_STACK_AUDIT='{"created_time":'$API_CREATED_TIME',"updated_time":'$API_UPDATED_TIME'}'
 
           STACK_AUDIT='{"api":'$API_STACK_AUDIT'}'
-          echo "stack_details=$STACK_AUDIT" >> $GITHUB_OUTPUT
+          echo "stack_details<<EOF" >> $GITHUB_OUTPUT
+          echo "$STACK_AUDIT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - id: deprovision-stack
         if: ${{ steps.request-form.outputs.request_type == 'deprovision' }}
         name: Verify branch is destroyable
@@ -321,8 +373,10 @@ jobs:
           MILESTONE_TITLE: ${{ github.event.issue.milestone.title }}
         run: |
           INFRA_STACK_NAME="prsfin-$INFRA_ENV-infra-stack"  
+          set +e
           DESCRIBE_STACK_OUT=$(aws cloudformation describe-stacks --stack-name "$INFRA_STACK_NAME")
           RET_CODE=$?
+          set -e
           if [[ $RET_CODE -ne 0 ]]; then
             FAILED_REASON="Infra Stack does not exist. given branch for milestone has already been destroyed."
             echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
@@ -332,7 +386,7 @@ jobs:
 
           ENV_TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].Tags[?Key=='environment'].Value")
           if [[ "$ENV_TAG_VALUE" != "$INFRA_ENV" ]]; then
-            FAILED_REASON="Stack is deployed for other environment '$ENV_TAG_VALUE' stack."
+            FAILED_REASON="Stack is deployed for other environment $ENV_TAG_VALUE stack."
             echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
             echo "Failed Reason: $FAILED_REASON"
             exit 1
@@ -340,7 +394,7 @@ jobs:
 
           MILESTONE_TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].Tags[?Key=='milestone'].Value")
           if [[ "$MILESTONE_TAG_VALUE" != "$MILESTONE_TITLE" ]]; then
-            FAILED_REASON="Other milestone branch is deployed to Test plan environment. Wait for completion of '$MILESTONE_TAG_VALUE' tests."
+            FAILED_REASON="Other milestone branch is deployed to Test plan environment. Wait for completion of $MILESTONE_TAG_VALUE tests."
             echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
             echo "Failed Reason: $FAILED_REASON"
             exit 1
@@ -350,10 +404,12 @@ jobs:
           API_UPDATED_TIME=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r ".Stacks[0].LastUpdatedTime")
           API_STACK_AUDIT='{"created_time":'$API_CREATED_TIME',"updated_time":'$API_UPDATED_TIME'}'
           STACK_AUDIT='{"api":'$API_STACK_AUDIT'}'
-          echo "stack_details=$STACK_AUDIT" >> $GITHUB_OUTPUT
+          echo "stack_details<<EOF" >> $GITHUB_OUTPUT
+          echo "$STACK_AUDIT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
   diff:
-    name: Infra stack Diff
+    name: Infra Stack Diff
     runs-on: ubuntu-latest
     needs:
       - update_request
@@ -365,6 +421,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate_request.outputs.milestone-branch.name }}
       - name: Setup Node Latest
         uses: actions/setup-node@v4
         with:
@@ -385,12 +443,12 @@ jobs:
         with:
           script: |
             const stackTags = [];
-            stackTags.push(`workflow_run_id=${context.payload.workflow.run_id}`);
+            stackTags.push(`workflow_run_id=${context.runId}`);
             stackTags.push(`milestone=${context.payload.issue.milestone.title}`);
             stackTags.push(`testplanType=${process.env.TESTPLAN_TYPE}`);
             stackTags.push(`testplanIssueNumber=${process.env.TESTPLAN_ISSUE_NUMBER}`);
             stackTags.push(`requestIssueNumber=${context.payload.issue.number}`);
-            core.setOutput("stackTags", stackTags.join(","));
+            core.setOutput("stackTags", stackTags);
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -405,10 +463,10 @@ jobs:
           actions_comment: false
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
-          TAGS: ${{ steps.prepare-tags.outputs.stackTags }}
+          TAGS: ${{ join(steps.prepare-tags.outputs.stackTags, ',') }}
 
   deployment:
-    name: deploy infra stack
+    name: Deploy Infra Stack
     runs-on: ubuntu-latest
     needs:
       - update_request
@@ -421,6 +479,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate_request.outputs.milestone-branch.name }}
       - name: Setup Node Latest
         uses: actions/setup-node@v4
         with:
@@ -442,6 +502,7 @@ jobs:
         env:
           MILESTONE_BRANCH_NAME: ${{ needs.validate_request.outputs.milestone-branch.name }}
           TESTPLAN_TYPE: ${{ needs.validate_request.outputs.testplan-type }}
+          ORIGINAL_ISSUE_TITLE: ${{ needs.update_request.outputs.original-issue-title }}
         with:
           script: |
             try {
@@ -456,7 +517,7 @@ jobs:
                 "  " + process.env.MILESTONE_BRANCH_NAME
               ];
 
-              const stackDetails = ${{ needs.validate_request.outputs.stack-details }}
+              const stackDetails = ${{ needs.validate_request.outputs.stack-details }};
               commentBody.push("", "### API Stack: ", "");
               if(stackDetails?.api) {
                 // audit details available
@@ -470,11 +531,17 @@ jobs:
               commentBody.push("> [!NOTE]", "> Please wait for the deployment to complete. This issue will be updated with deployment status.");
               commentBody.push("<br/>", "<br/>",  "");
 
-              const workflowTitle = context.payload.workflow.name +" (" + context.payload.workflow.run_id + ")";
-              const workflowLink = context.payload.workflow.run_url;
+              const workflowTitle = context.workflow +" (" + context.runId + ")";
+              const workflowLink = context.payload.repository.html_url+"/actions/runs/"+context.runId;
               commentBody.push("### Request Processed By: ", `  [Workflow - ${workflowTitle}](${workflowLink})`, "");
 
               console.log("commentRequest: ", {issue_number: context.payload.issue.number, body: commentBody});
+              const unlockIssueResponse = await github.rest.issues.unlock({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number
+              });
+              console.log("issue is unlock temporarily, unlock issue response:", unlockIssueResponse);
               const commentResponse = github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -486,9 +553,15 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.payload.issue.number,
-                title: "[Approved] " + context.payload.issue.title
+                title: "[Approved] " + process.env.ORIGINAL_ISSUE_TITLE
               });
               console.log("updateIssueResponse: ", updateIssueResponse);
+              const lockIssueResponse = await github.rest.issues.lock({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number
+              });
+              console.log("issue is lock again, lock issue response:", lockIssueResponse);
             } catch (error) {
               console.error("failed reason: ", error);
               core.setOutput("failedReason", `Error during deployment start comment, reason: ${error.message}`);
@@ -532,7 +605,9 @@ jobs:
           API_STACK_AUDIT='{"created_time":'$API_CREATED_TIME',"updated_time":'$API_UPDATED_TIME'}'
           STACK_OUTPUTS=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].Outputs")
           STACK_AUDIT='{"api":'$API_STACK_AUDIT',"outputs":'$STACK_OUTPUTS'}'
-          echo "stack_details=$STACK_AUDIT" >> $GITHUB_OUTPUT
+          echo "stack_details<<EOF" >> $GITHUB_OUTPUT
+          echo "$STACK_AUDIT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - id: update-issue-deploy-complete
         name: Update Issue - Deployment Complete
         uses: actions/github-script@v7
@@ -566,7 +641,7 @@ jobs:
                 `| **Duration** | ${duration} |`,
                 "<br/>"
               ];
-              const stackDetails = ${{ steps.describe-stack.outputs.stack_details }}
+              const stackDetails = ${{ steps.describe-stack.outputs.stack_details }};
               commentBody.push("", "### Stack Outputs: ", "");
               stackDetails?.outputs.forEach(output => {
                 commentBody.push(` - **${output.OutputKey}:** ${output.OutputValue}  `);
@@ -585,11 +660,17 @@ jobs:
               commentBody.push("> [!NOTE]", "> The deployment is completed. This request issue will be closing.");
               commentBody.push("<br/>", "<br/>",  "");
 
-              const workflowTitle = context.payload.workflow.name +" (" + context.payload.workflow.run_id + ")";
-              const workflowLink = context.payload.workflow.run_url;
+              const workflowTitle = context.workflow +" (" + context.runId + ")";
+              const workflowLink = context.payload.repository.html_url+"/actions/runs/"+context.runId;
               commentBody.push("### Request Processed By: ", `  [Workflow - ${workflowTitle}](${workflowLink})`, "");
 
               console.log("commentRequest: ", {issue_number: context.payload.issue.number, body: commentBody});
+              const unlockIssueResponse = await github.rest.issues.unlock({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number
+              });
+              console.log("issue is unlock temporarily, unlock issue response:", unlockIssueResponse);
               const commentResponse = github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -604,6 +685,12 @@ jobs:
                 state: 'closed'
               });
               console.log("updateIssueResponse: ", updateIssueResponse);
+              const lockIssueResponse = await github.rest.issues.lock({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number
+              });
+              console.log("issue is lock again, lock issue response:", lockIssueResponse);
             } catch (error) {
               console.error("failed reason: ", error);
               core.setOutput("failedReason", `Error during deployment complete comment, reason: ${error.message}`);
@@ -690,11 +777,17 @@ jobs:
                     "> **Needs Action:**   Please raise a `new request form` with correct details. This request issue will be `closed`.",
                     "<br/>", "<br/>",  "",
                     ];
-            const workflowTitle = context.payload.workflow.name +" (" + context.payload.workflow.run_id + ")";
-            const workflowLink = context.payload.workflow.run_url;
+            const workflowTitle = context.workflow +" (" + context.runId + ")";
+            const workflowLink = context.payload.repository.html_url+"/actions/runs/"+context.runId;
             commentBody.push("### Request Processed By: ", `  [Workflow - ${workflowTitle}](${workflowLink})`, "");
 
             console.log("commentRequest: ", {issue_number: context.payload.issue.number, body: commentBody});
+            const unlockIssueResponse = await github.rest.issues.unlock({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number
+            });
+            console.log("issue is unlock temporarily, unlock issue response:", unlockIssueResponse);
             const commentResponse = github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -706,6 +799,7 @@ jobs:
         uses: actions/github-script@v7
         env:
           FAIL_STATUS: ${{ steps.prepare-error.outputs.status }}
+          ORIGINAL_ISSUE_TITLE: ${{ needs.update_request.outputs.original-issue-title }}
         with:
           script: |
             const closeUpdateResponse = await github.rest.issues.update({
@@ -713,6 +807,12 @@ jobs:
               repo: context.repo.repo,
               issue_number: context.payload.issue.number,
               state: 'closed',
-              title: "[" + process.env.FAIL_STATUS + "]" + context.payload.issue.title,
+              title: "[" + process.env.FAIL_STATUS + "]" + process.env.ORIGINAL_ISSUE_TITLE,
             });
             console.log("closeUpdateResponse: ", closeUpdateResponse);
+            const lockIssueResponse = await github.rest.issues.lock({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number
+            });
+            console.log("issue is lock again, lock issue response:", lockIssueResponse);

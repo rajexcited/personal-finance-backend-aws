@@ -1,14 +1,16 @@
 from argparse import ArgumentParser
-import enum
+from enum import Enum
 import json
 import os
+from pathlib import Path
 import re
 from typing import Any, Dict, List
 from markdown_to_json import dictify
 from datetime import datetime, timedelta
+import pytz
 
 
-class RequestType(enum):
+class RequestType(Enum):
     Provision = "provision"
     Deprovision = "deprovision"
 
@@ -44,11 +46,16 @@ def export_to_env(env_to_export: Dict[str, str]):
     #     print(f"{k}={v}")
     github_output_filepath = os.getenv('GITHUB_OUTPUT')
     # print("github_output_filepath=", github_output_filepath)
-    if github_output_filepath:
-        with open(github_output_filepath, 'a') as env_file:
-            for k, v in env_to_export.items():
-                print(f"exporting output {k}={v}")
-                env_file.write(f"{k}={v}\n")
+    if not github_output_filepath:
+        github_output_filepath = Path("dist/GITHUB_OUTPUT")
+        github_output_filepath.parent.mkdir(parents=True, exist_ok=True)
+        print("since GITHUB_OUTPUT variable is not defined, exporting env to file: ",
+              github_output_filepath.resolve())
+
+    with open(github_output_filepath, 'a') as env_file:
+        for k, v in env_to_export.items():
+            print(f"exporting output {k}={v}")
+            env_file.write(f"{k}={v}\n")
 
 
 def validate_release_details(release_details: Any, request_form_issue_details: dict):
@@ -58,7 +65,7 @@ def validate_release_details(release_details: Any, request_form_issue_details: d
     for listitem in release_details:
         flatten_listitem = flatten_to_string(listitem).lower()
         if "api version:" in flatten_listitem.lower():
-            api_version_match = re.match(r".*api version:\s+(v\d+).*",
+            api_version_match = re.match(r".*api version:\s+(v\d+\.\d+\.\d+).*",
                                          flatten_listitem, re.IGNORECASE)
             if not api_version_match:
                 raise ValueError("API Version is not in correct format")
@@ -91,23 +98,29 @@ def validate_deployment_schedule(deployment_schedule_list: Any, request_form_iss
 
     for listitem in deployment_schedule_list:
         flatten_listitem = flatten_to_string(listitem).lower()
-        if "preferred dateTime:" in flatten_listitem:
-            preferred_time_match = re.match(r".+preferred dateTime: (\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}).+",
+        if "preferred datetime:" in flatten_listitem:
+            preferred_time_match = re.match(r".+preferred dateTime:\s+(\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}).+",
                                             flatten_listitem, re.IGNORECASE)
             if not preferred_time_match:
                 raise ValueError(
-                    "Preferred DateTime format is not correct. Please follow `Preferred DateTime: dd-mm-yyyy HH:MM:SS`")
+                    "Preferred DateTime format is not correct. Please follow `Preferred DateTime: mm-dd-yyyy HH:MM:SS`")
+            central = pytz.timezone('US/Central')
             preferred_date_obj = datetime.strptime(
-                preferred_time_match.group(1), "%d-%m-%Y %H:%M:%S")
+                preferred_time_match.group(1), "%m-%d-%Y %H:%M:%S").astimezone(central)
 
-            allowed_date = datetime.now()+timedelta(hours=1)
-            if preferred_date_obj < allowed_date:
+            now = datetime.now(pytz.utc).astimezone(
+                central)
+            delta = timedelta(hours=1)
+            if preferred_date_obj < (now-delta):
                 raise ValueError("Preferred DateTime is in past")
+            if (preferred_date_obj-delta) > now:
+                raise ValueError("Preferred DateTime is in future")
             if request_form_issue_details["milestone"]["state"] == "open":
                 milestone_due_date_obj = datetime.strptime(
                     request_form_issue_details["milestone"]["due_on"], "%Y-%m-%dT%H:%M:%SZ")
-                end_day_milestone_due_date_obj = milestone_due_date_obj.replace(
-                    hour=23, minute=59, second=59)
+                end_day_milestone_due_date_obj = milestone_due_date_obj \
+                    .astimezone(central) \
+                    .replace(hour=23, minute=59, second=59)
                 if preferred_date_obj > end_day_milestone_due_date_obj:
                     raise ValueError(
                         "Preferred DateTime is after milestone due date")
@@ -119,16 +132,52 @@ def validate_deployment_schedule(deployment_schedule_list: Any, request_form_iss
                 raise ValueError(
                     "Deployment Scope is not in correct format.")
             deployment_scope = scope_match.group(1).strip()
-            if "API" not in deployment_scope:
+            if deployment_scope not in ["api only", "ui and api"]:
                 raise ValueError(
-                    "Deployment Scope is not in correct format. Required [API]")
+                    "Deployment Scope is not in correct format.  Allowed 'API only' or 'UI and API'")
 
     if not has_preferred_datetime:
         raise ValueError(
-            "Deployment Schedule does not contain preferred datetime. `Preferred DateTime: dd-mm-yyyy HH:MM:SS` is required")
+            "Deployment Schedule does not contain preferred datetime. `Preferred DateTime: mm-dd-yyyy HH:MM:SS` is required")
     if not deployment_scope:
         raise ValueError(
             "Deployment Schedule does not contain deployment scope. Required [Deployment Scope]")
+
+
+def parsed_body(requestform_body: str, header1_dummy: bool = False, header2_dummy: bool = False) -> Dict:
+    """
+    Args:
+        requestform_body (str):  request form issue body
+        header1_dummy and header2_dummy are used for internal to correct the body to parse in dictionary
+    Returns:
+        Dictionary of header3 as key and content as value, parsed header3 content value could be of any of these types; list, dict or str.
+    """
+    parsed_req_form = dictify(requestform_body)
+    if not isinstance(parsed_req_form, Dict) and not header1_dummy:
+        # add header1 and retry
+        return parsed_body("# Dummy\n"+requestform_body, header1_dummy=True)
+
+    incorrect_format_error_message = "request form is not in correct format. Please follow template `Request  Regression - Provision/Deprovision Test Plan Environment`"
+
+    if not isinstance(parsed_req_form, Dict) or len(parsed_req_form) != 1:
+        raise TypeError(incorrect_format_error_message)
+
+    ignorek, header1_value = parsed_req_form.popitem()
+    if not isinstance(header1_value, Dict) and not header2_dummy:
+        # add header2 and retry
+        header1_index = requestform_body.find(ignorek)
+        header1_end_index = requestform_body.find(
+            "\n", header1_index+len(ignorek))
+        return parsed_body(requestform_body[:header1_end_index] + "\n## Dummy" + requestform_body[header1_end_index:], header2_dummy=True)
+
+    if not isinstance(header1_value, Dict) or len(header1_value) != 1:
+        raise TypeError(incorrect_format_error_message)
+
+    ignorek, header2_value = header1_value.popitem()
+    if not isinstance(header2_value, Dict):
+        raise TypeError(incorrect_format_error_message)
+
+    return header2_value
 
 
 def validate_request_form(request_form_issue_details: dict, testplan_type: str, branch_details: dict):
@@ -144,16 +193,7 @@ def validate_request_form(request_form_issue_details: dict, testplan_type: str, 
             "Request form title is not in correct format. Please follow template guideline `[Request] Provision/Deprovision Test Plan Environment`")
     export_to_env({"request_type": request_type.value})
 
-    parsed_req_form = dictify(request_form_issue_details.body)
-    if not isinstance(parsed_req_form, dict) or len(parsed_req_form.keys()) != 1:
-        raise TypeError(
-            "request form is not in correct format. Please follow template `Request TPE Deployment for Regression`")
-
-    k, req_form_dict = parsed_req_form.popitem()
-    if not isinstance(req_form_dict, dict):
-        raise TypeError(
-            "request form is not in correct format. Please follow template `Request TPE Deployment for Regression`")
-
+    req_form_dict = parsed_body(request_form_issue_details["body"])
     for k1, v1 in req_form_dict.items():
         heading_key = flatten_to_string(k1).lower()
         if "test plan" in heading_key:
@@ -169,9 +209,22 @@ def validate_request_form(request_form_issue_details: dict, testplan_type: str, 
                 v1, request_form_issue_details, branch_details)
 
 
+def get_valid_dict(arg: Any) -> Dict:
+    ret_dict = arg
+    if Path(arg).exists():
+        with open(arg, "r") as f:
+            ret_dict = json.load(f)
+    elif isinstance(arg, str):
+        ret_dict = json.loads(arg)
+
+    if isinstance(ret_dict, Dict):
+        return ret_dict
+    return None
+
+
 if __name__ == "__main__":
     parser = ArgumentParser(
-        description="validates Deployment Request form for TPE environment")
+        description="validates Deployment Request form for Testplan environment")
     parser.add_argument("--validate", action="store_true",
                         help="[Required] Validation Request")
     parser.add_argument("--request-form-issue-details",
@@ -183,26 +236,25 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     try:
-        if not args.validate:
+        if not getattr(args, "validate"):
             raise ValueError("validate arg is not provided")
 
-        if not args.request_form_issue_details:
+        request_form_issue_details = get_valid_dict(
+            getattr(args, "request_form_issue_details"))
+        if not request_form_issue_details:
             raise ValueError("request form issue details are not provided")
 
-        if not args.testplan_type:
+        if not getattr(args, "testplan_type"):
             raise ValueError("testplan type is not provided")
 
-        if not args.branch_details:
+        branch_details = get_valid_dict(getattr(args, "branch_details"))
+        if not branch_details:
             raise ValueError("branch details are not provided")
 
-        no_error = True
     except Exception as e:
-        no_error = False
         print("error: ", e)
         parser.print_help()
-
-    if not no_error:
         exit(1)
 
-    validate_request_form(args.request_form_issue_details,
-                          args.testplan_type, args.branch_details)
+    validate_request_form(request_form_issue_details,
+                          getattr(args, "testplan_type"), branch_details)

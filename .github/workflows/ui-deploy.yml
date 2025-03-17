@@ -1,3 +1,4 @@
+# deploy or destroy UI stack when demanded. the on demand request is received from ui repository workflow
 name: AWS UI Stack
 
 on:
@@ -25,22 +26,45 @@ jobs:
         run: echo "github context json values = ${{ toJSON(github) }}"
 
   validate_payload:
-    name: Validate env in client payload
+    name: Validate Client Payload
     runs-on: ubuntu-latest
     environment:
       name: aws-infra-${{ github.event.client_payload.env_type }}
     steps:
-      - name: Validate env in client payload
+      - name: Env Config
         run: |
-          AWS_REGION=${{ vars.AWS_REGION }}
-          INFRA_ENV=${{ vars.INFRA_ENV }}
-          AWS_ROLE_ARN=${{ secrets.AWS_CICD_ROLE_ARN }}
+          AWS_REGION="${{ vars.AWS_REGION }}"
+          INFRA_ENV="${{ vars.INFRA_ENV }}"
+          AWS_ROLE_ARN="${{ secrets.AWS_CICD_ROLE_ARN }}"
           if [ -z "$AWS_REGION" ] || [ -z "$INFRA_ENV" ] || [ -z "$AWS_ROLE_ARN" ]; then
             echo "One or more required environment variables are not set."
             exit 1
           fi
-          mkdir -p dist/ui
-      - name: Verify AWS Access
+      - name: Payload Schema
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const payload = context.payload.client_payload;
+            const errors = [];
+            if(!Array.isArray(payload.stackTags)) {
+              errors.push("stack tags is not array.");
+            }
+            if(payload.type !== "provision" || payload.type !== "deprovision") {
+              errors.push("request type is not supported.");
+            }
+            if(!payload.ui_repository) {
+              errors.push("ui_repository is not provided");
+            }
+            if(!payload.workflow_run_id) {
+              errors.push("workflow_run_id is not provided");
+            }
+            if(!payload.artifact_name) {
+              errors.push("artifact_name is not provided");
+            }
+            if(errors.length>0) {
+              core.setFailed("client payload schema invalid. errors: [" + errors.join(",") + "]");
+            }
+      - name: AWS Access
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ vars.AWS_REGION }}
@@ -57,6 +81,7 @@ jobs:
     environment:
       name: aws-infra-${{ github.event.client_payload.env_type }}
     steps:
+      - run: mkdir -p dist/ui
       - name: download UI artifact
         uses: actions/download-artifact@v4
         with:
@@ -64,6 +89,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.event.client_payload.ui_repository }}
           run-id: ${{ github.event.client_payload.workflow_run_id }}
+          name: ${{ github.event.client_payload.artifact_name }}
       - name: Copy artifact files to UI asset directory
         run: |
           ls -lrt dist/$ARTIFACT_NAME
@@ -94,12 +120,11 @@ jobs:
         run: |
           UI_STACK_NAME="prsfin-$INFRA_ENV-ui-deploy-stack"
           FAILED_REASON=""
+          set +e
           DESCRIBE_UI_STACK_OUT=$(aws cloudformation describe-stacks --stack-name "$UI_STACK_NAME")
           RET_CODE=$?
+          set -e
           if [[ $RET_CODE -eq 0 ]]; then
-            # STACK_TAG_LIST=$(echo "$DESCRIBE_UI_STACK_OUT" | jq -r ".Stacks[0].Tags")
-            # echo "stack_tags=$STACK_TAG_LIST" >> $GITHUB_OUTPUT
-
             STACK_STATUS=$(echo "$DESCRIBE_UI_STACK_OUT" | jq -r ".Stacks[0].StackStatus")
             # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/view-stack-events.html#cfn-console-view-stack-data-resources-status-codes
             if [[ "$STACK_STATUS" =~ ^(CREATE_IN_PROGRESS|UPDATE_IN_PROGRESS|DELETE_IN_PROGRESS|ROLLBACK_IN_PROGRESS|UPDATE_ROLLBACK_IN_PROGRESS)$ ]]; then
@@ -177,8 +202,10 @@ jobs:
           while :; do
             echo "Deployment is in progress. Waiting for $SLEEP_DURATION."
             sleep $SLEEP_DURATION
+            set +e
             DESCRIBE_API_STACK_OUT=$(aws cloudformation describe-stacks --stack-name "$API_STACK_NAME")
             RET_CODE=$?
+            set -e
             if [[ $RET_CODE -eq 0 ]]; then
               STACK_STATUS=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r ".Stacks[0].StackStatus")
               # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/view-stack-events.html#cfn-console-view-stack-data-resources-status-codes
@@ -239,6 +266,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.event.client_payload.ui_repository }}
           run-id: ${{ github.event.client_payload.workflow_run_id }}
+          name: ${{ github.event.client_payload.artifact_name }}
       - run: ls -lrt dist/${{ github.event.client_payload.artifact_name }}
       - run: |
           cp -r dist/$ARTIFACT_NAME/* dist/ui
