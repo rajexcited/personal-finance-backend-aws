@@ -172,7 +172,7 @@ jobs:
       - update_request
     outputs:
       milestone-branch: ${{ steps.get-milestone.outputs.branch }}
-      failed-reason: ${{ steps.get-milestone.outputs.failedReason || steps.testplan-issue.outputs.failedReason || steps.request-form.outputs.failedReason || steps.provision-stack.outputs.failedReason || steps.deprovision-stack.outputs.failedReason }}
+      failed-reason: ${{ steps.get-milestone.outputs.failedReason || steps.testplan-issue.outputs.failedReason || steps.testplan-issue2.outputs.failedReason || steps.request-form.outputs.failedReason || steps.provision-stack.outputs.failedReason || steps.deprovision-stack.outputs.failedReason }}
       testplan-type: ${{ steps.testplan-issue.outputs.testplanType }}
       request-type: ${{ steps.request-form.outputs.request_type }}
       testplan-issue-number: ${{ steps.testplan-issue.outputs.testplanIssue.number || steps.request-form.outputs.testplan_issue_number }}
@@ -268,6 +268,44 @@ jobs:
               }
               const testplanIssueRepo = testplanIssueRegex.exec(context.payload.issue.body)[1];
               const testplanIssueNumber = testplanIssueRegex.exec(context.payload.issue.body)[2];
+              if(testplanIssueRepo === context.repo.repo) {
+                const getIssueResponse = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: testplanIssueRepo,
+                  issue_number: testplanIssueNumber
+                });
+                console.log("getIssueResponse: ", getIssueResponse);
+                const allowedLabels = [foundTypeLabel.name, "test plan"];
+                const testplanLabels = getIssueResponse.data.labels.filter(label=>allowedLabels.includes(label.name));
+                if(testplanLabels.length!==allowedLabels.length ||
+                  getIssueResponse.data.state!=="open" || 
+                  getIssueResponse.data.milestone.number!==context.payload.issue.milestone.number ) {
+                  throw new Error("matching testplan issue not found")
+                }
+              }
+              core.setOutput("testplanIssue", {
+                  number: testplanIssueNumber,
+                  repo: testplanIssueRepo
+              });
+            } catch(error) {
+              console.error("failed reason: ", error);
+              core.setOutput("failedReason", `Error during test plan validation, reason: ${error.message}`);
+              core.setFailed(error.message);
+            }
+      - name: Validate testplan issue from another repo
+        id: testplan-issue2
+        if: contains(github.event.issue.labels.*.name, 'test plan')
+        uses: actions/github-script@v7
+        env:
+          TESTPLAN_REPO: ${{ steps.testplan-issue.outputs.testplanIssue.repo }}
+          TESTPLAN_NUMBER: ${{ steps.testplan-issue.outputs.testplanIssue.number }}
+        with:
+          github-token: ${{ secrets.REPO_AWS_PAT }}
+          script: |
+            try {
+              if(process.env.TESTPLAN_REPO === context.repo.repo) {
+                return;
+              }
               const getIssueResponse = await github.rest.issues.get({
                 owner: context.repo.owner,
                 repo: testplanIssueRepo,
@@ -281,10 +319,6 @@ jobs:
                  getIssueResponse.data.milestone.number!==context.payload.issue.milestone.number ) {
                  throw new Error("matching testplan issue not found")
               }
-              core.setOutput("testplanIssue", {
-                  number: testplanIssueNumber,
-                  repo: testplanIssueRepo
-              });
             } catch(error) {
               console.error("failed reason: ", error);
               core.setOutput("failedReason", `Error during test plan validation, reason: ${error.message}`);
