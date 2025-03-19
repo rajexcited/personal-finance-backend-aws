@@ -98,18 +98,15 @@ jobs:
         contains(github.event.issue.labels.*.name, 'test plan') ||
         contains(github.event.issue.labels.*.name, 'production')
       ) &&
-      ( 
-        startsWith(github.event.issue.author_association, 'OWNER') ||
-        startsWith(github.event.issue.user.login, 'github-actions')
-      )
+      startsWith(github.event.issue.author_association, 'OWNER')
     outputs:
       failed-reason: ${{ steps.update_request.outputs.failedReason || steps.env-request.outputs.failedReason }}
       env-type: ${{ steps.env-request.outputs.env_type }}
       original-issue-title: ${{ steps.update_issue_start.outputs.issue-title }}
     steps:
       - run: |
-          echo "The issue has milestone assigned and locked.""
-          echo "The issue has required labels (deployment, test plan).""
+          echo "The issue has milestone assigned and locked."
+          echo "The issue has required labels (deployment, test plan)."
           echo "This request form is raised by owner."
           echo "This request form title indicates that It is related to provision or deprovision test plan environment."
           echo "We will validate request form issue details."
@@ -175,9 +172,9 @@ jobs:
       failed-reason: ${{ steps.get-milestone.outputs.failedReason || steps.testplan-issue.outputs.failedReason || steps.testplan-issue2.outputs.failedReason || steps.request-form.outputs.failedReason || steps.provision-stack.outputs.failedReason || steps.deprovision-stack.outputs.failedReason }}
       testplan-type: ${{ steps.testplan-issue.outputs.testplanType }}
       request-type: ${{ steps.request-form.outputs.request_type }}
-      testplan-issue-number: ${{ steps.testplan-issue.outputs.testplanIssue.number || steps.request-form.outputs.testplan_issue_number }}
-      testplan-issue-repo: ${{ steps.testplan-issue.outputs.testplanIssue.repo }}
-      stack-details: ${{ steps.provision-stack.outputs.stack_details || steps.deprovision-stack.outputs.stack_details }}
+      testplan-issue-number: ${{ steps.testplan-issue.outputs.testplanIssue.number || steps.request-form.outputs.testplan_issue_number || null }}
+      testplan-issue-repo: ${{ steps.testplan-issue.outputs.testplanIssue.repo || null }}
+      stack-details: ${{ steps.provision-stack.outputs.stack_details || steps.deprovision-stack.outputs.stack_details || null }}
     environment:
       name: aws-infra-${{ needs.update_request.outputs.env-type }}
     steps:
@@ -754,43 +751,46 @@ jobs:
     needs:
       - update_request
       - validate_request
+      - diff
       - deployment
       - destroy
     if: failure()
     steps:
+      - run: |
+          echo 'Update Request: ${{ toJson(needs.update_request) }}'
+          echo 'Validate Request: ${{ toJson(needs.validate_request) }}'
+          echo 'Diff: ${{ toJson(needs.diff) }}'
+          echo 'Deployment: ${{ toJson(needs.deployment) }}'
+          echo 'Destroy: ${{ toJson(needs.destroy) }}'
+        continue-on-error: true
       - id: prepare-error
         uses: actions/github-script@v7
         env:
           VALIDATION_FAIL_REASON: ${{ needs.update_request.outputs.failed-reason || needs.validate_request.outputs.failed-reason }}
-          REQUEST_TYPE: ${{ needs.validate_request.outputs.request-type }}
+          IS_VALIDATION_FAILED: ${{ needs.update_request.result == 'failure' || needs.validate_request.result == 'failure' || needs.diff.result == 'failure' }}
           DEPLOY_FAILED_REASON: ${{ needs.deployment.outputs.failed-reason }}
+          IS_DEPLOY_FAILED: ${{ needs.deployment.result == 'failure' }}
           DESTROY_FAILED_REASON: ${{ needs.destroy.outputs.failed-reason }}
+          IS_DESTROY_FAILED: ${{ needs.destroy.result == 'failure' }}
         with:
           script: |
-            const validationError = process.env.VALIDATION_FAIL_REASON
-            if(validationError) {
-              core.setOutput("reason", "Validation of Request form is failed.");
-              core.setOutput("details", validationError);
+            let errorDetails= "Found unknown error. Please check the logs.";
+            if(String(process.env.IS_VALIDATION_FAILED) === "true") {
+              errorDetails = process.env.VALIDATION_FAIL_REASON || errorDetails;
+              core.setOutput("reason", "Validation of Api Request form is failed.");
               core.setOutput("status", "Denied");
-            } else {
-              const requestType = process.env.REQUEST_TYPE;
-              let errorDetails= "Found unknown error. Please check the logs.";
-              let reasonPrefix = ""
-              if(requestType === "provision") {
-                if(process.env.DEPLOY_FAILED_REASON) {
-                  errorDetails = process.env.DEPLOY_FAILED_REASON;
-                }
-                reasonPrefix = "Deployment of";
-              } else {
-                if(process.env.DESTROY_FAILED_REASON) {
-                  errorDetails = process.env.DESTROY_FAILED_REASON;
-                }
-                reasonPrefix = "Destroy of";
-              }
-              core.setOutput("reason", reasonPrefix + " Infra stack is failed.");
-              core.setOutput("details", errorDetails);
+            } else if(String(process.env.IS_DEPLOY_FAILED) === "true") {
+              errorDetails = process.env.DEPLOY_FAILED_REASON || errorDetails;
+              core.setOutput("reason", "Deployment of Infra stack is failed.");
               core.setOutput("status", "Failed");
+            } else if(String(process.env.IS_DESTROY_FAILED) === "true") {
+              errorDetails = process.env.DESTROY_FAILED_REASON || errorDetails;
+              core.setOutput("reason", "Destroy of Infra Stack is failed.");
+              core.setOutput("status", "Failed");
+            } else {
+              throw new Error("could not find any fail job");
             }
+            core.setOutput("details", errorDetails);
       - name: Add Failed Reason as Comment
         uses: actions/github-script@v7
         env:
@@ -833,7 +833,7 @@ jobs:
         uses: actions/github-script@v7
         env:
           FAIL_STATUS: ${{ steps.prepare-error.outputs.status }}
-          ORIGINAL_ISSUE_TITLE: ${{ needs.update_request.outputs.original-issue-title }}
+          ORIGINAL_ISSUE_TITLE: ${{ needs.update_request.outputs.original-issue-title || github.event.issue.title }}
         with:
           script: |
             const closeUpdateResponse = await github.rest.issues.update({
