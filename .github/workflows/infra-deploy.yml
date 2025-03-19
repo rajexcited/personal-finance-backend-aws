@@ -265,8 +265,14 @@ jobs:
               if(!testplanIssueRegex.test(context.payload.issue.body)) {
                 throw new Error("Test plan issue link not found")
               }
-              const testplanIssueRepo = testplanIssueRegex.exec(context.payload.issue.body)[1];
-              const testplanIssueNumber = testplanIssueRegex.exec(context.payload.issue.body)[2];
+              const matchedGroups = testplanIssueRegex.exec(context.payload.issue.body);
+              console.log("found match groups: ", matchedGroups);
+              const testplanIssueRepo = matchedGroups[1];
+              const testplanIssueNumber = matchedGroups[2];
+              if(!testplanIssueNumber || !testplanIssueRepo) {
+                throw new Error("Test plan issue link is not properly formatted.");
+              }
+              const allowedLabels = [foundTypeLabel.name, "test plan"];
               if(testplanIssueRepo === context.repo.repo) {
                 const getIssueResponse = await github.rest.issues.get({
                   owner: context.repo.owner,
@@ -274,7 +280,6 @@ jobs:
                   issue_number: testplanIssueNumber
                 });
                 console.log("getIssueResponse: ", getIssueResponse);
-                const allowedLabels = [foundTypeLabel.name, "test plan"];
                 const testplanLabels = getIssueResponse.data.labels.filter(label=>allowedLabels.includes(label.name));
                 if(testplanLabels.length!==allowedLabels.length ||
                   getIssueResponse.data.state!=="open" || 
@@ -284,7 +289,8 @@ jobs:
               }
               core.setOutput("testplanIssue", {
                   number: testplanIssueNumber,
-                  repo: testplanIssueRepo
+                  repo: testplanIssueRepo,
+                  allowedLabels: allowedLabels
               });
             } catch(error) {
               console.error("failed reason: ", error);
@@ -295,23 +301,22 @@ jobs:
         id: testplan-issue2
         if: contains(github.event.issue.labels.*.name, 'test plan')
         uses: actions/github-script@v7
-        env:
-          TESTPLAN_REPO: ${{ steps.testplan-issue.outputs.testplanIssue.repo }}
-          TESTPLAN_NUMBER: ${{ steps.testplan-issue.outputs.testplanIssue.number }}
         with:
           github-token: ${{ secrets.REPO_AWS_PAT }}
           script: |
             try {
-              if(process.env.TESTPLAN_REPO === context.repo.repo) {
+              const testPlanIssueDetails = ${{ steps.testplan-issue.outputs.testplanIssue }};
+              if(testPlanIssueDetails.repo === context.repo.repo) {
+                console.log("already verified");
                 return;
               }
               const getIssueResponse = await github.rest.issues.get({
                 owner: context.repo.owner,
-                repo: testplanIssueRepo,
-                issue_number: testplanIssueNumber
+                repo: testPlanIssueDetails.repo,
+                issue_number: testPlanIssueDetails.number
               });
               console.log("getIssueResponse: ", getIssueResponse);
-              const allowedLabels = [foundTypeLabel.name, "test plan"];
+              const allowedLabels = testPlanIssueDetails.allowedLabels;
               const testplanLabels = getIssueResponse.data.labels.filter(label=>allowedLabels.includes(label.name));
               if(testplanLabels.length!==allowedLabels.length ||
                  getIssueResponse.data.state!=="open" || 
