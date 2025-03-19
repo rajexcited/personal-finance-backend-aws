@@ -91,12 +91,14 @@ jobs:
       contains(github.event.issue.labels.*.name, 'deployment') &&
       github.event.issue.milestone != null &&
       (
+        contains(github.event.issue.labels.*.name, 'test plan') && (
         startsWith(github.event.issue.title, '[Request] Provision Test Plan Environment') ||
-        startsWith(github.event.issue.title, '[Request] Deprovision Test Plan Environment') 
-      ) &&
-      ( 
-        contains(github.event.issue.labels.*.name, 'test plan') ||
-        contains(github.event.issue.labels.*.name, 'production')
+        startsWith(github.event.issue.title, '[Request] Deprovision Test Plan Environment') )
+        ) &&
+        (
+          contains(github.event.issue.labels.*.name, 'production') && (
+          startsWith(github.event.issue.title, '[Request] Provision Production Environment') ||
+          startsWith(github.event.issue.title, '[Request] Deprovision Production Environment') )
       ) &&
       startsWith(github.event.issue.author_association, 'OWNER')
     outputs:
@@ -172,9 +174,9 @@ jobs:
       failed-reason: ${{ steps.get-milestone.outputs.failedReason || steps.testplan-issue.outputs.failedReason || steps.testplan-issue2.outputs.failedReason || steps.request-form.outputs.failedReason || steps.provision-stack.outputs.failedReason || steps.deprovision-stack.outputs.failedReason }}
       testplan-type: ${{ steps.testplan-issue.outputs.testplanType }}
       request-type: ${{ steps.request-form.outputs.request_type }}
-      testplan-issue-number: ${{ steps.testplan-issue.outputs.testplanIssue.number || steps.request-form.outputs.testplan_issue_number || null }}
-      testplan-issue-repo: ${{ steps.testplan-issue.outputs.testplanIssue.repo || null }}
-      stack-details: ${{ steps.provision-stack.outputs.stack_details || steps.deprovision-stack.outputs.stack_details || null }}
+      testplan-issue-number: ${{ steps.testplan-issue.outputs.testplanIssue.number || steps.request-form.outputs.testplan_issue_number }}
+      testplan-issue-repo: ${{ steps.testplan-issue.outputs.testplanIssue.repo }}
+      stack-details: ${{ steps.provision-stack.outputs.stack_details || steps.deprovision-stack.outputs.stack_details || '{}' }}
     environment:
       name: aws-infra-${{ needs.update_request.outputs.env-type }}
     steps:
