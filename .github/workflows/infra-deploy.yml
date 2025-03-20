@@ -31,8 +31,8 @@ jobs:
       - run: |
           echo "Issue body: ${{ github.event.issue.body }}"
       - run: |
-          echo "Issue milestone: ${{ github.event.issue.milestone }}"
           echo "Issue milestone title: ${{ github.event.issue.milestone.title }}"
+          echo "Issue milestone: ${{ toJson(github.event.issue.milestone) }}"
       - run: |
           echo "Issue state: ${{ github.event.issue.state }}"
           echo "Issue state reason: ${{ github.event.issue.state_reason }}"
@@ -41,7 +41,7 @@ jobs:
           echo "Issue locked: ${{ github.event.issue.locked }}"
           echo "Issue active lock reason: ${{ github.event.issue.active_lock_reason }}"
       - run: |
-          echo "Issue labels name: ${{ github.event.issue.labels.*.name }}"
+          echo "Issue labels name: ${{ toJson(github.event.issue.labels.*.name) }}"
       - run: |
           echo "Issue total comments: ${{ github.event.issue.comments }}"
       - run: |
@@ -89,18 +89,13 @@ jobs:
     runs-on: ubuntu-latest
     if: >
       contains(github.event.issue.labels.*.name, 'deployment') &&
-      github.event.issue.milestone != null &&
+      contains(github.event.issue.labels.*.name, 'test plan') && 
+      startsWith(github.event.issue.author_association, 'OWNER') &&
       (
-        contains(github.event.issue.labels.*.name, 'test plan') && (
         startsWith(github.event.issue.title, '[Request] Provision Test Plan Environment') ||
-        startsWith(github.event.issue.title, '[Request] Deprovision Test Plan Environment') )
-        ) &&
-        (
-          contains(github.event.issue.labels.*.name, 'production') && (
-          startsWith(github.event.issue.title, '[Request] Provision Production Environment') ||
-          startsWith(github.event.issue.title, '[Request] Deprovision Production Environment') )
+        startsWith(github.event.issue.title, '[Request] Deprovision Test Plan Environment')
       ) &&
-      startsWith(github.event.issue.author_association, 'OWNER')
+      github.event.issue.milestone != null
     outputs:
       failed-reason: ${{ steps.update_request.outputs.failedReason || steps.env-request.outputs.failedReason }}
       env-type: ${{ steps.env-request.outputs.env_type }}
