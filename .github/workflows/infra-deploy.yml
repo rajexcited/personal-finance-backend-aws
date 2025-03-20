@@ -331,7 +331,7 @@ jobs:
         env:
           TESTPLAN_TYPE: ${{ steps.testplan-issue.outputs.testplanType || 'unknown' }}
         run: |
-          echo '${{ github.event.issue }}' > request_form_issue_details.json
+          echo '${{ toJson(github.event.issue) }}' > request_form_issue_details.json
           echo '${{ steps.get-milestone.outputs.branch }}' > branch_details.json
           python --version
           pip install -r .github/scripts/requirements.txt
