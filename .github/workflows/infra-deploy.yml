@@ -31,8 +31,8 @@ jobs:
       - run: |
           echo "Issue body: ${{ github.event.issue.body }}"
       - run: |
-          echo "Issue milestone: ${{ github.event.issue.milestone }}"
           echo "Issue milestone title: ${{ github.event.issue.milestone.title }}"
+          echo "Issue milestone: ${{ toJson(github.event.issue.milestone) }}"
       - run: |
           echo "Issue state: ${{ github.event.issue.state }}"
           echo "Issue state reason: ${{ github.event.issue.state_reason }}"
@@ -41,7 +41,7 @@ jobs:
           echo "Issue locked: ${{ github.event.issue.locked }}"
           echo "Issue active lock reason: ${{ github.event.issue.active_lock_reason }}"
       - run: |
-          echo "Issue labels name: ${{ github.event.issue.labels.*.name }}"
+          echo "Issue labels name: ${{ toJson(github.event.issue.labels.*.name) }}"
       - run: |
           echo "Issue total comments: ${{ github.event.issue.comments }}"
       - run: |
@@ -89,27 +89,21 @@ jobs:
     runs-on: ubuntu-latest
     if: >
       contains(github.event.issue.labels.*.name, 'deployment') &&
-      github.event.issue.milestone != null &&
+      contains(github.event.issue.labels.*.name, 'test plan') && 
+      startsWith(github.event.issue.author_association, 'OWNER') &&
       (
         startsWith(github.event.issue.title, '[Request] Provision Test Plan Environment') ||
-        startsWith(github.event.issue.title, '[Request] Deprovision Test Plan Environment') 
+        startsWith(github.event.issue.title, '[Request] Deprovision Test Plan Environment')
       ) &&
-      ( 
-        contains(github.event.issue.labels.*.name, 'test plan') ||
-        contains(github.event.issue.labels.*.name, 'production')
-      ) &&
-      ( 
-        startsWith(github.event.issue.author_association, 'OWNER') ||
-        startsWith(github.event.issue.user.login, 'github-actions')
-      )
+      github.event.issue.milestone != null
     outputs:
       failed-reason: ${{ steps.update_request.outputs.failedReason || steps.env-request.outputs.failedReason }}
       env-type: ${{ steps.env-request.outputs.env_type }}
       original-issue-title: ${{ steps.update_issue_start.outputs.issue-title }}
     steps:
       - run: |
-          echo "The issue has milestone assigned and locked.""
-          echo "The issue has required labels (deployment, test plan).""
+          echo "The issue has milestone assigned and locked."
+          echo "The issue has required labels (deployment, test plan)."
           echo "This request form is raised by owner."
           echo "This request form title indicates that It is related to provision or deprovision test plan environment."
           echo "We will validate request form issue details."
@@ -177,7 +171,7 @@ jobs:
       request-type: ${{ steps.request-form.outputs.request_type }}
       testplan-issue-number: ${{ steps.testplan-issue.outputs.testplanIssue.number || steps.request-form.outputs.testplan_issue_number }}
       testplan-issue-repo: ${{ steps.testplan-issue.outputs.testplanIssue.repo }}
-      stack-details: ${{ steps.provision-stack.outputs.stack_details || steps.deprovision-stack.outputs.stack_details }}
+      stack-details: ${{ steps.provision-stack.outputs.stack_details || steps.deprovision-stack.outputs.stack_details || '{}' }}
     environment:
       name: aws-infra-${{ needs.update_request.outputs.env-type }}
     steps:
@@ -266,8 +260,14 @@ jobs:
               if(!testplanIssueRegex.test(context.payload.issue.body)) {
                 throw new Error("Test plan issue link not found")
               }
-              const testplanIssueRepo = testplanIssueRegex.exec(context.payload.issue.body)[1];
-              const testplanIssueNumber = testplanIssueRegex.exec(context.payload.issue.body)[2];
+              const matchedGroups = testplanIssueRegex.exec(context.payload.issue.body);
+              console.log("found match groups: ", matchedGroups);
+              const testplanIssueRepo = matchedGroups[1];
+              const testplanIssueNumber = matchedGroups[2];
+              if(!testplanIssueNumber || !testplanIssueRepo) {
+                throw new Error("Test plan issue link is not properly formatted.");
+              }
+              const allowedLabels = [foundTypeLabel.name, "test plan"];
               if(testplanIssueRepo === context.repo.repo) {
                 const getIssueResponse = await github.rest.issues.get({
                   owner: context.repo.owner,
@@ -275,7 +275,6 @@ jobs:
                   issue_number: testplanIssueNumber
                 });
                 console.log("getIssueResponse: ", getIssueResponse);
-                const allowedLabels = [foundTypeLabel.name, "test plan"];
                 const testplanLabels = getIssueResponse.data.labels.filter(label=>allowedLabels.includes(label.name));
                 if(testplanLabels.length!==allowedLabels.length ||
                   getIssueResponse.data.state!=="open" || 
@@ -285,39 +284,37 @@ jobs:
               }
               core.setOutput("testplanIssue", {
                   number: testplanIssueNumber,
-                  repo: testplanIssueRepo
+                  repo: testplanIssueRepo,
+                  allowedLabels: allowedLabels
               });
             } catch(error) {
               console.error("failed reason: ", error);
               core.setOutput("failedReason", `Error during test plan validation, reason: ${error.message}`);
               core.setFailed(error.message);
             }
-      - name: Validate testplan issue from another repo
-        id: testplan-issue2
+      - id: testplan-issue2
+        name: Validate testplan issue from another repo
         if: contains(github.event.issue.labels.*.name, 'test plan')
         uses: actions/github-script@v7
-        env:
-          TESTPLAN_REPO: ${{ steps.testplan-issue.outputs.testplanIssue.repo }}
-          TESTPLAN_NUMBER: ${{ steps.testplan-issue.outputs.testplanIssue.number }}
         with:
           github-token: ${{ secrets.REPO_AWS_PAT }}
           script: |
             try {
-              if(process.env.TESTPLAN_REPO === context.repo.repo) {
+              const testPlanIssueDetails = ${{ steps.testplan-issue.outputs.testplanIssue }};
+              if(testPlanIssueDetails.repo === context.repo.repo) {
+                console.log("already verified");
                 return;
               }
               const getIssueResponse = await github.rest.issues.get({
                 owner: context.repo.owner,
-                repo: testplanIssueRepo,
-                issue_number: testplanIssueNumber
+                repo: testPlanIssueDetails.repo,
+                issue_number: testPlanIssueDetails.number
               });
               console.log("getIssueResponse: ", getIssueResponse);
-              const allowedLabels = [foundTypeLabel.name, "test plan"];
+              const allowedLabels = testPlanIssueDetails.allowedLabels;
               const testplanLabels = getIssueResponse.data.labels.filter(label=>allowedLabels.includes(label.name));
-              if(testplanLabels.length!==allowedLabels.length ||
-                 getIssueResponse.data.state!=="open" || 
-                 getIssueResponse.data.milestone.number!==context.payload.issue.milestone.number ) {
-                 throw new Error("matching testplan issue not found")
+              if(testplanLabels.length!==allowedLabels.length || getIssueResponse.data.state!=="open" ) {
+                 throw new Error("matching testplan issue not found");
               }
             } catch(error) {
               console.error("failed reason: ", error);
@@ -334,7 +331,7 @@ jobs:
         env:
           TESTPLAN_TYPE: ${{ steps.testplan-issue.outputs.testplanType || 'unknown' }}
         run: |
-          echo '${{ github.event.issue }}' > request_form_issue_details.json
+          echo '${{ toJson(github.event.issue) }}' > request_form_issue_details.json
           echo '${{ steps.get-milestone.outputs.branch }}' > branch_details.json
           python --version
           pip install -r .github/scripts/requirements.txt
@@ -754,43 +751,46 @@ jobs:
     needs:
       - update_request
       - validate_request
+      - diff
       - deployment
       - destroy
     if: failure()
     steps:
+      - run: |
+          echo 'Update Request: ${{ toJson(needs.update_request) }}'
+          echo 'Validate Request: ${{ toJson(needs.validate_request) }}'
+          echo 'Diff: ${{ toJson(needs.diff) }}'
+          echo 'Deployment: ${{ toJson(needs.deployment) }}'
+          echo 'Destroy: ${{ toJson(needs.destroy) }}'
+        continue-on-error: true
       - id: prepare-error
         uses: actions/github-script@v7
         env:
           VALIDATION_FAIL_REASON: ${{ needs.update_request.outputs.failed-reason || needs.validate_request.outputs.failed-reason }}
-          REQUEST_TYPE: ${{ needs.validate_request.outputs.request-type }}
+          IS_VALIDATION_FAILED: ${{ needs.update_request.result == 'failure' || needs.validate_request.result == 'failure' || needs.diff.result == 'failure' }}
           DEPLOY_FAILED_REASON: ${{ needs.deployment.outputs.failed-reason }}
+          IS_DEPLOY_FAILED: ${{ needs.deployment.result == 'failure' }}
           DESTROY_FAILED_REASON: ${{ needs.destroy.outputs.failed-reason }}
+          IS_DESTROY_FAILED: ${{ needs.destroy.result == 'failure' }}
         with:
           script: |
-            const validationError = process.env.VALIDATION_FAIL_REASON
-            if(validationError) {
-              core.setOutput("reason", "Validation of Request form is failed.");
-              core.setOutput("details", validationError);
+            let errorDetails= "Found unknown error. Please check the logs.";
+            if(String(process.env.IS_VALIDATION_FAILED) === "true") {
+              errorDetails = process.env.VALIDATION_FAIL_REASON || errorDetails;
+              core.setOutput("reason", "Validation of Api Request form is failed.");
               core.setOutput("status", "Denied");
-            } else {
-              const requestType = process.env.REQUEST_TYPE;
-              let errorDetails= "Found unknown error. Please check the logs.";
-              let reasonPrefix = ""
-              if(requestType === "provision") {
-                if(process.env.DEPLOY_FAILED_REASON) {
-                  errorDetails = process.env.DEPLOY_FAILED_REASON;
-                }
-                reasonPrefix = "Deployment of";
-              } else {
-                if(process.env.DESTROY_FAILED_REASON) {
-                  errorDetails = process.env.DESTROY_FAILED_REASON;
-                }
-                reasonPrefix = "Destroy of";
-              }
-              core.setOutput("reason", reasonPrefix + " Infra stack is failed.");
-              core.setOutput("details", errorDetails);
+            } else if(String(process.env.IS_DEPLOY_FAILED) === "true") {
+              errorDetails = process.env.DEPLOY_FAILED_REASON || errorDetails;
+              core.setOutput("reason", "Deployment of Infra stack is failed.");
               core.setOutput("status", "Failed");
+            } else if(String(process.env.IS_DESTROY_FAILED) === "true") {
+              errorDetails = process.env.DESTROY_FAILED_REASON || errorDetails;
+              core.setOutput("reason", "Destroy of Infra Stack is failed.");
+              core.setOutput("status", "Failed");
+            } else {
+              throw new Error("could not find any fail job");
             }
+            core.setOutput("details", errorDetails);
       - name: Add Failed Reason as Comment
         uses: actions/github-script@v7
         env:
@@ -833,7 +833,7 @@ jobs:
         uses: actions/github-script@v7
         env:
           FAIL_STATUS: ${{ steps.prepare-error.outputs.status }}
-          ORIGINAL_ISSUE_TITLE: ${{ needs.update_request.outputs.original-issue-title }}
+          ORIGINAL_ISSUE_TITLE: ${{ needs.update_request.outputs.original-issue-title || github.event.issue.title }}
         with:
           script: |
             const closeUpdateResponse = await github.rest.issues.update({
