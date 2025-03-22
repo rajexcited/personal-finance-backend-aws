@@ -24,12 +24,19 @@ jobs:
           echo "Client Payload = ${{ toJson(github.event.client_payload) }}"
       - name: Print Github Context
         run: echo "github context json values = ${{ toJSON(github) }}"
+      - name: Print Context
+        uses: actions/github-script@v7
+        with:
+          script: |
+            console.log("Context: ", context);
 
   validate_payload:
     name: Validate Client Payload
     runs-on: ubuntu-latest
     environment:
       name: aws-infra-${{ github.event.client_payload.env_type }}
+    outputs:
+      branch-name: ${{ steps.get-milestone.outputs.branchName }}
     steps:
       - name: Env Config
         run: |
@@ -49,7 +56,7 @@ jobs:
             if(!Array.isArray(payload.stackTags)) {
               errors.push("stack tags is not array.");
             }
-            if(payload.type !== "provision" || payload.type !== "deprovision") {
+            if(payload.type !== "provision" && payload.type !== "deprovision") {
               errors.push("request type is not supported.");
             }
             if(!payload.ui_repository) {
@@ -63,6 +70,67 @@ jobs:
             }
             if(errors.length>0) {
               core.setFailed("client payload schema invalid. errors: [" + errors.join(",") + "]");
+            }
+      - name: Checkout
+        uses: actions/checkout@v4
+      - id: get-milestone
+        name: Validate Milestone and Branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              var branchName = "master";
+              if(context.payload.client_payload.apiVersion) {
+                // get milestone
+                const listMilestonesResponse = await github.rest.issues.listMilestones({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  state: "all"
+                });
+                console.log("listMilestonesResponse=", listMilestonesResponse);
+                const matchedMilestone = listMilestonesResponse.data.find(mlst=>mlst.title===context.payload.client_payload.apiVersion);
+                if(!matchedMilestone) {
+                  throw Error(`milestone for matching api version[${context.payload.client_payload.apiVersion}] not found.`);
+                }
+                if(matchedMilestone.state === "open") {
+                  // check milestone branch
+                  if(!matchedMilestone.due_on) {
+                    throw new Error("Milestone due date is not set");
+                  }
+                  const milestoneDueOn = new Date(matchedMilestone.due_on);
+                  if(milestoneDueOn < new Date()) {
+                    throw new Error("Milestone due date is already passed");
+                  }
+                  branchName = `milestone/${matchedMilestone.title}`;
+                }
+              }
+              if(branchName!=="master") {
+                // verify milestone branch commit has merged all of the master branch
+                const compareResponse = await github.rest.repos.compareCommits({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  base: "master",
+                  head: branchName
+                });
+                console.log("milestone branch as head and master branch as base, compareResponse: ", compareResponse);
+                if (compareResponse.data.behind_by > 0) {
+                  throw new Error(`Milestone branch [${branchName}] is behind master by ${compareResponse.data.behind_by} commits.`);
+                }
+              } else {
+                // The master branch should have api version, old versions deployment is not supported
+                // compare package.json and milestone version
+                const fs = require('fs');
+                const packageJson = fs.readFileSync('package.json', 'utf8');
+                const packageJsonObj = JSON.parse(packageJson);
+                if(`v${packageJsonObj.version}` !== context.payload.client_payload.apiVersion) {
+                  throw new Error(`Master branch package.json version [${packageJsonObj.version}] does not match with requested version [${context.payload.client_payload.apiVersion}]`);
+                }
+              }
+              core.setOutput("branchName", branchName);
+            } catch (error) {
+              console.error("failed reason: ", error);
+              core.setOutput("failedReason", `Error during milestone validation, reason: ${error.message}`);
+              core.setFailed(error.message);
             }
       - name: AWS Access
         uses: aws-actions/configure-aws-credentials@v4
@@ -137,12 +205,15 @@ jobs:
     name: UI stack diff
     runs-on: ubuntu-latest
     needs:
+      - validate_payload
       - validate_deployment
     environment:
       name: aws-infra-${{ github.event.client_payload.env_type }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate_payload.outputs.branch-name }}
       - name: Setup Node Latest
         uses: actions/setup-node@v4
         with:
@@ -241,6 +312,7 @@ jobs:
     name: deploy UI stack
     runs-on: ubuntu-latest
     needs:
+      - validate_payload
       - diff_stack
       - wait_infra_deploy
     environment:
@@ -248,6 +320,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate_payload.outputs.branch-name }}
       - name: Setup Node Latest
         uses: actions/setup-node@v4
         with:

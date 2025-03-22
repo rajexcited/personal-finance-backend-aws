@@ -6,7 +6,6 @@ on:
   issues:
     types:
       - opened
-      - deleted
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.issue.milestone.number }}-${{ github.event.issue.number }}
@@ -212,7 +211,7 @@ jobs:
                   base: "master",
                   head: milestoneBranch
                 });
-                console.log("milestone branch as base and master branch as head, compareResponse: ", compareResponse);
+                console.log("milestone branch as head and master branch as base, compareResponse: ", compareResponse);
                 if (compareResponse.data.behind_by > 0) {
                   throw new Error(`Milestone branch [${milestoneBranch}] is behind master by ${compareResponse.data.behind_by} commits.`);
                 }
