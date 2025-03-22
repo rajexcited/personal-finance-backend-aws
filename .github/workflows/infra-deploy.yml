@@ -449,6 +449,13 @@ jobs:
     outputs:
       stack-tags: ${{ steps.prepare-tags.outputs.stackTags }}
     steps:
+      - name: Display Needs
+        run: |
+          echo "Needs of Validate Request: ${{ toJson(needs.validate_request) }}"
+          echo "Needs of Update Request: ${{ toJson(needs.update_request) }}"
+          echo "Milestone branch name: ${{ needs.validate_request.outputs.milestone-branch.name }}"
+          echo "Testplan Type: ${{ needs.validate_request.outputs.testplan-type }}"
+          echo "Testplan Issue Number: ${{ needs.validate_request.outputs.testplan-issue-number }}"
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -479,6 +486,8 @@ jobs:
             stackTags.push(`testplanIssueNumber=${process.env.TESTPLAN_ISSUE_NUMBER}`);
             stackTags.push(`requestIssueNumber=${context.payload.issue.number}`);
             core.setOutput("stackTags", stackTags);
+      - run: |
+          echo "Infra Stack TAGS: ${{ join(steps.prepare-tags.outputs.stackTags, ',') }}"
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -507,6 +516,16 @@ jobs:
     outputs:
       failed-reason: ${{ steps.deploying-comment.outputs.failedReason || steps.describe-stack.outputs.failedReason || steps.update-issue-deploy-complete.outputs.failedReason }}
     steps:
+      - name: Display Needs
+        run: |
+          echo "Needs of Validate Request: ${{ toJson(needs.validate_request) }}"
+          echo "Needs of Update Request: ${{ toJson(needs.update_request) }}"
+          echo "Needs of Diff: ${{ toJson(needs.diff) }}"
+          echo "from validate request, Milestone branch name: ${{ needs.validate_request.outputs.milestone-branch.name }}"
+          echo "from validate request, Testplan Type: ${{ needs.validate_request.outputs.testplan-type }}"
+          echo "from update request, Original Issue Title: ${{ needs.update_request.outputs.original-issue-title }}"
+          echo "from validate request, Stack Details: ${{ needs.validate_request.outputs.stack-details }}"
+          echo "from diff, Stack Tags: ${{ needs.diff.outputs.stack-tags }}"
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -618,8 +637,11 @@ jobs:
           TAGS: ${{ needs.diff.outputs.stack-tags }}
         continue-on-error: true
       - id: describe-stack
+        env:
+          CDK_DEPLOY_OUTCOME: ${{ steps.cdk-deploy.outcome }}
         run: |
-          if [ "${{ steps.cdk-deploy.outcome }}" == "failure" ]; then
+          echo "cdk deploy outcome: $CDK_DEPLOY_OUTCOME"
+          if [ "$CDK_DEPLOY_OUTCOME" == "failure" ]; then
             echo "failedReason=CDK deployment failed. Check the logs for more details." >> $GITHUB_OUTPUT
             exit 1
           fi
@@ -648,6 +670,11 @@ jobs:
         with:
           script: |
             try {
+              console.log("Milestone Branch Name: ", process.env.MILESTONE_BRANCH_NAME);
+              console.log("Testplan Type: ", process.env.TESTPLAN_TYPE);
+              console.log("Deployment Start Time: ", process.env.DEPLOYMENT_START_TIME);
+              const stackDetails = ${{ steps.describe-stack.outputs.stack_details }};
+              console.log("Stack Details: ", stackDetails);
               const deploymentEndTime = new Date();
               const diffParts = new Date(new Date() - new Date(process.env.DEPLOYMENT_START_TIME)).toISOString().substr(11, 8).split(":");
               let duration = "";
@@ -671,7 +698,7 @@ jobs:
                 `| **Duration** | ${duration} |`,
                 "<br/>"
               ];
-              const stackDetails = ${{ steps.describe-stack.outputs.stack_details }};
+              
               commentBody.push("", "### Stack Outputs: ", "");
               stackDetails?.outputs.forEach(output => {
                 commentBody.push(` - **${output.OutputKey}:** ${output.OutputValue}  `);
