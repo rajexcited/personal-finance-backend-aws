@@ -557,6 +557,7 @@ jobs:
           cd dist/lambda_layer/nodejs
           npm install .
           mkdir -p dist/ui
+          touch dist/ui/dummy.txt
       - id: deploying-comment
         name: Update Issue - Deploying
         uses: actions/github-script@v7
@@ -571,7 +572,6 @@ jobs:
               core.setOutput("deploymentStartTime", deploymentStartTime);
               const commentBody = [
                 "## Infra Deployment Started",
-                "<br/>", 
                 "", "### Start Time: ", "",
                 "  " + deploymentStartTime, 
                 "", "### Milestone Branch: ", "",
@@ -635,6 +635,10 @@ jobs:
           # setup cicd role through instructions from aws-manual branch.
           role-to-assume: ${{ secrets.AWS_CICD_ROLE_ARN }}
           role-session-name: cdkSession
+      - run: |
+          aws --version
+          cdk --version
+          aws configure list
       - id: cdk-deploy
         name: cdk deploy
         uses: youyo/aws-cdk-github-actions@v2
@@ -689,16 +693,18 @@ jobs:
               console.log("Stack Details: ", stackDetails);
               const deploymentEndTime = new Date();
               const diffParts = new Date(new Date() - new Date(process.env.DEPLOYMENT_START_TIME)).toISOString().substr(11, 8).split(":");
+              const getNonZero = (value, suffix) => {
+                const pluralS = value>1? "s" : "";
+                if(value>0) { 
+                  return `${value} ${suffix}${pluralS}`; 
+                }
+                return "";
+              }
               let duration = "";
-              if(parseInt(diffParts[0]) > 0) {
-                duration += diffParts[0] + " hour" + (diffParts[0] > 1 ? "s " : " ");
-              }
-              if(parseInt(diffParts[1]) > 0) {
-                duration += diffParts[1] + " minute" + (diffParts[1] > 1 ? "s " : " ");
-              }
-              if(parseInt(diffParts[2]) > 0) {
-                duration += diffParts[2] + " second" + (diffParts[2] > 1 ? "s " : " ");
-              }
+              duration += getNonZero(parseInt(diffParts[0]), "hour") + " ";
+              duration += getNonZero(parseInt(diffParts[1]), "minute") + " ";
+              duration += getNonZero(parseInt(diffParts[2]), "second") + " ";
+              
               const commentBody = [
                 "## Infra Deployment Completed",
                 "<br/>", 
@@ -839,16 +845,14 @@ jobs:
           script: |
             const commentBody = [
                     "## Request " + process.env.FAIL_STATUS, 
-                    "<br/>", "",
-                    "### Reason:",
-                    "  " + process.env.FAIL_REASON,
-                    "", "",
+                    "", "### Reason:", "",
+                    "  " + process.env.FAIL_REASON, "",
                     "**Error:**  " + process.env.ERROR_DETAILS, 
                     "<br/>",  "",
                     "> [!NOTE]",
                     "> **Needs Action:**   Please raise a `new request form` with correct details. This request issue will be `closed`.",
                     "<br/>", "<br/>",  "",
-                    ];
+                  ];
             const workflowTitle = context.workflow +" (" + context.runId + ")";
             const workflowLink = context.payload.repository.html_url+"/actions/runs/"+context.runId;
             commentBody.push("### Request Processed By: ", `  [Workflow - ${workflowTitle}](${workflowLink})`, "");
