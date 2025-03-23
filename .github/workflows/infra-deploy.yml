@@ -370,6 +370,11 @@ jobs:
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
           MILESTONE_TITLE: ${{ github.event.issue.milestone.title }}
+          TESTPLAN_TYPE: ${{ steps.testplan-issue.outputs.testplanType }}
+          TESTPLAN_ISS_REPO: ${{ steps.testplan-issue.outputs.testplanIssue-repo }}
+          TESTPLAN_ISS_NUMBER: ${{ steps.testplan-issue.outputs.testplanIssue-number }}
+          REQUEST_ISS_REPO: ${{ github.event.repository.name }}
+          REQUEST_ISS_NUMBER: ${{ github.event.issue.number }}
         run: |
           INFRA_STACK_NAME="prsfin-$INFRA_ENV-infra-stack"
           set +e
@@ -380,18 +385,53 @@ jobs:
             echo "Infra Stack does not exist. given branch for milestone can be deployed."
             exit 0
           fi
-
-          ENV_TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].Tags[?Key=='environment'].Value")
-          if [[ "$ENV_TAG_VALUE" != "$INFRA_ENV" ]]; then
-            FAILED_REASON="Stack is deployed for other environment $ENV_TAG_VALUE stack."
+          # verify stack status
+          STACK_STATUS=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].StackStatus')
+          if [[ "$STACK_STATUS" != "CREATE_COMPLETE" && "$STACK_STATUS" != "UPDATE_COMPLETE" ]]; then
+            STACK_STATUS_REASON=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].StackStatusReason')
+            FAILED_REASON="Stack is not in complete status. The Stack Status Reason: $STACK_STATUS_REASON"
             echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
             echo "Failed Reason: $FAILED_REASON"
             exit 1
           fi
-
-          MILESTONE_TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].Tags[?Key=='milestone'].Value")
-          if [[ "$MILESTONE_TAG_VALUE" != "$MILESTONE_TITLE" ]]; then
-            FAILED_REASON="Other milestone branch is deployed to Test plan environment. Wait for completion of $MILESTONE_TAG_VALUE tests."
+          # environment tag match must never fail
+          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="environment").Value')
+          if [[ "$TAG_VALUE" != "$INFRA_ENV" ]]; then
+            FAILED_REASON="Stack is deployed for other environment $TAG_VALUE stack."
+            echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
+            echo "Failed Reason: $FAILED_REASON"
+            exit 1
+          fi
+          # check milestone 
+          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="milestone").Value')
+          if [[ "$TAG_VALUE" != "$MILESTONE_TITLE" ]]; then
+            FAILED_REASON="Other milestone branch is deployed to Test plan environment. Wait for completion of $TAG_VALUE tests."
+            echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
+            echo "Failed Reason: $FAILED_REASON"
+            exit 1
+          fi
+          # check testplan Type 
+          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="testplanType").Value')
+          if [[ "$TAG_VALUE" != "$TESTPLAN_TYPE" ]]; then
+            FAILED_REASON="The testplan type doesnot match. Found $TAG_VALUE testplan type."
+            echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
+            echo "Failed Reason: $FAILED_REASON"
+            exit 1
+          fi
+          # check testplan Issue number 
+          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="testplanIssueNumber").Value')
+          EXPECTED_TESTPLAN_ISS = "$TESTPLAN_ISS_REPO/issue-$TESTPLAN_ISS_NUMBER"
+          if [[ "$TAG_VALUE" != "$EXPECTED_TESTPLAN_ISS" ]]; then
+            FAILED_REASON="The stack is deployed for another testplan issue, $TAG_VALUE, instead of $EXPECTED_TESTPLAN_ISS."
+            echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
+            echo "Failed Reason: $FAILED_REASON"
+            exit 1
+          fi
+          # check request Issue number, make sure request is not duplicate
+          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="requestIssueNumber").Value')
+          EXPECTED_REQUEST_ISS = "$REQUEST_ISS_REPO/issue-$REQUEST_ISS_NUMBER"
+          if [[ "$TAG_VALUE" == "$EXPECTED_REQUEST_ISS" ]]; then
+            FAILED_REASON="The stack deployment is attempted with provided request form. Can not re-use same request form."
             echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
             echo "Failed Reason: $FAILED_REASON"
             exit 1
@@ -494,14 +534,15 @@ jobs:
         env:
           TESTPLAN_TYPE: ${{ needs.validate_request.outputs.testplan-type }}
           TESTPLAN_ISSUE_NUMBER: ${{ needs.validate_request.outputs.testplan-issue-number }}
+          TESTPLAN_ISSUE_REPO: ${{ needs.validate_request.outputs.testplan-issue-repo }}
         with:
           script: |
             const stackTags = [];
             stackTags.push(`workflow_run_id=${context.runId}`);
             stackTags.push(`milestone=${context.payload.issue.milestone.title}`);
             stackTags.push(`testplanType=${process.env.TESTPLAN_TYPE}`);
-            stackTags.push(`testplanIssueNumber=${process.env.TESTPLAN_ISSUE_NUMBER}`);
-            stackTags.push(`requestIssueNumber=${context.payload.issue.number}`);
+            stackTags.push(`testplanIssueNumber=${process.env.TESTPLAN_ISSUE_REPO}/issue-${process.env.TESTPLAN_ISSUE_NUMBER}`);
+            stackTags.push(`requestIssueNumber=${context.repo.repo}/issue-${context.payload.issue.number}`);
             core.setOutput("stackTags", stackTags);
       - run: |
           echo "Infra Stack TAGS: ${{ toJson(steps.prepare-tags.outputs.stackTags) }}"
