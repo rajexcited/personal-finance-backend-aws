@@ -420,7 +420,7 @@ jobs:
           fi
           # check testplan Issue number 
           TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="testplanIssueNumber").Value')
-          EXPECTED_TESTPLAN_ISS = "$TESTPLAN_ISS_REPO/issue-$TESTPLAN_ISS_NUMBER"
+          EXPECTED_TESTPLAN_ISS="$TESTPLAN_ISS_REPO/issue-$TESTPLAN_ISS_NUMBER"
           if [[ "$TAG_VALUE" != "$EXPECTED_TESTPLAN_ISS" ]]; then
             FAILED_REASON="The stack is deployed for another testplan issue, $TAG_VALUE, instead of $EXPECTED_TESTPLAN_ISS."
             echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
@@ -429,7 +429,7 @@ jobs:
           fi
           # check request Issue number, make sure request is not duplicate
           TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="requestIssueNumber").Value')
-          EXPECTED_REQUEST_ISS = "$REQUEST_ISS_REPO/issue-$REQUEST_ISS_NUMBER"
+          EXPECTED_REQUEST_ISS="$REQUEST_ISS_REPO/issue-$REQUEST_ISS_NUMBER"
           if [[ "$TAG_VALUE" == "$EXPECTED_REQUEST_ISS" ]]; then
             FAILED_REASON="The stack deployment is attempted with provided request form. Can not re-use same request form."
             echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
