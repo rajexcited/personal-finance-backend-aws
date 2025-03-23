@@ -558,6 +558,7 @@ jobs:
           npm install .
           mkdir -p dist/ui
           touch dist/ui/dummy.txt
+          ls -lrt dist/ui
       - id: deploying-comment
         name: Update Issue - Deploying
         uses: actions/github-script@v7
@@ -635,10 +636,6 @@ jobs:
           # setup cicd role through instructions from aws-manual branch.
           role-to-assume: ${{ secrets.AWS_CICD_ROLE_ARN }}
           role-session-name: cdkSession
-      - run: |
-          aws --version
-          cdk --version
-          aws configure list
       - id: cdk-deploy
         name: cdk deploy
         uses: youyo/aws-cdk-github-actions@v2
