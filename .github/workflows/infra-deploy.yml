@@ -563,8 +563,9 @@ jobs:
           jq "del(.devDependencies, .scripts, .bin)" package.json > dist/lambda_layer/nodejs/package.json
           cd dist/lambda_layer/nodejs
           npm install .
+          cd ../../..
           mkdir -p dist/ui
-          touch dist/ui/dummy.txt
+          # touch dist/ui/dummy.txt
           pwd
           echo ls -lrt
           ls -lrt
