@@ -439,7 +439,7 @@ jobs:
 
           API_CREATED_TIME=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r ".Stacks[0].CreationTime")
           API_UPDATED_TIME=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r ".Stacks[0].LastUpdatedTime")
-          API_STACK_AUDIT='{"created_time":'$API_CREATED_TIME',"updated_time":'$API_UPDATED_TIME'}'
+          API_STACK_AUDIT='{"created_time":"'$API_CREATED_TIME'","updated_time":"'$API_UPDATED_TIME'"}'
 
           STACK_AUDIT='{"api":'$API_STACK_AUDIT'}'
           echo "stack_details<<EOF" >> $GITHUB_OUTPUT
@@ -482,7 +482,7 @@ jobs:
 
           API_CREATED_TIME=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r ".Stacks[0].CreationTime")
           API_UPDATED_TIME=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r ".Stacks[0].LastUpdatedTime")
-          API_STACK_AUDIT='{"created_time":'$API_CREATED_TIME',"updated_time":'$API_UPDATED_TIME'}'
+          API_STACK_AUDIT='{"created_time":"'$API_CREATED_TIME'","updated_time":"'$API_UPDATED_TIME'"}'
           STACK_AUDIT='{"api":'$API_STACK_AUDIT'}'
           echo "stack_details<<EOF" >> $GITHUB_OUTPUT
           echo "$STACK_AUDIT" >> $GITHUB_OUTPUT
@@ -732,7 +732,7 @@ jobs:
 
           API_CREATED_TIME=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].CreationTime")
           API_UPDATED_TIME=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].LastUpdatedTime")
-          API_STACK_AUDIT='{"created_time":'$API_CREATED_TIME',"updated_time":'$API_UPDATED_TIME'}'
+          API_STACK_AUDIT='{"created_time":"'$API_CREATED_TIME'","updated_time":"'$API_UPDATED_TIME'"}'
           STACK_OUTPUTS=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].Outputs")
           STACK_AUDIT='{"api":'$API_STACK_AUDIT',"outputs":'$STACK_OUTPUTS'}'
           echo "stack_details<<EOF" >> $GITHUB_OUTPUT
@@ -761,7 +761,7 @@ jobs:
                   return `${value} ${suffix}${pluralS}`; 
                 }
                 return "";
-              }
+              };
               let duration = "";
               duration += getNonZero(parseInt(diffParts[0]), "hour") + " ";
               duration += getNonZero(parseInt(diffParts[1]), "minute") + " ";
