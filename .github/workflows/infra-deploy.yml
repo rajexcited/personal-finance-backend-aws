@@ -164,12 +164,13 @@ jobs:
     needs:
       - update_request
     outputs:
-      milestone-branch-name: ${{ steps.get-milestone.outputs.branch.name }}
+      branch-name: ${{ steps.get-milestone.outputs.branch-name }}
+      branch-url: ${{ steps.get-milestone.outputs.branch-url }}
       failed-reason: ${{ steps.get-milestone.outputs.failedReason || steps.testplan-issue.outputs.failedReason || steps.testplan-issue2.outputs.failedReason || steps.request-form.outputs.failedReason || steps.provision-stack.outputs.failedReason || steps.deprovision-stack.outputs.failedReason }}
       testplan-type: ${{ steps.testplan-issue.outputs.testplanType }}
       request-type: ${{ steps.request-form.outputs.request_type }}
-      testplan-issue-number: ${{ steps.testplan-issue.outputs.testplanIssue.number || steps.request-form.outputs.testplan_issue_number }}
-      testplan-issue-repo: ${{ steps.testplan-issue.outputs.testplanIssue.repo }}
+      testplan-issue-number: ${{ steps.testplan-issue.outputs.testplanIssue-number || steps.request-form.outputs.testplan_issue_number }}
+      testplan-issue-repo: ${{ steps.testplan-issue.outputs.testplanIssue-repo }}
       stack-details: ${{ steps.provision-stack.outputs.stack_details || steps.deprovision-stack.outputs.stack_details || '{}' }}
     environment:
       name: aws-infra-${{ needs.update_request.outputs.env-type }}
@@ -200,10 +201,13 @@ jobs:
                   branch: milestoneBranch
                 });
                 console.log("getBranchResponse: ", getBranchResponse);
-                core.setOutput("branch", {
+                const branchDetails = {
                   name: getBranchResponse.data.name, 
                   url: getBranchResponse.data._links.html
-                });
+                };
+                core.setOutput("branch", branchDetails); 
+                core.setOutput("branch-name", branchDetails.name); 
+                core.setOutput("branch-url", branchDetails.url);
                 // verify milestone branch commit has merged all of the master branch
                 const compareResponse = await github.rest.repos.compareCommits({
                   owner: context.repo.owner,
@@ -230,10 +234,13 @@ jobs:
                   repo: context.repo.repo,
                   branch: "master"
                 });
-                core.setOutput("branch", {
+                const branchDetails = {
                   name: getBranchResponse.data.name, 
                   url: getBranchResponse.data._links.html
-                });
+                };
+                core.setOutput("branch", branchDetails);
+                core.setOutput("branch-name", branchDetails.name);
+                core.setOutput("branch-url", branchDetails.url);
               }
             } catch (error) {
               console.error("failed reason: ", error);
@@ -281,11 +288,14 @@ jobs:
                   throw new Error("matching testplan issue not found")
                 }
               }
-              core.setOutput("testplanIssue", {
+              const testplanDetails = {
                   number: testplanIssueNumber,
                   repo: testplanIssueRepo,
                   allowedLabels: allowedLabels
-              });
+              };
+              core.setOutput("testplanIssue", testplanDetails);
+              core.setOutput("testplanIssue-number", testplanDetails.number);
+              core.setOutput("testplanIssue-repo", testplanDetails.repo);
             } catch(error) {
               console.error("failed reason: ", error);
               core.setOutput("failedReason", `Error during test plan validation, reason: ${error.message}`);
@@ -453,13 +463,13 @@ jobs:
         run: |
           echo "Needs of Validate Request: ${{ toJson(needs.validate_request) }}"
           echo "Needs of Update Request: ${{ toJson(needs.update_request) }}"
-          echo "Milestone branch name: ${{ needs.validate_request.outputs.milestone-branch-name }}"
+          echo "Milestone branch name: ${{ needs.validate_request.outputs.branch-name }}"
           echo "Testplan Type: ${{ needs.validate_request.outputs.testplan-type }}"
           echo "Testplan Issue Number: ${{ needs.validate_request.outputs.testplan-issue-number }}"
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.validate_request.outputs.milestone-branch-name }}
+          ref: ${{ needs.validate_request.outputs.branch-name }}
       - name: Setup Node Latest
         uses: actions/setup-node@v4
         with:
@@ -522,15 +532,16 @@ jobs:
           echo "Needs of Validate Request: ${{ toJson(needs.validate_request) }}"
           echo "Needs of Update Request: ${{ toJson(needs.update_request) }}"
           echo "Needs of Diff: ${{ toJson(needs.diff) }}"
-          echo "from validate request, Milestone branch name: ${{ needs.validate_request.outputs.milestone-branch-name }}"
+          echo "from validate request, Milestone branch name: ${{ needs.validate_request.outputs.branch-name }}"
           echo "from validate request, Testplan Type: ${{ needs.validate_request.outputs.testplan-type }}"
           echo "from update request, Original Issue Title: ${{ needs.update_request.outputs.original-issue-title }}"
           echo "from validate request, Stack Details: ${{ needs.validate_request.outputs.stack-details }}"
-          echo "from diff, Stack Tags: ${{ needs.diff.outputs.stack-tags }}"
+          echo "from validate request, Stack Details: ${{ toJson(needs.validate_request.outputs.stack-details) }}"
+          echo "from diff, Stack Tags: ${{ join(needs.diff.outputs.stack-tags) }}"
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.validate_request.outputs.milestone-branch-name }}
+          ref: ${{ needs.validate_request.outputs.branch-name }}
       - name: Setup Node Latest
         uses: actions/setup-node@v4
         with:
@@ -550,14 +561,14 @@ jobs:
         name: Update Issue - Deploying
         uses: actions/github-script@v7
         env:
-          MILESTONE_BRANCH_NAME: ${{ needs.validate_request.outputs.milestone-branch-name }}
+          MILESTONE_BRANCH_NAME: ${{ needs.validate_request.outputs.branch-name }}
           TESTPLAN_TYPE: ${{ needs.validate_request.outputs.testplan-type }}
           ORIGINAL_ISSUE_TITLE: ${{ needs.update_request.outputs.original-issue-title }}
         with:
           script: |
             try {
               const deploymentStartTime = new Date().toISOString();
-              core.setoutput("deploymentStartTime", deploymentStartTime);
+              core.setOutput("deploymentStartTime", deploymentStartTime);
               const commentBody = [
                 "## Infra Deployment Started",
                 "<br/>", 
@@ -567,7 +578,7 @@ jobs:
                 "  " + process.env.MILESTONE_BRANCH_NAME
               ];
 
-              const stackDetails = ${{ needs.validate_request.outputs.stack-details }};
+              const stackDetails = ${{ toJson(needs.validate_request.outputs.stack-details) }};
               commentBody.push("", "### API Stack: ", "");
               if(stackDetails?.api) {
                 // audit details available
@@ -635,7 +646,7 @@ jobs:
           cdk_args: "--require-approval never --exclusively"
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
-          TAGS: ${{ needs.diff.outputs.stack-tags }}
+          TAGS: ${{ join(needs.diff.outputs.stack-tags) }}
         continue-on-error: true
       - id: describe-stack
         env:
@@ -665,7 +676,7 @@ jobs:
         name: Update Issue - Deployment Complete
         uses: actions/github-script@v7
         env:
-          MILESTONE_BRANCH_NAME: ${{ needs.validate_request.outputs.milestone-branch-name }}
+          MILESTONE_BRANCH_NAME: ${{ needs.validate_request.outputs.branch-name }}
           TESTPLAN_TYPE: ${{ needs.validate_request.outputs.testplan-type }}
           DEPLOYMENT_START_TIME: ${{ steps.deploying-comment.outputs.deploymentStartTime }}
         with:
