@@ -2,7 +2,17 @@
   "app": "npx ts-node --prefer-ts-exts bin/app.ts",
   "watch": {
     "include": ["**"],
-    "exclude": ["README.md", "cdk*.json", "**/*.d.ts", "**/*.js", "tsconfig.json", "package*.json", "yarn.lock", "node_modules", "test"]
+    "exclude": [
+      "README.md",
+      "cdk*.json",
+      "**/*.d.ts",
+      "**/*.js",
+      "tsconfig.json",
+      "package*.json",
+      "yarn.lock",
+      "node_modules",
+      "test"
+    ]
   },
   "context": {
     "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
@@ -48,6 +58,35 @@
     "@aws-cdk/aws-cloudwatch-actions:changeLambdaPermissionLogicalIdForLambdaAction": true,
 
     "dev": {
+      "expenseReceipt": {
+        "temporaryKeyPrefix": "temp/",
+        "finalizeReceiptKeyPrefix": "receipts/",
+        "deleteTags": {
+          "delete": "schedule"
+        },
+        "expiration": {
+          "finalizeReceipt": "1 day",
+          "temporaryReceipt": "1 day"
+        }
+      },
+      "apigateway": {
+        "deleteUserExpiration": "1 hour",
+        "secretRotatingDuration": "1 month"
+      },
+      "cloudfront": {
+        "geoRestriction": {
+          "allowCountryCodes": ["US"]
+        },
+        "pathPrefix": {
+          "ui": "/ui",
+          "errors": "/errors",
+          "restApi": "/api"
+        },
+        "enableWebAcl": false,
+        "homepageUrl": "personal-finance"
+      }
+    },
+    "tpe": {
       "expenseReceipt": {
         "temporaryKeyPrefix": "temp/",
         "finalizeReceiptKeyPrefix": "receipts/",
