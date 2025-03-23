@@ -707,21 +707,29 @@ jobs:
           TAGS: ${{ join(needs.diff.outputs.stack-tags) }}
         continue-on-error: true
       - id: describe-stack
+        name: Describe stack
         env:
+          INFRA_ENV: ${{ vars.INFRA_ENV }}
           CDK_DEPLOY_OUTCOME: ${{ steps.cdk-deploy.outcome }}
         run: |
           echo "cdk deploy outcome: $CDK_DEPLOY_OUTCOME"
-          if [ "$CDK_DEPLOY_OUTCOME" == "failure" ]; then
-            echo "failedReason=CDK deployment failed. Check the logs for more details." >> $GITHUB_OUTPUT
-            exit 1
-          fi
           INFRA_STACK_NAME="prsfin-$INFRA_ENV-infra-stack"
+          set +e
           DESCRIBE_STACK_OUT=$(aws cloudformation describe-stacks --stack-name "$INFRA_STACK_NAME")
           RET_CODE=$?
+          set -e
           if [[ $RET_CODE -ne 0 ]]; then
             echo "failedReason=Failed to describe stack. Error: $DESCRIBE_STACK_OUT" >> $GITHUB_OUTPUT
             exit $RET_CODE
           fi
+          if [ "$CDK_DEPLOY_OUTCOME" == "failure" ]; then
+            STACK_STATUS=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].StackStatus')
+            STACK_STATUS_REASON=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].StackStatusReason')
+            FAILED_REASON="CDK deployment failed. please check logs for details. Stack Status is $STACK_STATUS and Reason: $STACK_STATUS_REASON"
+            echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
           API_CREATED_TIME=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].CreationTime")
           API_UPDATED_TIME=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].LastUpdatedTime")
           API_STACK_AUDIT='{"created_time":'$API_CREATED_TIME',"updated_time":'$API_UPDATED_TIME'}'
