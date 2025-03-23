@@ -164,7 +164,7 @@ jobs:
     needs:
       - update_request
     outputs:
-      milestone-branch: ${{ steps.get-milestone.outputs.branch }}
+      milestone-branch-name: ${{ steps.get-milestone.outputs.branch.name }}
       failed-reason: ${{ steps.get-milestone.outputs.failedReason || steps.testplan-issue.outputs.failedReason || steps.testplan-issue2.outputs.failedReason || steps.request-form.outputs.failedReason || steps.provision-stack.outputs.failedReason || steps.deprovision-stack.outputs.failedReason }}
       testplan-type: ${{ steps.testplan-issue.outputs.testplanType }}
       request-type: ${{ steps.request-form.outputs.request_type }}
@@ -453,13 +453,13 @@ jobs:
         run: |
           echo "Needs of Validate Request: ${{ toJson(needs.validate_request) }}"
           echo "Needs of Update Request: ${{ toJson(needs.update_request) }}"
-          echo "Milestone branch name: ${{ needs.validate_request.outputs.milestone-branch.name }}"
+          echo "Milestone branch name: ${{ needs.validate_request.outputs.milestone-branch-name }}"
           echo "Testplan Type: ${{ needs.validate_request.outputs.testplan-type }}"
           echo "Testplan Issue Number: ${{ needs.validate_request.outputs.testplan-issue-number }}"
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.validate_request.outputs.milestone-branch.name }}
+          ref: ${{ needs.validate_request.outputs.milestone-branch-name }}
       - name: Setup Node Latest
         uses: actions/setup-node@v4
         with:
@@ -487,7 +487,8 @@ jobs:
             stackTags.push(`requestIssueNumber=${context.payload.issue.number}`);
             core.setOutput("stackTags", stackTags);
       - run: |
-          echo "Infra Stack TAGS: ${{ join(steps.prepare-tags.outputs.stackTags, ',') }}"
+          echo "Infra Stack TAGS: ${{ toJson(steps.prepare-tags.outputs.stackTags) }}"
+          echo "Infra Stack TAGS: ${{ join(steps.prepare-tags.outputs.stackTags) }}"
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -502,7 +503,7 @@ jobs:
           actions_comment: false
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
-          TAGS: ${{ join(steps.prepare-tags.outputs.stackTags, ',') }}
+          TAGS: ${{ join(steps.prepare-tags.outputs.stackTags) }}
 
   deployment:
     name: Deploy Infra Stack
@@ -521,7 +522,7 @@ jobs:
           echo "Needs of Validate Request: ${{ toJson(needs.validate_request) }}"
           echo "Needs of Update Request: ${{ toJson(needs.update_request) }}"
           echo "Needs of Diff: ${{ toJson(needs.diff) }}"
-          echo "from validate request, Milestone branch name: ${{ needs.validate_request.outputs.milestone-branch.name }}"
+          echo "from validate request, Milestone branch name: ${{ needs.validate_request.outputs.milestone-branch-name }}"
           echo "from validate request, Testplan Type: ${{ needs.validate_request.outputs.testplan-type }}"
           echo "from update request, Original Issue Title: ${{ needs.update_request.outputs.original-issue-title }}"
           echo "from validate request, Stack Details: ${{ needs.validate_request.outputs.stack-details }}"
@@ -529,7 +530,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.validate_request.outputs.milestone-branch.name }}
+          ref: ${{ needs.validate_request.outputs.milestone-branch-name }}
       - name: Setup Node Latest
         uses: actions/setup-node@v4
         with:
@@ -549,7 +550,7 @@ jobs:
         name: Update Issue - Deploying
         uses: actions/github-script@v7
         env:
-          MILESTONE_BRANCH_NAME: ${{ needs.validate_request.outputs.milestone-branch.name }}
+          MILESTONE_BRANCH_NAME: ${{ needs.validate_request.outputs.milestone-branch-name }}
           TESTPLAN_TYPE: ${{ needs.validate_request.outputs.testplan-type }}
           ORIGINAL_ISSUE_TITLE: ${{ needs.update_request.outputs.original-issue-title }}
         with:
@@ -664,7 +665,7 @@ jobs:
         name: Update Issue - Deployment Complete
         uses: actions/github-script@v7
         env:
-          MILESTONE_BRANCH_NAME: ${{ needs.validate_request.outputs.milestone-branch.name }}
+          MILESTONE_BRANCH_NAME: ${{ needs.validate_request.outputs.milestone-branch-name }}
           TESTPLAN_TYPE: ${{ needs.validate_request.outputs.testplan-type }}
           DEPLOYMENT_START_TIME: ${{ steps.deploying-comment.outputs.deploymentStartTime }}
         with:
