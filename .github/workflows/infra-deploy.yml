@@ -481,7 +481,14 @@ jobs:
           npm run build
           mkdir -p dist/lambda_layer/nodejs
           jq "del(.devDependencies, .scripts, .bin)" package.json > dist/lambda_layer/nodejs/package.json
+          pwd
           mkdir -p dist/ui
+          echo ls -lrt
+          ls -lrt
+          echo ls -lrt dist
+          ls -lrt dist
+          echo ls -lrt ../
+          ls -lrt ../
       - id: prepare-tags
         uses: actions/github-script@v7
         env:
@@ -558,7 +565,15 @@ jobs:
           npm install .
           mkdir -p dist/ui
           touch dist/ui/dummy.txt
+          pwd
+          echo ls -lrt
+          ls -lrt
+          echo ls -lrt dist
+          ls -lrt dist
+          echo ls -lrt dist/ui
           ls -lrt dist/ui
+          echo ls -lrt ../
+          ls -lrt ../
       - id: deploying-comment
         name: Update Issue - Deploying
         uses: actions/github-script@v7
