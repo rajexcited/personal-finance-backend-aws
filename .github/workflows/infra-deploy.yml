@@ -8,7 +8,7 @@ on:
       - opened
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.issue.milestone.number }}-${{ github.event.issue.number }}
+  group: ${{ github.workflow }}-${{ github.event.issue.milestone.number }}-${{ toJson(github.event.issue.labels.*.name) }}
   cancel-in-progress: true
 
 permissions:
@@ -638,10 +638,25 @@ jobs:
 
               const stackDetails = ${{ toJson(needs.validate_request.outputs.stack-details) }};
               commentBody.push("", "### API Stack: ", "");
+              // Convert UTC to Central Time
+              const centralTimeFormat = new Intl.DateTimeFormat("en-US", {
+                timeZone: "America/Chicago", 
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                timeZoneName: "short"
+              });
+              const toTime = (datetime) => {
+                const date = new Date(datetime);
+                return centralTimeFormat.format(date);
+              };
               if(stackDetails?.api) {
                 // audit details available
-                commentBody.push("- **Created On:**  " + stackDetails.api.created_time);
-                commentBody.push("- **Updated On:**  " + stackDetails.api.updated_time);
+                commentBody.push("- **Created On:**  " + toTime(stackDetails.api.created_time));
+                commentBody.push("- **Updated On:**  " + toTime(stackDetails.api.updated_time));
               } else {
                 commentBody.push("API Stack is not found. It seems to be first deployment.");
               }
@@ -754,7 +769,7 @@ jobs:
               const stackDetails = ${{ steps.describe-stack.outputs.stack_details }};
               console.log("Stack Details: ", stackDetails);
               const deploymentEndTime = new Date();
-              const diffParts = new Date(new Date() - new Date(process.env.DEPLOYMENT_START_TIME)).toISOString().substr(11, 8).split(":");
+              const diffParts = new Date(deploymentEndTime - new Date(process.env.DEPLOYMENT_START_TIME)).toISOString().substr(11, 8).split(":");
               const getNonZero = (value, suffix) => {
                 const pluralS = value>1? "s" : "";
                 if(value>0) { 
@@ -787,10 +802,25 @@ jobs:
                 commentBody.push("  No outputs found.");
               }
               commentBody.push("", "### Stack Audit: ", "");
+              // Convert UTC to Central Time
+              const centralTimeFormat = new Intl.DateTimeFormat("en-US", {
+                timeZone: "America/Chicago", 
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                timeZoneName: "short"
+              });
+              const toTime = (datetime) => {
+                const date = new Date(datetime);
+                return centralTimeFormat.format(date);
+              };
               if(stackDetails?.api) {
                 // audit details available
-                commentBody.push("- **Created On:**  " + stackDetails.api.created_time);
-                commentBody.push("- **Updated On:**  " + stackDetails.api.updated_time);
+                commentBody.push("- **Created On:**  " + toTime(stackDetails.api.created_time));
+                commentBody.push("- **Updated On:**  " + toTime(stackDetails.api.updated_time));
               }
 
               commentBody.push("<br/>", "");
