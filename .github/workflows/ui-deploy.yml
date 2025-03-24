@@ -170,7 +170,14 @@ jobs:
           name: ${{ github.event.client_payload.artifact_name }}
       - name: Copy artifact files to UI asset directory
         run: |
+          pwd
+          echo ls -lrt
+          ls -lrt
+          echo ls -lrt dist
+          ls -lrt dist
+          echo ls -lrt dist/$ARTIFACT_NAME
           ls -lrt dist/$ARTIFACT_NAME
+          echo "copying artifact folder to ui"
           cp -r dist/$ARTIFACT_NAME/* dist/ui
         env:
           ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
