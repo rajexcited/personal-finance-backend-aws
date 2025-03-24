@@ -163,7 +163,7 @@ jobs:
       - name: download UI artifact
         uses: actions/download-artifact@v4
         with:
-          path: dist/
+          path: dist/ui/
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.event.client_payload.ui_repository }}
           run-id: ${{ github.event.client_payload.workflow_run_id }}
@@ -175,23 +175,30 @@ jobs:
           ls -lrt
           echo ls -lrt dist
           ls -lrt dist
-          echo ls -lrt dist/$ARTIFACT_NAME
-          ls -lrt dist/$ARTIFACT_NAME
-          echo "copying artifact folder to ui"
-          cp -r dist/$ARTIFACT_NAME/* dist/ui
+          # echo ls -lrt dist/$ARTIFACT_NAME
+          # ls -lrt dist/$ARTIFACT_NAME
+          # echo "copying artifact folder to ui"
+          # cp -r dist/$ARTIFACT_NAME/* dist/ui
         env:
           ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
       - name: validate UI asset directory structure
         run: |
+          echo ls -lrt dist
+          ls -lrt dist
+          echo ls -lrt dist/ui
           ls -lrt dist/ui
           ls -lrt dist/ui/index.html
-          ls -lrt dist/ui/static
           ls -lrt dist/ui/logo.jpeg
           ls -lrt dist/ui/logo192.png
-          ls -lrt dist/ui/static/css
-          ls -lrt dist/ui/static/js
-          ls -lrt dist/ui/static/media
           ls -lrt dist/ui/favicon.ico
+          echo ls -lrt dist/ui/static
+          ls -lrt dist/ui/static
+          echo ls -lrt dist/ui/static/css
+          ls -lrt dist/ui/static/css
+          echo ls -lrt dist/ui/static/js
+          ls -lrt dist/ui/static/js
+          echo ls -lrt dist/ui/static/media
+          ls -lrt dist/ui/static/media
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -374,14 +381,14 @@ jobs:
       - name: download UI artifact
         uses: actions/download-artifact@v4
         with:
-          path: dist/
+          path: dist/ui/
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.event.client_payload.ui_repository }}
           run-id: ${{ github.event.client_payload.workflow_run_id }}
           name: ${{ github.event.client_payload.artifact_name }}
-      - run: ls -lrt dist/${{ github.event.client_payload.artifact_name }}
+      # - run: ls -lrt dist/${{ github.event.client_payload.artifact_name }}
       - run: |
-          cp -r dist/$ARTIFACT_NAME/* dist/ui
+          # cp -r dist/$ARTIFACT_NAME/* dist/ui
           ls -lrt dist/ui
         env:
           ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
