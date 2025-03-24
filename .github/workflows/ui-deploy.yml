@@ -67,6 +67,9 @@ jobs:
             if(!payload.ui_repository) {
               errors.push("ui_repository is not provided");
             }
+            if(!payload.ui_repository.startsWith(context.repo.owner)) {
+              errors.push("ui_repository owner is not correct");
+            }
             if(!payload.workflow_run_id) {
               errors.push("workflow_run_id is not provided");
             }
