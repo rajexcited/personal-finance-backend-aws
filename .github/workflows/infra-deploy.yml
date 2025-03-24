@@ -96,9 +96,9 @@ jobs:
       ) &&
       github.event.issue.milestone != null
     outputs:
-      failed-reason: ${{ steps.update_request.outputs.failedReason || steps.env-request.outputs.failedReason }}
+      failed-reason: ${{ steps.update-request.outputs.failedReason || steps.env-request.outputs.failedReason }}
       env-type: ${{ steps.env-request.outputs.env_type }}
-      original-issue-title: ${{ steps.update_issue_start.outputs.issue-title }}
+      original-issue-title: ${{ steps.update-request.outputs.issue-title }}
     steps:
       - run: |
           echo "The issue has milestone assigned and locked."
@@ -106,7 +106,7 @@ jobs:
           echo "This request form is raised by owner."
           echo "This request form title indicates that It is related to provision or deprovision test plan environment."
           echo "We will validate request form issue details."
-      - id: update_request
+      - id: update-request
         name: Update Issue - Start Processing
         uses: actions/github-script@v7
         with:
@@ -626,18 +626,6 @@ jobs:
         with:
           script: |
             try {
-              const deploymentStartTime = new Date().toISOString();
-              core.setOutput("deploymentStartTime", deploymentStartTime);
-              const commentBody = [
-                "## Infra Deployment Started",
-                "", "### Start Time: ", "",
-                "  " + deploymentStartTime, 
-                "", "### Milestone Branch: ", "",
-                "  " + process.env.MILESTONE_BRANCH_NAME
-              ];
-
-              const stackDetails = ${{ toJson(needs.validate_request.outputs.stack-details) }};
-              commentBody.push("", "### API Stack: ", "");
               // Convert UTC to Central Time
               const centralTimeFormat = new Intl.DateTimeFormat("en-US", {
                 timeZone: "America/Chicago", 
@@ -653,6 +641,19 @@ jobs:
                 const date = new Date(datetime);
                 return centralTimeFormat.format(date);
               };
+              const deploymentStartTime = new Date().toISOString();
+              core.setOutput("deploymentStartTime", deploymentStartTime);
+              const commentBody = [
+                "## Infra Deployment Started",
+                "", "### Start Time: ", "",
+                "  " + toTime(deploymentStartTime), 
+                "", "### Milestone Branch: ", "",
+                "  " + process.env.MILESTONE_BRANCH_NAME
+              ];
+
+              const stackDetails = ${{ toJson(needs.validate_request.outputs.stack-details) }};
+              commentBody.push("", "### API Stack: ", "");
+              
               if(stackDetails?.api) {
                 // audit details available
                 commentBody.push("- **Created On:**  " + toTime(stackDetails.api.created_time));
@@ -757,17 +758,28 @@ jobs:
         name: Update Issue - Deployment Complete
         uses: actions/github-script@v7
         env:
-          MILESTONE_BRANCH_NAME: ${{ needs.validate_request.outputs.branch-name }}
-          TESTPLAN_TYPE: ${{ needs.validate_request.outputs.testplan-type }}
           DEPLOYMENT_START_TIME: ${{ steps.deploying-comment.outputs.deploymentStartTime }}
         with:
           script: |
             try {
-              console.log("Milestone Branch Name: ", process.env.MILESTONE_BRANCH_NAME);
-              console.log("Testplan Type: ", process.env.TESTPLAN_TYPE);
               console.log("Deployment Start Time: ", process.env.DEPLOYMENT_START_TIME);
               const stackDetails = ${{ steps.describe-stack.outputs.stack_details }};
               console.log("Stack Details: ", stackDetails);
+              // Convert UTC to Central Time
+              const centralTimeFormat = new Intl.DateTimeFormat("en-US", {
+                timeZone: "America/Chicago", 
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                timeZoneName: "short"
+              });
+              const toTime = (datetime) => {
+                const date = new Date(datetime);
+                return centralTimeFormat.format(date);
+              };
               const deploymentEndTime = new Date();
               const diffParts = new Date(deploymentEndTime - new Date(process.env.DEPLOYMENT_START_TIME)).toISOString().substr(11, 8).split(":");
               const getNonZero = (value, suffix) => {
@@ -788,8 +800,8 @@ jobs:
                 "", "### Deployment Time: ", "",
                 "| | time |", 
                 "|---|---|",
-                `| **Start Time** | ${process.env.DEPLOYMENT_START_TIME} |`,
-                `| **End Time** | ${deploymentEndTime.toISOString()} |`,
+                `| **Start Time** | ${toTime(process.env.DEPLOYMENT_START_TIME)} |`,
+                `| **End Time** | ${toTime(deploymentEndTime.toISOString())} |`,
                 `| **Duration** | ${duration} |`,
                 "<br/>"
               ];
@@ -802,21 +814,7 @@ jobs:
                 commentBody.push("  No outputs found.");
               }
               commentBody.push("", "### Stack Audit: ", "");
-              // Convert UTC to Central Time
-              const centralTimeFormat = new Intl.DateTimeFormat("en-US", {
-                timeZone: "America/Chicago", 
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-                timeZoneName: "short"
-              });
-              const toTime = (datetime) => {
-                const date = new Date(datetime);
-                return centralTimeFormat.format(date);
-              };
+              
               if(stackDetails?.api) {
                 // audit details available
                 commentBody.push("- **Created On:**  " + toTime(stackDetails.api.created_time));
