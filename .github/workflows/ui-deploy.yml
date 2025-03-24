@@ -350,7 +350,7 @@ jobs:
             echo "Infra Api Stack deployment is taking longer time than expected. please validate stack manually"
             exit 1
           fi
-          DISTRIBUTION_ID=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r '.Stacks[0].Outputs[] | select(.OutputKey | starts_with("DistributionId")).OutputValue')
+          DISTRIBUTION_ID=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r '.Stacks[0].Outputs[] | select(.OutputKey[0:14] == "DistributionId").OutputValue')
           echo "distribution_id=$DISTRIBUTION_ID" >> $GITHUB_OUTPUT
 
   deployment:
