@@ -81,7 +81,7 @@ jobs:
     needs:
       - required_props
     environment:
-      name: aws-infra-testplan
+      name: aws-infra-development
     steps:
       - name: Milestone matches
         env:
