@@ -36,8 +36,6 @@ def validate_test_plan_issue_link(test_plan_dict_value: Any, request_form_issue_
         raise ValueError("Test plan issue link is not in correct format")
     if linkMatch.group(1).lower() != testplan_type.lower():
         raise ValueError("Test Plan type does not match")
-    testplan_issue_number = int(linkMatch.group(2))
-    export_to_env({"testplan_issue_number": testplan_issue_number})
 
 
 def export_to_env(env_to_export: Dict[str, str]):
