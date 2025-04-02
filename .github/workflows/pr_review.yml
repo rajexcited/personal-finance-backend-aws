@@ -80,6 +80,8 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - required_props
+    environment:
+      name: aws-infra-testplan
     steps:
       - name: Milestone matches
         env:
@@ -105,6 +107,7 @@ jobs:
             console.log("milestone branch as head and master branch as base, compareResponse: ", compareResponse);
             if (compareResponse.data.behind_by > 0) {
               core.setFailed(`Milestone branch is behind master by ${compareResponse.data.behind_by} commits.`);
+              throw new Error(`Milestone branch is behind master by ${compareResponse.data.behind_by} commits.`);
             }
       - name: All issues closed
         uses: actions/github-script@v7
@@ -120,63 +123,89 @@ jobs:
             const listIssuesWithoutPr = listIssuesResponse.data.filter(iss=>iss.url!==context.payload.pull_request._links.issue.href);
             if(listIssuesWithoutPr.length > 0) {
                 core.setFailed(`Found ${listIssuesWithoutPr.length} open issues for milestone ${context.payload.pull_request.milestone.title}. Resolved all issues before merging.`);
+                throw new Error(`Found ${listIssuesWithoutPr.length} open issues for milestone ${context.payload.pull_request.milestone.title}. Resolved all issues before merging.`);
             }
-      - name: Regression testplan
+      - id: find-regression-testplan
         uses: actions/github-script@v7
         with:
           script: |
-            const getRegressionTestplanIssue = async (pageNo) => {
-                pageNo = pageNo || 1;
-                if(pageNo > 5) {
-                    return [];
-                }
-                console.log("pageNo: ", pageNo);
-                const listIssuesResponse = await github.rest.issues.listForRepo({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    state: "all",
-                    milestone: context.payload.pull_request.milestone.number,
-                    labels: ["regression", "test plan"],
-                    sort: "updated"
-                });
-                console.log("listIssuesResponse: ", listIssuesResponse);
-                const filteredIssues = listIssuesResponse.data.filter(iss=>iss.title.startsWith("[Testplan]: Regression Test Plan"));
-                if(filteredIssues.length > 0) {
-                    return filteredIssues;
-                }
-                return await getRegressionTestplanIssue(pageNo+1)
-            };
-            const listRegressionIssues = await getRegressionTestplanIssue();
-            if(listRegressionIssues.length === 0 ) {
-                core.setFailed(`Regression tesplan is not found for milestone ${context.payload.pull_request.milestone.title}. Make sure to execute regression testplan before merging.`);
-                throw new Error(`Regression tesplan is not found for milestone ${context.payload.pull_request.milestone.title}. Make sure to execute regression testplan before merging.`);
+            // Fetch all comments on the pull request
+            const listCommentsResponse = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number
+            });
+            console.log("listCommentsResponse: ", listCommentsResponse);
+            const testplanIssueRegex = new RegExp(".+regression test plan:.+https://github.com/"+context.repo.owner+"/([^/]+)/issues/(\\d+).*", "i");
+            const matchedComment = listCommentsResponse.data.find(comment=>testplanIssueRegex.test(comment.body));
+            if(!matchedComment) {
+              core.setFailed("regression testplan execution issue is not found.");
+              throw new Error("regression testplan execution issue is not found.");
             }
-            const openRegressionIssue = listRegressionIssues.find(iss=>iss.state==="open");
-            if(openRegressionIssue) {
-                // if this runs after all issues closed step, we never get error. but in case of step execute order changes
-                core.setFailed(`regression testplan issue [#${openRegressionIssue.number}] is not completed yet`);
-                throw new Error(`regression testplan issue [#${openRegressionIssue.number}] is not completed yet`);
+            const matchedTestplanGroups = testplanIssueRegex.exec(matchedComment.body);
+            console.log("found matched testplan groups: ", matchedTestplanGroups);
+            const testplanIssueRepo = matchedTestplanGroups[1];
+            const testplanIssueNumber = matchedTestplanGroups[2];
+            core.setOutput("testplanIssueRepo", testplanIssueRepo);
+            core.setOutput("testplanIssueNumber", testplanIssueNumber);
+            if(testplanIssueRepo !== context.repo.repo) {
+              return;
             }
-            const hasCompleteComment = async ind => {
-                ind = ind || 0;
-                if(ind===listRegressionIssues.length) {
-                    return false;
-                }
-                const regressionIssue = listRegressionIssues[ind];
-                const listCommentsResponse = await github.rest.issues.listComments({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: regressionIssue.number
-                });
-                console.log("listCommentsResponse: ", listCommentsResponse);
-                const foundCompleteComment=!!listCommentsResponse.data.find(comment=> comment.body.includes("There are no critical issues") && comment.body.includes("Status-All%20Good"));
-                if (foundCompleteComment) {
-                    return true;
-                }
-                return await hasCompleteComment(ind+1);
-            };
-            const isRegressionCompleted = await hasCompleteComment();
-            if(!isRegressionCompleted) {
+            const getIssueResponse = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: testplanIssueNumber
+            });
+            console.log("getIssueResponse: ", getIssueResponse);
+            core.setOutput("testplanIssue", getIssueResponse.data);
+            const listCommentsResponse2 = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: testplanIssueNumber
+            });
+            console.log("listCommentsResponse2: ", listCommentsResponse2);
+            core.setOutput("testplanIssueComments", listCommentsResponse2.data);
+      - id: find-ui-regression-testplan
+        if: steps.find-regression-testplan.outputs.testplanIssueRepo != github.event.pull_request.base.repo.name
+        uses: actions/github-script@v7
+        env:
+          TESTPLAN_ISSUE_NUMBER: ${{ steps.find-regression-testplan.outputs.testplanIssueNumber }}
+          TESTPLAN_ISSUE_REPO: ${{ steps.find-regression-testplan.outputs.testplanIssueRepo }}
+        with:
+          github-token: ${{ secrets.REPO_AWS_PAT }}
+          script: |
+            const getIssueResponse = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: process.env.TESTPLAN_ISSUE_REPO,
+              issue_number: process.env.TESTPLAN_ISSUE_NUMBER
+            });
+            console.log("getIssueResponse: ", getIssueResponse);
+            core.setOutput("testplanIssue", getIssueResponse.data);
+            const listCommentsResponse = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: process.env.TESTPLAN_ISSUE_REPO,
+              issue_number: process.env.TESTPLAN_ISSUE_NUMBER
+            });
+            console.log("listCommentsResponse: ", listCommentsResponse);
+            core.setOutput("testplanIssueComments", listCommentsResponse.data);
+      - name: Validate Regression testplan
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const testplanIssue = ${{ steps.find-regression-testplan.outputs.testplanIssue || steps.find-ui-regression-testplan.outputs.testplanIssue || '{}' }};
+            const testplanIssueComments = ${{ steps.find-regression-testplan.outputs.testplanIssueComments || steps.find-ui-regression-testplan.outputs.testplanIssueComments || '[]' }};
+            if(!testplanIssue.number || testplanIssueComments.length===0 || testplanIssue.state !== "closed") {
+              core.setFailed("completed regression testplan not found");
+              throw new Error("completed regression testplan not found");
+            }
+            const allowedLabels = ["regression", "test plan"];
+            const issueLables = testplanIssue.labels.filter(lbl=>allowedLabels.includes(lbl.name));
+            if(issueLables.length !== allowedLabels.length) {
+              core.setFailed("provided issue link in comment is not regression testplan");
+              throw new Error("provided issue link in comment is not regression testplan");
+            }
+            const foundCompleteComment=!!testplanIssueComments.find(comment=> comment.body.includes("There are no critical issues") && comment.body.includes("Status-All%20Good"));
+            if (!foundCompleteComment) {
                 core.setFailed("Regression issue is closed but all critical issues are not resolved.");
                 throw new Error("Regression issue is closed but all critical issues are not resolved.");
             }
