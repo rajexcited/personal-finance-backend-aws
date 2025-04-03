@@ -36,8 +36,8 @@ jobs:
     environment:
       name: aws-infra-${{ github.event.client_payload.env_type }}
     outputs:
-      branch-name: ${{ steps.get-milestone.outputs.branchName }}
-      failed-reason: ${{ steps.payload-schema.outputs.failedReason || steps.get-milestone.outputs.failedReason }}
+      branch-name: ${{ steps.get-milestone-testplan.outputs.branchName || steps.get-milestone-prod.outputs.tagRefName }}
+      failed-reason: ${{ steps.payload-schema.outputs.failedReason || steps.get-milestone-testplan.outputs.failedReason || steps.get-milestone-prod.outputs.failedReason }}
     steps:
       - name: Env Config
         run: |
@@ -83,7 +83,8 @@ jobs:
             }
       - name: Checkout
         uses: actions/checkout@v4
-      - id: get-milestone
+      - id: get-milestone-testplan
+        if: github.event.client_payload.is_testplan == 'true'
         name: Validate Milestone and Branch
         uses: actions/github-script@v7
         with:
@@ -142,6 +143,14 @@ jobs:
               core.setOutput("failedReason", `Error during milestone validation, reason: ${error.message}`);
               core.setFailed(error.message);
             }
+      - name: Setup Node Latest
+        # https://github.com/actions/setup-node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "latest"
+          cache: "npm"
+      - run: |
+          npm install @aws-sdk/client-cloudformation
       - name: AWS Access
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -149,6 +158,44 @@ jobs:
           # setup cicd role through instructions from aws-manual branch.
           role-to-assume: ${{ secrets.AWS_CICD_ROLE_ARN }}
           role-session-name: cdkSession
+      - id: get-milestone-prod
+        name: Validate Milestone and Branch
+        if: github.event.client_payload.is_prod == 'true'
+        uses: actions/github-script@v7
+        env:
+          INFRA_ENV: ${{ vars.INFRA_ENV }}
+        with:
+          script: |
+            try {
+              const { CloudFormationClient, DescribeStacksCommand } = require("@aws-sdk/client-cloudformation");
+              // Initialize CloudFormation client
+              // https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/cloudformation/command/DescribeStacksCommand/
+              const cloudFormationClient = new CloudFormationClient();
+              const stackSuccessRegex = new RegExp("^CREATE_COMPLETE|UPDATE_COMPLETE$");
+              const describeStackCommand = new DescribeStacksCommand({ StackName: `prsfin-${process.env.INFRA_ENV}-infra-stack` });
+              const describeStackResponse = await cloudFormationClient.send(describeStackCommand);
+              console.log("describeStackResponse:", describeStackResponse);
+              // check status
+              if(!stackSuccessRegex.test(describeStackResponse.Stacks[0].StackStatus)) {
+                throw new Error(`Infra Stack deployment is not success. found undesired Status [${describeStackResponse.StackStatus}] with reason, ${describeStackResponse.StackStatusReason}. Please check stack events for more details.`);
+              }
+              // find latest deployed tag
+              const milestoneTag = describeStackResponse.Stacks[0].Tags.find(tag=>tag.Key==="milestone");
+              if(!milestoneTag?.Value) {
+                throw new Error("deployed version not found");
+              }
+              const getRefResponse = await github.rest.repos.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${milestoneTag.Value}`
+              });
+              console.log("getRefResponse: ", getRefResponse);
+              core.setOutput("tagRefName", tagRef.ref);
+            } catch (error) {
+              console.error("failed reason: ", error);
+              core.setOutput("failedReason", `Error during milestone validation, reason: ${error.message}`);
+              core.setFailed(error.message);
+            }
 
   validate_deployment:
     name: Validate deployment
@@ -158,6 +205,8 @@ jobs:
     if: github.event.client_payload.type == 'provision'
     environment:
       name: aws-infra-${{ github.event.client_payload.env_type }}
+    outputs:
+      failed-reason: ${{ steps.validate-uistack-status.outputs.failedReason }}
     steps:
       - run: mkdir -p dist/ui
       - name: download UI artifact
@@ -207,9 +256,11 @@ jobs:
           role-to-assume: ${{ secrets.AWS_CICD_ROLE_ARN }}
           role-session-name: cdkSession
       - name: Validate UI stack status
+        id: validate-uistack-status
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
           MILESTONE_TITLE: ${{ github.event.client_payload.milestone }}
+          IS_TESTPLAN: ${{ github.event.client_payload.is_testplan }}
         run: |
           FAILED_REASON=""
           UI_STACK_NAME="prsfin-$INFRA_ENV-ui-deploy-stack"
@@ -238,13 +289,15 @@ jobs:
             echo "Failed Reason: $FAILED_REASON"
             exit 1
           fi
-          # check milestone 
-          TAG_VALUE=$(echo "$DESCRIBE_UI_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="milestone").Value')
-          if [[ "$TAG_VALUE" != "$MILESTONE_TITLE" ]]; then
-            FAILED_REASON="Other milestone branch is deployed to Test plan environment. Wait for completion of $TAG_VALUE tests."
-            echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
-            echo "Failed Reason: $FAILED_REASON"
-            exit 1
+          if [[ "$IS_TESTPLAN" == "true" ]]; then
+            # check milestone 
+            TAG_VALUE=$(echo "$DESCRIBE_UI_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="milestone").Value')
+            if [[ "$TAG_VALUE" != "$MILESTONE_TITLE" ]]; then
+              FAILED_REASON="Other milestone branch is deployed to Test plan environment. Wait for completion of $TAG_VALUE tests."
+              echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
+              echo "Failed Reason: $FAILED_REASON"
+              exit 1
+            fi
           fi
 
   diff_stack:

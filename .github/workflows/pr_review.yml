@@ -1,0 +1,264 @@
+# For Pull request - verifies whether there are any issues for milestone opened?
+name: PR Milestone issues
+
+# https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#pull_request
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+      - milestoned
+      - demilestoned
+      - ready_for_review
+    branches:
+      - "master"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  workflow_eligible:
+    name: Workflow Run eligibility
+    runs-on: ubuntu-latest
+    outputs:
+      is-runnable: ${{ steps.pr-open.outputs.is-open != 'true' && steps.source-branch.outputs.non-mileston-pattern != 'true' }}
+    steps:
+      - name: Display Github object
+        run: |
+          echo 'github json: ${{ toJson(github) }}'
+      - name: Display Context and rest availabilities
+        uses: actions/github-script@v7
+        with:
+          script: |
+            console.log("Context obj: ", context);
+            console.log("Github config: ", github)
+            console.log("Github Rest API config: ", github.rest)
+            console.log("Github Rest Issues API:", github.rest.issues)
+      - id: pr-open
+        name: PR Should be open
+        if: github.event.pull_request.state != 'open'
+        run: |
+          echo "state should be open, skipping"
+          echo "is-open=true" >> $GITHUB_OUTPUT
+      - id: source-branch
+        name: PR source branch milestone
+        if: ${{ !startsWith(github.event.pull_request.head.ref, 'ref/head/milestone/') }}
+        run: |
+          echo "source branch for PR should be milestone, skipping"
+          echo "found other source branch, ${{ github.event.pull_request.head.ref }}"
+          echo "non-milestone-pattern=true" >> $GITHUB_OUTPUT
+
+  required_props:
+    name: validate PR Props
+    runs-on: ubuntu-latest
+    needs:
+      - workflow_eligible
+    if: needs.workflow_eligible.outputs.is-runnable == 'true'
+    steps:
+      - name: Dont have milestone
+        if: github.event.pull_request.milestone == null
+        run: |
+          echo "failing to indicate proper PR check"
+          echo "milestone is not assigned to PR, please assign the appropriate milestone."
+          exit 1
+      - name: Draft state
+        if: github.event.pull_request.draft == true
+        run: |
+          echo "failing to indicate proper PR check"
+          echo "PR is in draft state, not ready to review."
+          exit 1
+
+  validate:
+    name: validate PR Issues
+    runs-on: ubuntu-latest
+    needs:
+      - required_props
+    environment:
+      name: aws-infra-development
+    steps:
+      - name: Milestone matches
+        env:
+          MILESTONE_TITLE: ${{ github.event.pull_request.milestone.title }}
+          SOURCE_BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+        run: |
+          echo "Milestone title to PR is $MILESTONE_TITLE"
+          if [[ ! "$SOURCE_BRANCH_NAME" =~ ${MILESTONE_TITLE}$ ]]; then
+            echo "Source milestone branch is not matching assigned milestone. please correct the assignment"
+            exit 1
+          fi
+      - name: Milestone Branch behind master
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // verify milestone branch commit has merged all of the master branch
+            const compareResponse = await github.rest.repos.compareCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              base: "master",
+              head: context.payload.pull_request.head.ref
+            });
+            console.log("milestone branch as head and master branch as base, compareResponse: ", compareResponse);
+            if (compareResponse.data.behind_by > 0) {
+              core.setFailed(`Milestone branch is behind master by ${compareResponse.data.behind_by} commits.`);
+              throw new Error(`Milestone branch is behind master by ${compareResponse.data.behind_by} commits.`);
+            }
+      - name: All issues closed
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const listIssuesResponse = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              milestone: context.payload.pull_request.milestone.number
+            });
+            console.log("listIssuesResponse: ", listIssuesResponse);
+            const listIssuesWithoutPr = listIssuesResponse.data.filter(iss=>iss.url!==context.payload.pull_request._links.issue.href);
+            if(listIssuesWithoutPr.length > 0) {
+                core.setFailed(`Found ${listIssuesWithoutPr.length} open issues for milestone ${context.payload.pull_request.milestone.title}. Resolved all issues before merging.`);
+                throw new Error(`Found ${listIssuesWithoutPr.length} open issues for milestone ${context.payload.pull_request.milestone.title}. Resolved all issues before merging.`);
+            }
+      - id: find-regression-testplan
+        name: Find Regression Testplan
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Fetch all comments on the pull request
+            const listCommentsResponse = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number
+            });
+            console.log("listCommentsResponse: ", listCommentsResponse);
+            const testplanIssueRegex = new RegExp(".*regression test plan:.+https://github.com/"+context.repo.owner+"/([^/]+)/issues/(\\d+).*", "i");
+            const matchedComment = listCommentsResponse.data.find(comment=>testplanIssueRegex.test(comment.body));
+            if(!matchedComment) {
+              core.setFailed("regression testplan execution issue is not found.");
+              throw new Error("regression testplan execution issue is not found.");
+            }
+            const matchedTestplanGroups = testplanIssueRegex.exec(matchedComment.body);
+            console.log("found matched testplan groups: ", matchedTestplanGroups);
+            const testplanIssueRepo = matchedTestplanGroups[1];
+            const testplanIssueNumber = matchedTestplanGroups[2];
+            core.setOutput("testplanIssueRepo", testplanIssueRepo);
+            core.setOutput("testplanIssueNumber", testplanIssueNumber);
+            if(testplanIssueRepo !== context.repo.repo) {
+              return;
+            }
+            const getIssueResponse = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: testplanIssueNumber
+            });
+            console.log("getIssueResponse: ", getIssueResponse);
+            core.setOutput("testplanIssue", getIssueResponse.data);
+            const listCommentsResponse2 = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: testplanIssueNumber
+            });
+            console.log("listCommentsResponse2: ", listCommentsResponse2);
+            core.setOutput("testplanIssueComments", listCommentsResponse2.data);
+      - id: find-ui-regression-testplan
+        name: Find Ui Regression Testplan
+        if: steps.find-regression-testplan.outputs.testplanIssueRepo != github.event.pull_request.base.repo.name
+        uses: actions/github-script@v7
+        env:
+          TESTPLAN_ISSUE_NUMBER: ${{ steps.find-regression-testplan.outputs.testplanIssueNumber }}
+          TESTPLAN_ISSUE_REPO: ${{ steps.find-regression-testplan.outputs.testplanIssueRepo }}
+        with:
+          github-token: ${{ secrets.REPO_AWS_PAT }}
+          script: |
+            const getIssueResponse = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: process.env.TESTPLAN_ISSUE_REPO,
+              issue_number: process.env.TESTPLAN_ISSUE_NUMBER
+            });
+            console.log("getIssueResponse: ", getIssueResponse);
+            core.setOutput("testplanIssue", getIssueResponse.data);
+            const listCommentsResponse = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: process.env.TESTPLAN_ISSUE_REPO,
+              issue_number: process.env.TESTPLAN_ISSUE_NUMBER
+            });
+            console.log("listCommentsResponse: ", listCommentsResponse);
+            core.setOutput("testplanIssueComments", listCommentsResponse.data);
+      - name: Validate Regression testplan
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const testplanIssue = ${{ steps.find-regression-testplan.outputs.testplanIssue || steps.find-ui-regression-testplan.outputs.testplanIssue || '{}' }};
+            const testplanIssueComments = ${{ steps.find-regression-testplan.outputs.testplanIssueComments || steps.find-ui-regression-testplan.outputs.testplanIssueComments || '[]' }};
+            if(!testplanIssue.number || testplanIssueComments.length===0 || testplanIssue.state !== "closed") {
+              core.setFailed("completed regression testplan not found");
+              throw new Error("completed regression testplan not found");
+            }
+            const allowedLabels = ["regression", "test plan"];
+            const issueLables = testplanIssue.labels.filter(lbl=>allowedLabels.includes(lbl.name));
+            if(issueLables.length !== allowedLabels.length) {
+              core.setFailed("provided issue link in comment is not regression testplan");
+              throw new Error("provided issue link in comment is not regression testplan");
+            }
+            const foundCompleteComment=!!testplanIssueComments.find(comment=> comment.body.includes("There are no critical issues") && comment.body.includes("Status-All%20Good"));
+            if (!foundCompleteComment) {
+                core.setFailed("Regression issue is closed but all critical issues are not resolved.");
+                throw new Error("Regression issue is closed but all critical issues are not resolved.");
+            }
+
+  wait-and-approve:
+    name: Wait for PR Checks and approve
+    runs-on: ubuntu-latest
+    needs:
+      - validate
+    permissions:
+      checks: read
+      pull-requests: write
+      statuses: read
+      contents: read
+    steps:
+      - name: Wait for All Checks to Finish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JOB_NAME: "Wait for PR Checks and approve"
+        run: |
+          echo "Waiting for all checks to complete..."
+          while true; do
+            # Fetch the status of checks excluding this workflow
+            PR_CHECKS_OUTPUT=$(gh pr checks ${{ github.event.pull_request.number }} --repo "${{ github.repository }}" | grep -v "$JOB_NAME")
+            echo "$PR_CHECKS_OUTPUT"
+            STATUS=$(echo "$PR_CHECKS_OUTPUT" | grep -oE "pending|in_progress" || echo "")
+            
+            # Exit loop if no checks are pending or in progress
+            if [ -z "$STATUS" ]; then
+              echo "All checks have finished."
+              break
+            else
+              echo "Checks are still running. Retrying in 30 seconds..."
+              sleep 30
+            fi
+          done
+
+      - name: Verify Success of Other Checks
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Ensure no check has failed
+          RESULT=$(gh pr checks ${{ github.event.pull_request.number }} --repo ${{ github.repository }} | grep -i "fail" || echo "nofailed")
+          if [[ "$RESULT" != "nofailed" ]]; then
+            echo "Found some failures: $RESULT"
+            exit 1
+          fi
+
+      - name: Approve PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Approving pull request..."
+          gh pr review ${{ github.event.pull_request.number }} --approve --repo ${{ github.repository }}

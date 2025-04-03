@@ -59,7 +59,7 @@ function getAppTags(tagsEnv?: string) {
   try {
     if (tagsEnv) {
       // Parse the tags parameter
-      const tagsArray = tagsEnv.split(",");
+      const tagsArray = JSON.parse(tagsEnv);
       console.log(`tagsArray: ${tagsArray}`);
 
       for (let tag of tagsArray) {

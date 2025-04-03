@@ -83,22 +83,85 @@ jobs:
             console.log("Github Rest API config: ", github.rest)
             console.log("Github Rest Issues API:", github.rest.issues)
 
+  run_eligible:
+    name: Workflow Run Eligible
+    runs-on: ubuntu-latest
+    outputs:
+      original-issue-title: ${{ github.event.issue.title }}
+      is-prod-provision: ${{ steps.request-form-issue.outputs.is-prod-provision }}
+      is-testplan-provision: ${{ steps.request-form-issue.outputs.is-testplan-provision }}
+      is-testplan-deprovision: ${{ steps.request-form-issue.outputs.is-testplan-deprovision }}
+      is-prod-rollback: ${{ steps.request-form-issue.outputs.is-prod-rollback }}
+      is-testplan: ${{ steps.request-form-issue.outputs.for-testplan }}
+      is-production: ${{ steps.request-form-issue.outputs.for-production }}
+      env-ref-name: ${{ steps.request-form-issue.outputs.env-ref-name }}
+    steps:
+      - run: |
+          echo "Eligibilities"
+          echo "Request form is for deployment purpose"
+          echo "Request form must assigned milestone"
+          echo "Request form is created by owner"
+          echo "Only 1 Environment must exist"
+          echo "Request form is either provision or deprovision request"
+      - if: >
+          ! contains(github.event.issue.labels.*.name, 'deployment') ||
+          ! startsWith(github.event.issue.author_association, 'OWNER') ||
+          ! github.event.issue.milestone != null
+        run: |
+          echo Workflow is not eligible to process issue
+          exit 1
+      - if: >
+          ! contains(github.event.issue.labels.*.name, 'production') && 
+          ! contains(github.event.issue.labels.*.name, 'test plan')
+        run: |
+          echo "environment label is not defined to issue"
+          echo Workflow is not eligible to process issue
+          exit 1
+      - if: >
+          contains(github.event.issue.labels.*.name, 'production') && 
+          contains(github.event.issue.labels.*.name, 'test plan')
+        run: |
+          echo "both environment labels are defined to issue"
+          echo Workflow is not eligible to process issue
+          exit 1
+      - if: >
+          ! startsWith(github.event.issue.title, '[Request] Provision ') && 
+          ! startsWith(github.event.issue.title, '[Request] [Rollback] Provision ') && 
+          ! startsWith(github.event.issue.title, '[Request] Deprovision ')
+        run: |
+          echo "It is not Request form for provision or deprovision"
+          echo Workflow is not eligible to process issue
+          exit 1
+      - id: request-form-issue
+        name: Request Form Issue categorized
+        env:
+          IS_TESTPLAN: ${{ contains(github.event.issue.labels.*.name, 'test plan') }}
+          IS_TESTPLAN_PROVISION: ${{ startsWith(github.event.issue.title, '[Request] Provision Test Plan Environment') }}
+          IS_TESTPLAN_DEPROVISION: ${{ startsWith(github.event.issue.title, '[Request] Deprovision Test Plan Environment') }}
+          IS_PRODUCTION: ${{ contains(github.event.issue.labels.*.name, 'production') }}
+          IS_PRODUCTION_PROVISION: ${{ startsWith(github.event.issue.title, '[Request] Provision Production Environment') }}
+          IS_PROD_ROLLBACK_PROVISION: ${{ startsWith(github.event.issue.title, '[Request] [Rollback] Provision Production Environment') }}
+        run: |
+          if [[ "$IS_TESTPLAN" == "true" ]]; then
+            echo "env-ref-name=testplan"
+          fi
+          if [[ "$IS_PRODUCTION" == "true" ]]; then
+            echo "env-ref-name=production"
+          fi
+          echo "for-testplan=$IS_TESTPLAN" >> $GITHUB_OUTPUT
+          echo "for-production=$IS_PRODUCTION" >> $GITHUB_OUTPUT
+          echo "is-testplan-provision=$IS_TESTPLAN_PROVISION" >> $GITHUB_OUTPUT
+          echo "is-testplan-deprovision=$IS_TESTPLAN_DEPROVISION" >> $GITHUB_OUTPUT
+          echo "is-prod-provision=$IS_PRODUCTION_PROVISION" >> $GITHUB_OUTPUT
+          echo "is-prod-rollback=$IS_PROD_ROLLBACK_PROVISION" >> $GITHUB_OUTPUT
+
   update_request:
     name: Start Request
     runs-on: ubuntu-latest
-    if: >
-      contains(github.event.issue.labels.*.name, 'deployment') &&
-      contains(github.event.issue.labels.*.name, 'test plan') && 
-      startsWith(github.event.issue.author_association, 'OWNER') &&
-      (
-        startsWith(github.event.issue.title, '[Request] Provision Test Plan Environment') ||
-        startsWith(github.event.issue.title, '[Request] Deprovision Test Plan Environment')
-      ) &&
-      github.event.issue.milestone != null
+    needs:
+      - run_eligible
     outputs:
-      failed-reason: ${{ steps.update-request.outputs.failedReason || steps.env-request.outputs.failedReason }}
-      env-type: ${{ steps.env-request.outputs.env_type }}
-      original-issue-title: ${{ steps.update-request.outputs.issue-title }}
+      failed-reason: ${{ steps.update-request.outputs.failedReason }}
     steps:
       - run: |
           echo "The issue has milestone assigned and locked."
@@ -112,7 +175,6 @@ jobs:
         with:
           script: |
             try {
-              core.setOutput("issue-title", context.payload.issue.title);
               const updateResponse = await github.rest.issues.update({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -133,52 +195,89 @@ jobs:
               core.setOutput("failedReason", `Error during issue update, reason: ${error.message}`);
               core.setFailed(error.message);
             }
-      - id: env-request
-        uses: actions/github-script@v7
-        with:
-          script: |
-            try {
-              const allowedTypes = ["test plan", "production"];
-              const foundTestplanLabel = context.payload.issue.labels.find(label=>label.name === "test plan");
-              const foundProductionLabel = context.payload.issue.labels.find(label=>label.name === "production");
-              if(!foundTestplanLabel && !foundProductionLabel) {
-                throw new Error("Environemt is not specified in Request issue labels");
-              }
-              if(foundTestplanLabel && foundProductionLabel) {
-                throw new Error("Both test plan and production labels are found in Request issue labels");
-              }
-              if(foundTestplanLabel) {
-                core.setOutput("env_type", "testplan");
-              } else {
-                core.setOutput("env_type", "production");
-              }
-            } catch(error) {
-              console.error("failed reason: ", error);
-              core.setOutput("failedReason", `Error during Env request validation, reason: ${error.message}`);
-              core.setFailed(error.message);
-            }
 
   validate_request:
     name: Validate Request Form
     runs-on: ubuntu-latest
     needs:
+      - run_eligible
       - update_request
     outputs:
-      branch-name: ${{ steps.get-milestone.outputs.branch-name }}
-      branch-url: ${{ steps.get-milestone.outputs.branch-url }}
-      failed-reason: ${{ steps.get-milestone.outputs.failedReason || steps.testplan-issue.outputs.failedReason || steps.testplan-issue2.outputs.failedReason || steps.request-form.outputs.failedReason || steps.provision-stack.outputs.failedReason || steps.deprovision-stack.outputs.failedReason }}
+      branch-name: ${{ steps.get-milestone-testplan.outputs.branch-name || steps.get-milestone-prod.outputs.tagRefName }}
+      branch-url: ${{ steps.get-milestone-testplan.outputs.branch-url || steps.get-milestone-prod.outputs.tagRefUrl }}
+      failed-reason: ${{ steps.get-milestone-testplan.outputs.failedReason || steps.testplan-issue.outputs.failedReason || steps.testplan-issue2.outputs.failedReason || steps.request-form-testplan.outputs.failedReason || steps.testplan-request-eligible.outputs.failedReason || steps.prod-request-eligible.outputs.failedReason || steps.request-form-prod.outputs.failedReason }}
       testplan-type: ${{ steps.testplan-issue.outputs.testplanType }}
-      request-type: ${{ steps.request-form.outputs.request_type }}
-      testplan-issue-number: ${{ steps.testplan-issue.outputs.testplanIssue-number || steps.request-form.outputs.testplan_issue_number }}
+      request-type: ${{ steps.get-request-type.outputs.request-type }}
+      testplan-issue-number: ${{ steps.testplan-issue.outputs.testplanIssue-number }}
       testplan-issue-repo: ${{ steps.testplan-issue.outputs.testplanIssue-repo }}
-      stack-details: ${{ steps.provision-stack.outputs.stack_details || steps.deprovision-stack.outputs.stack_details || '{}' }}
-    environment:
-      name: aws-infra-${{ needs.update_request.outputs.env-type }}
     steps:
+      - run: |
+          echo "if provision, allowed environment is either testplan or production"
+          echo "if deprovision, allowed environment is testplan"
+          echo "rollback is only for production environment"
+          echo "if provision, milestone must be open except case of rollback"
+          echo "if production, tag and milestone branch must not exist"
+          echo "if rollback, milestone must be closed."
+          echo "if rollback, milestone must be immediate good previous version"
+          echo "if rollback, tag must exist"
+      - id: testplan-request-eligible
+        if: needs.run_eligible.outputs.is-testplan == 'true'
+        env:
+          IS_TESTPLAN_PROVISION: ${{ needs.run_eligible.outputs.is-testplan-provision }}
+          IS_TESTPLAN_DEPROVISION: ${{ needs.run_eligible.outputs.is-testplan-deprovision }}
+          IS_MILESTONE_OPEN: ${{ github.event.issue.milestone.state == 'open' }}
+        run: |
+          ELIGIBLE="false"
+          if [[ "$IS_TESTPLAN_PROVISION" == "true" || "$IS_TESTPLAN_DEPROVISION" == "true" ]]; then
+            if [[ "$IS_MILESTONE_OPEN" == "true" ]]; then
+              ELIGIBLE="true"
+            fi
+          fi
+          if [[ "$ELIGIBLE" == "false" ]]; then
+            echo "failed request form criteria"
+            echo "Criteria-1, testplan provision or deprovision request. But found values, testpln provision? $IS_TESTPLAN_PROVISION, testplan deprovision? $IS_TESTPLAN_DEPROVISION"
+            echo "Criteria-2, testplan environment."
+            echo "Criteria-3, open milestone. But found values, milestone open? $IS_MILESTONE_OPEN"
+            echo "failedReason=for testplan request form, milestone or label assignments are incorrect" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+      - name: prod-request-eligible
+        if: needs.run_eligible.outputs.is-production == 'true'
+        env:
+          IS_PRODUCTION_PROVISION: ${{ needs.run_eligible.outputs.is-prod-provision }}
+          IS_PROD_ROLLBACK_PROVISION: ${{ needs.run_eligible.outputs.is-prod-rollback }}
+          IS_MILESTONE_OPEN: ${{ github.event.issue.milestone.state == 'open' }}
+        run: |
+          ELIGIBLE="false"
+          if [[ "$IS_PRODUCTION_PROVISION" == "true" && "$IS_MILESTONE_OPEN" == "true" ]]; then
+            ELIGIBLE="true"
+          fi
+          if [[ "$IS_PROD_ROLLBACK_PROVISION" == "true" && "$IS_MILESTONE_OPEN" == "false" ]]; then
+            ELIGIBLE="true"
+          fi
+          if [[ "$ELIGIBLE" == "false" ]]; then
+            echo "failed request form criteria"
+            echo "Criteria-1, production or rollback provision request. But found values, prod provision? $IS_PRODUCTION_PROVISION, prod rollback provision? $IS_PROD_ROLLBACK_PROVISION"
+            echo "Criteria-2, production environment."
+            echo "Criteria-3, open milestone if production, closed milestone if rollback. But found values, milestone open? $IS_MILESTONE_OPEN"
+            echo "failedReason=for prod request form, milestone or label assignments are incorrect" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+      - id: get-request-type
+        env:
+          IS_TESTPLAN_DEPROVISION: ${{ needs.run_eligible.outputs.is-testplan-deprovision }}
+        run: |
+          # since provision and deprovision conditions are verified appropriate to env, here we don't need to have repeatated conditions
+          if [[ "$IS_TESTPLAN_DEPROVISION" == "true" ]]; then
+            echo "request-type=deprovision" >> $GITHUB_OUTPUT
+          else
+            echo "request-type=provision" >> $GITHUB_OUTPUT
+          fi
       - name: Checkout
         uses: actions/checkout@v4
-      - id: get-milestone
+      - id: get-milestone-testplan
         name: Validate Milestone and Branch
+        if: needs.run_eligible.outputs.is-testplan == 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -249,7 +348,7 @@ jobs:
             }
       - id: testplan-issue
         name: Validate Testplan issue
-        if: contains(github.event.issue.labels.*.name, 'test plan')
+        if: needs.run_eligible.outputs.is-testplan == 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -303,7 +402,7 @@ jobs:
             }
       - id: testplan-issue2
         name: Validate testplan issue from another repo
-        if: contains(github.event.issue.labels.*.name, 'test plan')
+        if: needs.run_eligible.outputs.is-testplan == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.REPO_AWS_PAT }}
@@ -330,22 +429,89 @@ jobs:
               core.setOutput("failedReason", `Error during test plan validation, reason: ${error.message}`);
               core.setFailed(error.message);
             }
+      - id: get-milestone-prod
+        if: needs.run_eligible.outputs.is-production == 'true'
+        name: Validate Milestone and Branch
+        uses: actions/github-script@v7
+        env:
+          IS_ROLLBACK: ${{ needs.run_eligible.outputs.is-prod-rollback }}
+        with:
+          script: |
+            try {
+              const getBranch = async (branchName, tagName) => {
+                try {
+                  if(branchName) {
+                    const getBranchResponse = await github.rest.repos.getBranch({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      branch: branchName
+                    });
+                    console.log("getBranchResponse: ", getBranchResponse);
+                    return getBranchResponse.data;
+                  }
+                  if(tagName) {
+                    const getRefResponse = await github.rest.repos.getRef({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      ref: `tags/${tagName}`
+                    });
+                    console.log("getRefResponse: ", getRefResponse);
+                    return getRefResponse.data;
+                  }
+                  throw new Error("requested neither branch nor tag");
+                } catch(e) {
+                  console.error("error during getBranch rest call", e);
+                }
+                return null;
+              };
+              // milestone due Date must be configured and is not past.
+              if(!context.payload.issue.milestone.due_on) {
+                throw new Error("Milestone due date is not set");
+              }
+              if(process.env.IS_ROLLBACK != "true") {
+                // for prod deployment, date has to be today
+                const milestoneDueOn = new Date(context.payload.issue.milestone.due_on);
+                if(milestoneDueOn.toLocaleDateString() !== new Date().toLocaleDateString()) {
+                  throw new Error("Milestone due date is not today");
+                }
+                // verify milestone branch not exists
+                const milestoneBranch = await getBranch(`milestone/${context.payload.issue.milestone.title}`);
+                if(milestoneBranch) {
+                  throw new Error("milestone branch exist. It has to be merge to master and delete before prod deployment");
+                }
+              }
+              // verify tag ref
+              const tagRef = await getBranch(null, context.payload.issue.milestone.title);
+              if(tagRef && process.env.IS_ROLLBACK != "true") {
+                throw new Error(`for production deploy, tag [${context.payload.issue.milestone.title}] cannot exist.`);
+              }
+              if(!tagRef && process.env.IS_ROLLBACK == "true") {
+                throw new Error(`for production rollback deploy, tag [${context.payload.issue.milestone.title}] not found.`);
+              }
+              core.setOutput("tagRefName", tagRef?.name);
+              core.setOutput("tagRefUrl", tagRef?._links.html);
+            } catch (error) {
+              console.error("failed reason: ", error);
+              core.setOutput("failedReason", `Error during milestone validation, reason: ${error.message}`);
+              core.setFailed(error.message);
+            }
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           cache: "pip" # caching pip dependencies
           python-version: "3.13"
-      - id: request-form
+      - id: request-form-testplan
+        if: needs.run_eligible.outputs.is-testplan == 'true'
         name: Validate Request form details
         env:
           TESTPLAN_TYPE: ${{ steps.testplan-issue.outputs.testplanType || 'unknown' }}
         run: |
           echo '${{ toJson(github.event.issue) }}' > request_form_issue_details.json
-          echo '${{ steps.get-milestone.outputs.branch }}' > branch_details.json
+          echo '${{ steps.get-milestone-testplan.outputs.branch }}' > branch_details.json
           python --version
           pip install -r .github/scripts/requirements.txt
           set +e
-          python .github/scripts/deploy_request.py --validate \
+          python .github/scripts/testplan_deploy_request.py --validate \
               --request-form-issue-details "request_form_issue_details.json" \
               --testplan-type "$TESTPLAN_TYPE" \
               --branch-details "branch_details.json" > deploy_request_output.log 2>&1
@@ -358,21 +524,172 @@ jobs:
           fi
           cat deploy_request_output.log
           exit $RETURN_CODE
+      - id: request-form-prod
+        if: needs.run_eligible.outputs.is-production == 'true'
+        name: Validate Request Form Details
+        run: |
+          echo '${{ toJson(github.event.issue) }}' > request_form_issue_details.json
+          python --version
+          pip install -r .github/scripts/requirements.txt
+          set +e
+          python .github/scripts/prod_deploy_request.py --validate \
+              --request-form-issue-details "request_form_issue_details.json"  > deploy_request_output.log 2>&1
+          RETURN_CODE=$?
+          set -e
+          if [ $RETURN_CODE -ne 0 ]; then
+            echo "failedReason<<EOF" >> $GITHUB_OUTPUT
+            cat deploy_request_output.log >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+          cat deploy_request_output.log
+          exit $RETURN_CODE
+      - name: Validate Rollback
+        if: needs.run_eligible.outputs.is-prod-rollback == 'true'
+        uses: actions/github-script@v7
+        env:
+          EXISTING_VERSION: ${{ steps.request-form-prod.outputs.existing_version }}
+        with:
+          script: |
+            try {
+              // find related issue of release form
+              // verify rollback version is immediate valid previous version, milestone and tag
+              const listMilestonesResponse = await github.rest.issues.listMilestones({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: "all"
+              });
+              console.log("listMilestonesResponse: ", listMilestonesResponse);
+              const deployedMilestone=listMilestonesResponse.data.find(mlst=>mlst.title===process.env.EXISTING_VERSION);
+              if(!deployedMilestone) {
+                throw new Error("deployed milestone is not found");
+              }
+              const listIssuesResponse = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["deployment", "production"],
+                state: "closed",
+                milestone: deployedMilestone.number
+              });
+              console.log("listIssuesResponse: ", listIssuesResponse);
+              const releasedRequest = listIssuesResponse.data.find(iss=>iss.title.startsWith("[Approved] [Request] Provision Production Environment"));
+              if(!releasedRequest) {
+                throw new Error("prod release request form not found");
+              }
+              const versionRegex = /^v\d+\.\d+\.\d+$/;
+              // filter by open status and due date is today
+              const releaseMilestone = listMilestonesResponse.data.find(mlstn=> {
+                if(versionRegex.test(mlstn.title) && mlstn.state === "open") {
+                  if(new Date(mlstn.due_on).toLocaleDateString() === new Date().toLocaleDateString()) {
+                    return true;
+                  }
+                }
+                return false;
+              });
+              if(!releaseMilestone) {
+                throw new Error("release milestone is not found.");
+              }
+              if(releaseMilestone.title !== process.env.EXISTING_VERSION) {
+                throw new Error("releasing milestone version is not same as provided existing version");
+              }
+              const validVersionsAfterRollback = listMilestonesResponse.data
+                        .filter(mlstn=>mlstn.title>context.payload.issue.milestone.title && mlstn.title<=releaseMilestone.title)
+                        .filter(mlstn=>versionRegex.test(mlstn.title))
+                        .map(mlstn=>mlstn.title)
+                        .sort();
+              if(validVersionsAfterRollback[0]!==releaseMilestone.title) {
+                const expectedRollbackVersionMessage = validVersionsAfterRollback[0]? "Expected rollback, " + validVersionsAfterRollback[0]: "No rollback version found";
+                throw new Error("Invalid Rollback version is defined. cannot fulfill the request. " + expectedRollbackVersionMessage);
+              }
+            } catch(error) {
+              console.error("failed reason: ", error);
+              core.setOutput("failedReason", `Error during test plan validation, reason: ${error.message}`);
+              core.setFailed(error.message);
+            }
+
+  validate_request_stack:
+    name: Validate Stack
+    runs-on: ubuntu-latest
+    needs:
+      - run_eligible
+      - validate_request
+    outputs:
+      failed-reason: ${{ steps.provision-stack-testplan.outputs.failedReason || steps.deprovision-stack-testplan.outputs.failedReason || steps.provision-stack-prod.outputs.failedReason }}
+      stack-details: ${{ steps.provision-stack-testplan.outputs.stack_details || steps.deprovision-stack-testplan.outputs.stack_details || steps.provision-stack-prod.outputs.stack_details || '{}' }}
+    environment:
+      name: aws-infra-${{ needs.run_eligible.outputs.env-ref-name }}
+    steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_CICD_ROLE_ARN }}
           role-session-name: cdkSession
-      - id: provision-stack
-        if: ${{ steps.request-form.outputs.request_type == 'provision' }}
+      - id: provision-stack-prod
         name: Verify branch is deployable
+        if: >
+          needs.validate_request.outputs.request-type == 'provision' &&
+          needs.run_eligible.outputs.is-production == 'true'
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
           MILESTONE_TITLE: ${{ github.event.issue.milestone.title }}
-          TESTPLAN_TYPE: ${{ steps.testplan-issue.outputs.testplanType }}
-          TESTPLAN_ISS_REPO: ${{ steps.testplan-issue.outputs.testplanIssue-repo }}
-          TESTPLAN_ISS_NUMBER: ${{ steps.testplan-issue.outputs.testplanIssue-number }}
+          REQUEST_ISS_REPO: ${{ github.event.repository.name }}
+          REQUEST_ISS_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          INFRA_STACK_NAME="prsfin-$INFRA_ENV-infra-stack"
+          set +e
+          DESCRIBE_STACK_OUT=$(aws cloudformation describe-stacks --stack-name "$INFRA_STACK_NAME")
+          RET_CODE=$?
+          set -e
+          if [[ $RET_CODE -ne 0 ]]; then
+            echo "Infra Stack does not exist. given branch for milestone can be deployed."
+            exit 0
+          fi
+          # verify stack status
+          STACK_STATUS=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].StackStatus')
+          if [[ ! "$STACK_STATUS" =~ _COMPLETE$ ]]; then
+            STACK_STATUS_REASON=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].StackStatusReason')
+            FAILED_REASON="The Stack status is not complete, found Status: $STACK_STATUS. The Stack Status Reason: $STACK_STATUS_REASON"
+            echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
+            echo "Failed Reason: $FAILED_REASON"
+            exit 1
+          fi
+          # environment tag match must never fail
+          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="environment").Value')
+          if [[ "$TAG_VALUE" != "$INFRA_ENV" ]]; then
+            FAILED_REASON="Stack is deployed for other environment $TAG_VALUE stack."
+            echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
+            echo "Failed Reason: $FAILED_REASON"
+            exit 1
+          fi
+          # check request Issue number, make sure request is not duplicate
+          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="requestIssueNumber").Value')
+          EXPECTED_REQUEST_ISS="$REQUEST_ISS_REPO/issue-$REQUEST_ISS_NUMBER"
+          if [[ "$TAG_VALUE" == "$EXPECTED_REQUEST_ISS" ]]; then
+            FAILED_REASON="The stack deployment is attempted with provided request form. Can not re-use same request form."
+            echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
+            echo "Failed Reason: $FAILED_REASON"
+            exit 1
+          fi
+
+          API_CREATED_TIME=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r ".Stacks[0].CreationTime")
+          API_UPDATED_TIME=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r ".Stacks[0].LastUpdatedTime")
+          API_STACK_AUDIT='{"created_time":"'$API_CREATED_TIME'","updated_time":"'$API_UPDATED_TIME'"}'
+
+          STACK_AUDIT='{"api":'$API_STACK_AUDIT'}'
+          echo "stack_details<<EOF" >> $GITHUB_OUTPUT
+          echo "$STACK_AUDIT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      - id: provision-stack-testplan
+        name: Verify branch is deployable
+        if: >
+          needs.validate_request.outputs.request-type == 'provision' &&
+          needs.run_eligible.outputs.is-testplan == 'true'
+        env:
+          INFRA_ENV: ${{ vars.INFRA_ENV }}
+          MILESTONE_TITLE: ${{ github.event.issue.milestone.title }}
+          TESTPLAN_TYPE: ${{ needs.validate_request.outputs.testplan-type }}
+          TESTPLAN_ISS_REPO: ${{ needs.validate_request.outputs.testplan-issue-repo }}
+          TESTPLAN_ISS_NUMBER: ${{ needs.validate_request.outputs.testplan-issue-number }}
           REQUEST_ISS_REPO: ${{ github.event.repository.name }}
           REQUEST_ISS_NUMBER: ${{ github.event.issue.number }}
         run: |
@@ -445,8 +762,10 @@ jobs:
           echo "stack_details<<EOF" >> $GITHUB_OUTPUT
           echo "$STACK_AUDIT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-      - id: deprovision-stack
-        if: ${{ steps.request-form.outputs.request_type == 'deprovision' }}
+      - id: deprovision-stack-testplan
+        if: >
+          needs.validate_request.outputs.request-type == 'deprovision' &&
+          needs.run_eligible.outputs.is-testplan
         name: Verify branch is destroyable
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
@@ -488,14 +807,76 @@ jobs:
           echo "$STACK_AUDIT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+  create_tag:
+    name: Create Tag
+    runs-on: ubuntu-latest
+    needs:
+      - run_eligible
+      - validate_request
+      - validate_request_stack
+    outputs:
+      failed-reason: ${{ steps.no-branch.outputs.failedReason || steps.create-prod-tag.outputs.failedReason }}
+      branch-tag-name: ${{ needs.validate_request.outputs.branch-name || github.event.issue.milestone.title }}
+    steps:
+      - id: no-branch
+        env:
+          BRANCH_NAME: ${{ needs.validate_request.outputs.branch-name }}
+          IS_PROD_ROLLBACK: ${{ needs.run_eligible.outputs.is-prod-rollback }}
+          IS_PROD_PROVISION: ${{ needs.run_eligible.outputs.is-prod-provision }}
+          IS_TESTPLAN: ${{ needs.run_eligible.outputs.is-testplan }}
+        run: |
+          if [[ -z "$BRANCH_NAME" ]]; then
+            if [[ "$IS_PROD_ROLLBACK" == "true" ]]; then
+              FAILED_REASON="Tag for prod rollback is not defined."
+              echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
+              echo "$FAILED_REASON"
+              exit 1
+            fi
+            if [[ "$IS_TESTPLAN" == "true" ]]; then
+              FAILED_REASON="Milestone Branch is not defined."
+              echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
+              echo "$FAILED_REASON"
+              exit 1
+            fi
+          elif [[ "$IS_PROD_PROVISION" == "true" ]]; then
+            FAILED_REASON="Tag cannot be available for prod."
+            echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
+            echo "$FAILED_REASON"
+            exit 1
+          fi
+      - id: create-prod-tag
+        name: Create Tag
+        if: needs.run_eligible.outputs.is-prod-provision == 'true'
+        env:
+          TAG_VER: ${{ github.event.issue.milestone.title }}
+        run: |
+          LOG_FILE="create_tag.failed.log"
+          if ! git tag -a "$TAG_VER" -m "Release $TAG_VER" 2>>"$LOG_FILE"; then
+            echo "failedReason<<EOF" >> $GITHUB_OUTPUT
+            echo "Failed to create tag $TAG_VER." >> $GITHUB_OUTPUT
+            echo "$(cat $LOG_FILE)" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          if ! git push origin "$TAG_VER" 2>>"$LOG_FILE"; then
+            echo "failedReason<<EOF" >> $GITHUB_OUTPUT
+            echo "Failed to push tag $TAG_VER." >> $GITHUB_OUTPUT
+            echo "$(cat $LOG_FILE)" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
   diff:
     name: Infra Stack Diff
     runs-on: ubuntu-latest
     needs:
+      - run_eligible
       - update_request
       - validate_request
+      - validate_request_stack
+      - create_tag
     environment:
-      name: aws-infra-${{ needs.update_request.outputs.env-type }}
+      name: aws-infra-${{ needs.run_eligible.outputs.env-ref-name }}
     outputs:
       stack-tags: ${{ steps.prepare-tags.outputs.stackTags }}
     steps:
@@ -509,7 +890,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.validate_request.outputs.branch-name }}
+          ref: ${{ needs.create_tag.outputs.branch-tag-name }}
       - name: Setup Node Latest
         uses: actions/setup-node@v4
         with:
@@ -540,8 +921,10 @@ jobs:
             const stackTags = [];
             stackTags.push(`workflow_run_id=${context.runId}`);
             stackTags.push(`milestone=${context.payload.issue.milestone.title}`);
-            stackTags.push(`testplanType=${process.env.TESTPLAN_TYPE}`);
-            stackTags.push(`testplanIssueNumber=${process.env.TESTPLAN_ISSUE_REPO}/issue-${process.env.TESTPLAN_ISSUE_NUMBER}`);
+            if(process.env.TESTPLAN_TYPE && process.env.TESTPLAN_ISSUE_REPO && process.env.TESTPLAN_ISSUE_NUMBER) {
+              stackTags.push(`testplanType=${process.env.TESTPLAN_TYPE}`);
+              stackTags.push(`testplanIssueNumber=${process.env.TESTPLAN_ISSUE_REPO}/issue-${process.env.TESTPLAN_ISSUE_NUMBER}`);
+            }
             stackTags.push(`requestIssueNumber=${context.repo.repo}/issue-${context.payload.issue.number}`);
             core.setOutput("stackTags", stackTags);
       - run: |
@@ -567,11 +950,14 @@ jobs:
     name: Deploy Infra Stack
     runs-on: ubuntu-latest
     needs:
+      - run_eligible
       - update_request
       - validate_request
+      - validate_request_stack
       - diff
+      - create_tag
     environment:
-      name: aws-infra-${{ needs.update_request.outputs.env-type }}
+      name: aws-infra-${{ needs.run_eligible.outputs.env-ref-name }}
     outputs:
       failed-reason: ${{ steps.deploying-comment.outputs.failedReason || steps.describe-stack.outputs.failedReason || steps.update-issue-deploy-complete.outputs.failedReason }}
     steps:
@@ -589,7 +975,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.validate_request.outputs.branch-name }}
+          ref: ${{ needs.create_tag.outputs.branch-tag-name }}
       - name: Setup Node Latest
         uses: actions/setup-node@v4
         with:
@@ -620,9 +1006,9 @@ jobs:
         name: Update Issue - Deploying
         uses: actions/github-script@v7
         env:
-          MILESTONE_BRANCH_NAME: ${{ needs.validate_request.outputs.branch-name }}
-          TESTPLAN_TYPE: ${{ needs.validate_request.outputs.testplan-type }}
-          ORIGINAL_ISSUE_TITLE: ${{ needs.update_request.outputs.original-issue-title }}
+          MILESTONE_BRANCH_NAME: ${{ needs.create_tag.outputs.branch-tag-name }}
+          IS_FOR_TESTPLAN: ${{ needs.run_eligible.outputs.is-testplan }}
+          ORIGINAL_ISSUE_TITLE: ${{ needs.run_eligible.outputs.original-issue-title }}
         with:
           script: |
             try {
@@ -646,12 +1032,16 @@ jobs:
               const commentBody = [
                 "## Infra Deployment Started",
                 "", "### Start Time: ", "",
-                "  " + toTime(deploymentStartTime), 
-                "", "### Milestone Branch: ", "",
-                "  " + process.env.MILESTONE_BRANCH_NAME
+                "  " + toTime(deploymentStartTime)
               ];
+              if("true" == process.env.IS_FOR_TESTPLAN) {
+                commentBody.push("", "### Milestone Branch: ", "");
+              } else {
+                commentBody.push("", "### Tag: ", "");
+              }
+              commentBody.push("  " + process.env.MILESTONE_BRANCH_NAME);
 
-              const stackDetails = ${{ toJson(needs.validate_request.outputs.stack-details) }};
+              const stackDetails = ${{ needs.validate_request_stack.outputs.stack-details }};
               commentBody.push("", "### API Stack: ", "");
               
               if(stackDetails?.api) {
@@ -883,27 +1273,36 @@ jobs:
     name: Handle Request form Failure
     runs-on: ubuntu-latest
     needs:
+      - run_eligible
       - update_request
       - validate_request
+      - validate_request_stack
+      - create_tag
       - diff
       - deployment
       - destroy
     if: failure()
     steps:
       - run: |
+          echo 'Run Eligible: ${{ toJson(needs.run_eligible) }}'
           echo 'Update Request: ${{ toJson(needs.update_request) }}'
           echo 'Validate Request: ${{ toJson(needs.validate_request) }}'
+          echo 'Validate Request Stack: ${{ toJson(needs.validate_request_stack) }}'
+          echo 'Create Tag: ${{ toJson(needs.create_tag) }}'
           echo 'Diff: ${{ toJson(needs.diff) }}'
           echo 'Deployment: ${{ toJson(needs.deployment) }}'
           echo 'Destroy: ${{ toJson(needs.destroy) }}'
-        continue-on-error: true
+      - if: needs.run_eligible.result == 'failure'
+        run: |
+          echo "Since run eligible job failed, skipping fail handler job"
+          exit 1
       - id: prepare-error
         uses: actions/github-script@v7
         env:
-          VALIDATION_FAIL_REASON: ${{ needs.update_request.outputs.failed-reason || needs.validate_request.outputs.failed-reason }}
-          IS_VALIDATION_FAILED: ${{ needs.update_request.result == 'failure' || needs.validate_request.result == 'failure' || needs.diff.result == 'failure' }}
-          DEPLOY_FAILED_REASON: ${{ needs.deployment.outputs.failed-reason }}
-          IS_DEPLOY_FAILED: ${{ needs.deployment.result == 'failure' }}
+          VALIDATION_FAIL_REASON: ${{ needs.update_request.outputs.failed-reason || needs.validate_request.outputs.failed-reason || needs.validate_request_stack.outputs.failed-reason }}
+          IS_VALIDATION_FAILED: ${{ needs.update_request.result == 'failure' || needs.validate_request.result == 'failure' || needs.validate_request_stack.result == 'failure' || needs.diff.result == 'failure' }}
+          DEPLOY_FAILED_REASON: ${{ needs.create_tag.outputs.failed-reason || needs.deployment.outputs.failed-reason }}
+          IS_DEPLOY_FAILED: ${{ needs.deployment.result == 'failure' || needs.create_tag.result == 'failure' }}
           DESTROY_FAILED_REASON: ${{ needs.destroy.outputs.failed-reason }}
           IS_DESTROY_FAILED: ${{ needs.destroy.result == 'failure' }}
         with:
@@ -965,7 +1364,7 @@ jobs:
         uses: actions/github-script@v7
         env:
           FAIL_STATUS: ${{ steps.prepare-error.outputs.status }}
-          ORIGINAL_ISSUE_TITLE: ${{ needs.update_request.outputs.original-issue-title || github.event.issue.title }}
+          ORIGINAL_ISSUE_TITLE: ${{ needs.run_eligible.outputs.original-issue-title }}
         with:
           script: |
             const closeUpdateResponse = await github.rest.issues.update({
