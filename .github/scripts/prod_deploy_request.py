@@ -439,11 +439,10 @@ def validate_deployment_schedule(deployment_schedule_list: List):
                 if isinstance(listitem.parsed_content, MdListItemTitleContent):
                     if "Preferred Date and Time" in listitem.parsed_content.title:
                         preferred_time_match = re.match(
-                            r"\s*(\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}).+", listitem.parsed_content.content)
+                            r"\s*(\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}).*", listitem.parsed_content.content)
 
     if not preferred_time_match:
-        raise ValueError(
-            "Preferred DateTime format is not correct. Please follow `Preferred DateTime: mm-dd-yyyy HH:MM:SS`")
+        raise ValueError("Preferred DateTime format is not correct.")
 
     central = pytz.timezone('US/Central')
     preferred_date_time = datetime.strptime(

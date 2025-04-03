@@ -143,10 +143,10 @@ jobs:
           IS_PROD_ROLLBACK_PROVISION: ${{ startsWith(github.event.issue.title, '[Request] [Rollback] Provision Production Environment') }}
         run: |
           if [[ "$IS_TESTPLAN" == "true" ]]; then
-            echo "env-ref-name=testplan"
+            echo "env-ref-name=testplan" >> $GITHUB_OUTPUT
           fi
           if [[ "$IS_PRODUCTION" == "true" ]]; then
-            echo "env-ref-name=production"
+            echo "env-ref-name=production" >> $GITHUB_OUTPUT
           fi
           echo "for-testplan=$IS_TESTPLAN" >> $GITHUB_OUTPUT
           echo "for-production=$IS_PRODUCTION" >> $GITHUB_OUTPUT
