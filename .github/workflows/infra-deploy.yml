@@ -205,7 +205,7 @@ jobs:
     outputs:
       branch-name: ${{ steps.get-milestone-testplan.outputs.branch-name || steps.get-milestone-prod.outputs.tagRefName }}
       branch-url: ${{ steps.get-milestone-testplan.outputs.branch-url || steps.get-milestone-prod.outputs.tagRefUrl }}
-      failed-reason: ${{ steps.get-milestone-testplan.outputs.failedReason || steps.testplan-issue.outputs.failedReason || steps.testplan-issue2.outputs.failedReason || steps.request-form-testplan.outputs.failedReason || steps.testplan-request-eligible.outputs.failedReason || steps.prod-request-eligible.outputs.failedReason || steps.request-form-prod.outputs.failedReason }}
+      failed-reason: ${{ steps.get-milestone-testplan.outputs.failedReason || steps.testplan-issue.outputs.failedReason || steps.testplan-issue2.outputs.failedReason || steps.request-form-testplan.outputs.failedReason || steps.testplan-request-eligible.outputs.failedReason || steps.prod-request-eligible.outputs.failedReason || steps.request-form-prod.outputs.failedReason || steps.get-milestone-prod.outputs.failedReason }}
       testplan-type: ${{ steps.testplan-issue.outputs.testplanType }}
       request-type: ${{ steps.get-request-type.outputs.request-type }}
       testplan-issue-number: ${{ steps.testplan-issue.outputs.testplanIssue-number }}
@@ -486,7 +486,7 @@ jobs:
               if(process.env.IS_ROLLBACK != "true") {
                 // for prod deployment, date has to be today
                 const milestoneDueOnDate = toTime(context.payload.issue.milestone.due_on).substring(0,10);
-                if(milestoneDueOn !== toTime(new Date()).substring(0,10)) {
+                if(milestoneDueOnDate !== toTime(new Date()).substring(0,10)) {
                   throw new Error("Milestone due date is not today");
                 }
                 // verify milestone branch not exists
