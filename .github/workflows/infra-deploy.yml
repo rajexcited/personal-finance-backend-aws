@@ -13,7 +13,7 @@ concurrency:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
   issues: write
 
 jobs:
@@ -867,6 +867,8 @@ jobs:
         env:
           TAG_VER: ${{ github.event.issue.milestone.title }}
         run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
           LOG_FILE="create_tag.failed.log"
           if ! git tag -a "$TAG_VER" -m "Release $TAG_VER" 2>>"$LOG_FILE"; then
             echo "failedReason<<EOF" >> $GITHUB_OUTPUT
