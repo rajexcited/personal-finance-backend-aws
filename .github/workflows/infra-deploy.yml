@@ -646,7 +646,6 @@ jobs:
           needs.run_eligible.outputs.is-production == 'true'
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
-          MILESTONE_TITLE: ${{ github.event.issue.milestone.title }}
           REQUEST_ISS_REPO: ${{ github.event.repository.name }}
           REQUEST_ISS_NUMBER: ${{ github.event.issue.number }}
         run: |
@@ -686,11 +685,12 @@ jobs:
             exit 1
           fi
 
-          API_CREATED_TIME=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r ".Stacks[0].CreationTime")
-          API_UPDATED_TIME=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r ".Stacks[0].LastUpdatedTime")
+          API_CREATED_TIME=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].CreationTime")
+          API_UPDATED_TIME=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].LastUpdatedTime")
           API_STACK_AUDIT='{"created_time":"'$API_CREATED_TIME'","updated_time":"'$API_UPDATED_TIME'"}'
 
           STACK_AUDIT='{"api":'$API_STACK_AUDIT'}'
+          echo "$STACK_AUDIT"
           echo "stack_details<<EOF" >> $GITHUB_OUTPUT
           echo "$STACK_AUDIT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -1303,14 +1303,14 @@ jobs:
     if: failure()
     steps:
       - run: |
-          echo Run Eligible: ${{ toJson(needs.run_eligible) }}
-          echo Update Request: ${{ toJson(needs.update_request) }}
-          echo Validate Request: ${{ toJson(needs.validate_request) }}
-          echo Validate Request Stack: ${{ toJson(needs.validate_request_stack) }}
-          echo Create Tag: ${{ toJson(needs.create_tag) }}
-          echo Diff: ${{ toJson(needs.diff) }}
-          echo Deployment: ${{ toJson(needs.deployment) }}
-          echo Destroy: ${{ toJson(needs.destroy) }}
+          echo 'Run Eligible: ${{ needs.run_eligible }}'
+          echo 'Update Request: ${{ needs.update_request }}'
+          echo 'Validate Request: ${{ needs.validate_request }}'
+          echo 'Validate Request Stack: ${{ needs.validate_request_stack }}'
+          echo 'Create Tag: ${{ needs.create_tag }}'
+          echo 'Diff: ${{ needs.diff }}'
+          echo 'Deployment: ${{ needs.deployment }}'
+          echo 'Destroy: ${{ needs.destroy }}'
       - if: needs.run_eligible.result == 'failure'
         run: |
           echo "Since run eligible job failed, skipping fail handler job"
