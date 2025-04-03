@@ -859,6 +859,8 @@ jobs:
             echo "$FAILED_REASON"
             exit 1
           fi
+      - name: Checkout
+        uses: actions/checkout@v4
       - id: create-prod-tag
         name: Create Tag
         if: needs.run_eligible.outputs.is-prod-provision == 'true'
