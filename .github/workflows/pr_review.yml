@@ -56,7 +56,7 @@ jobs:
           echo "non-milestone-pattern=true" >> $GITHUB_OUTPUT
 
   required_props:
-    name: validate PR Issues
+    name: validate PR Props
     runs-on: ubuntu-latest
     needs:
       - workflow_eligible
@@ -126,6 +126,7 @@ jobs:
                 throw new Error(`Found ${listIssuesWithoutPr.length} open issues for milestone ${context.payload.pull_request.milestone.title}. Resolved all issues before merging.`);
             }
       - id: find-regression-testplan
+        name: Find Regression Testplan
         uses: actions/github-script@v7
         with:
           script: |
@@ -136,7 +137,7 @@ jobs:
               issue_number: context.payload.pull_request.number
             });
             console.log("listCommentsResponse: ", listCommentsResponse);
-            const testplanIssueRegex = new RegExp(".+regression test plan:.+https://github.com/"+context.repo.owner+"/([^/]+)/issues/(\\d+).*", "i");
+            const testplanIssueRegex = new RegExp(".*regression test plan:.+https://github.com/"+context.repo.owner+"/([^/]+)/issues/(\\d+).*", "i");
             const matchedComment = listCommentsResponse.data.find(comment=>testplanIssueRegex.test(comment.body));
             if(!matchedComment) {
               core.setFailed("regression testplan execution issue is not found.");
@@ -166,6 +167,7 @@ jobs:
             console.log("listCommentsResponse2: ", listCommentsResponse2);
             core.setOutput("testplanIssueComments", listCommentsResponse2.data);
       - id: find-ui-regression-testplan
+        name: Find Ui Regression Testplan
         if: steps.find-regression-testplan.outputs.testplanIssueRepo != github.event.pull_request.base.repo.name
         uses: actions/github-script@v7
         env:
