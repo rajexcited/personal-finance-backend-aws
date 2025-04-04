@@ -30,14 +30,12 @@ jobs:
             console.log("Github Rest API config: ", github.rest)
             console.log("Github Rest Issues API:", github.rest.issues)
             console.log("Github Rest Repo API:", github.rest.repos)
-            const asyncErrorWrapper = (fn) {
-              return async (...args) => {
-                try {
-                  return await fn(...args);
-                } catch(e) { 
-                 console.error(e); 
-                }
-              };
+            const asyncErrorWrapper = async fn => {
+              try {
+                await fn();
+              } catch(e) { 
+                console.error(e); 
+              }
             };
             await asyncErrorWrapper(async () => {
               const getRefResponse = await github.rest.git.getRef({
