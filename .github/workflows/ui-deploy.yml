@@ -195,7 +195,7 @@ jobs:
                 ref: `tags/${milestoneTag.Value}`
               });
               console.log("getRefResponse: ", getRefResponse);
-              core.setOutput("tagRefName", tagRef.ref);
+              core.setOutput("tagRefName", getRefResponse.data.ref);
             } catch (error) {
               console.error("failed reason: ", error);
               core.setOutput("failedReason", `Error during milestone validation, reason: ${error.message}`);
