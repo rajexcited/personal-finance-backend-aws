@@ -30,9 +30,31 @@ jobs:
             console.log("Github Rest API config: ", github.rest)
             console.log("Github Rest Issues API:", github.rest.issues)
             console.log("Github Rest Repo API:", github.rest.repos)
-            console.log("Github Rest Repo API:", github.rest.repos.getRef)
-            console.log("Github Rest Repo API:", github.rest.repos.getRef.toString())
-            console.log("Github Rest Repo API:", github.rest.repos.getRef.valueOf())
+            const asyncErrorWrapper = (fn) {
+              return async (...args) => {
+                try {
+                  return await fn(...args);
+                } catch(e) { 
+                 console.error(e); 
+                }
+              };
+            };
+            await asyncErrorWrapper(async () => {
+              const getRefResponse = await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: "tags/v0.2.0"
+              });
+              console.log("ref response: ", getRefResponse);
+            });
+            await asyncErrorWrapper(async () => {
+              const listMatchingRefsResponse = await github.rest.git.listMatchingRefs({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: "tags/*"
+              });
+              console.log("listMatchingRefs response: ", listMatchingRefsResponse);
+            });
 
   build:
     name: npm Build
