@@ -18,7 +18,7 @@ Command to create ci cd role
 ```cmd
 python -m scripts.create-cicd-role --create --cicd-role-base-dir cicd-role --aws-account <aws account number> --environment <one of supported value> --github-owner <github account id> --github-repo <repository where workflow will be connecting to AWS>
 # example,
-python -m scripts.create-cicd-role --create --cicd-role-base-dir cicd-role --aws-account 111111111111 --environment testplan --github-owner rajexcited --github-repo personal-finance-backend-aws
+python -m scripts.create-cicd-role --create --cicd-role-base-dir cicd-role --aws-account 111111111111 --environment experiment --github-owner rajexcited --github-repo-aws personal-finance-backend-aws github-repo-ui personal-finance-ui
 ```
 
 add `--dry-run` param, if you would like to simulate the role creation. Each IAM request and response are stored under `dist` directory,
@@ -55,7 +55,7 @@ Command to create bootstrap stack
 python -m scripts.bootstrap-cdk --bootstrap --aws-account <aws account number> --cdk-roles-dir cdk-roles --environment <one of supported value>
 
 # example,
-python -m scripts.bootstrap-cdk --bootstrap --aws-account 111111111111 --cdk-roles-dir cdk-roles --environment testplan
+python -m scripts.bootstrap-cdk --bootstrap --aws-account 111111111111 --cdk-roles-dir cdk-roles --environment experiment
 ```
 
 add `--dry-run` param, if you would like to simulate the role creation.
@@ -67,3 +67,16 @@ add `--destroy --delete-policies` params, if you would like to delete bootstrap 
 
 - [bootstrap customizing](https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping-customizing.html)
 - [cli bootstrap options](https://docs.aws.amazon.com/cdk/v2/guide/ref-cli-cmd-bootstrap.html)
+
+## Update Custom Policy
+
+After role and bootstrap stack are setup, there will time to update permissions existing custom policies that role uses. So, instead of delete and re-create, run the update policy command. Update the policy json file with new permissions and run below command.
+
+```cmd
+python -m scripts.iam-policy --update --aws-account <aws account number> --policy-path <file path to policy json> --environment <one of supported value>
+
+# example,
+python -m scripts.iam-policy --update --aws-account 111111111111 --policy-path cdk-roles/cfn-exec-role/policies/custom/storage-policy.json --environment testplan
+```
+
+add `--dry-run` param, if you would like to simulate the policy update.

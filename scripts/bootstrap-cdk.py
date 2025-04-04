@@ -4,7 +4,7 @@ import subprocess
 import sys
 import threading
 from typing import Dict
-from .utils import Environment, ArgumentProcessor, app_config, rootpath, aws_error_handler
+from .utils import Environment, ArgumentProcessor, app_config, rootpath, aws_error_handler, get_manage_policy_name_suffix, get_cdk_policy_prefix
 from .iam_role.policy import create_custom_policies, delete_custom_policies
 from .iam_role.role import save_json
 import boto3
@@ -32,11 +32,14 @@ def create_manage_policy_arns(arg_values: Dict):
     role_base_dir = arg_values["cdk_roles_dir"]/cfn_role_name
     custom_policies_result = create_custom_policies(role_base_dir=role_base_dir,
                                                     aws_account_number=arg_values["aws_account"],
+                                                    aws_region=arg_values["aws_region"],
                                                     environment=arg_values["environment"],
                                                     fail_if_exists=False,
                                                     update_if_exists=arg_values["update_policies_if_exists"],
-                                                    name_suffix=f"-{app_config['app_id']}{arg_values['environment'].value}",
-                                                    name_prefix="cdk"
+                                                    name_suffix=get_manage_policy_name_suffix(
+                                                        arg_values["environment"]),
+                                                    name_prefix=get_cdk_policy_prefix(
+                                                        role_base_dir)
                                                     )
     base_dir = Path("bootstrap")/arg_values["cdk_roles_dir"]
     save_json(custom_policies_result,

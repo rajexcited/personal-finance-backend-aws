@@ -2,7 +2,7 @@ from pathlib import Path
 from string import Template
 import json
 from typing import List, TypedDict, Dict
-from ..utils import Environment, app_config, rootpath
+from ..utils import Environment, app_config, rootpath, get_manage_policy_name_suffix
 from .policy import get_trust_policy, PolicyAction, create_inline_policies, create_custom_policies, PolicyResponseTypeDef
 from .client import iam
 from mypy_boto3_iam.type_defs import CreateRoleRequestTypeDef, CreatePolicyResponseTypeDef, CreatePolicyVersionResponseTypeDef, AttachRolePolicyRequestTypeDef, CreateRoleResponseTypeDef
@@ -31,9 +31,9 @@ def save_json(data: dict, role_base_dir: Path, role_name: str, save_for: str):
     return file_path
 
 
-def prepare_role_request(role_base_dir: Path, aws_account_number: int | str, environment: Environment, role_name_template=Template, github_owner: str = None, github_repo: str = None) -> CreateRoleRequestTypeDef:
+def prepare_role_request(role_base_dir: Path, aws_account_number: int | str, environment: Environment, role_name_template=Template, github_owner: str = None, github_repo_aws: str = None, github_repo_ui: str = None) -> CreateRoleRequestTypeDef:
     assume_role_policy_document = get_trust_policy(
-        role_base_dir, aws_account_number, environment, github_owner, github_repo)
+        role_base_dir, aws_account_number=aws_account_number, environment=environment, github_owner=github_owner, github_repo_aws=github_repo_aws, github_repo_ui=github_repo_ui)
     role_name = role_name_template.substitute(
         env_name=environment.name.lower(),
         env_id=environment.value,
@@ -54,9 +54,15 @@ def prepare_role_request(role_base_dir: Path, aws_account_number: int | str, env
     return create_role_request
 
 
-def create_role(role_base_dir: Path, aws_account_number: int | str, environment: Environment, role_name_template=Template, policy_actions: List[PolicyAction] = [], github_owner: str = None, github_repo: str = None):
-    create_role_request = prepare_role_request(
-        role_base_dir, aws_account_number, environment, role_name_template, github_owner, github_repo)
+def create_role(role_base_dir: Path, aws_account_number: int | str, environment: Environment, role_name_template=Template, policy_actions: List[PolicyAction] = [], github_owner: str = None, github_repo_aws: str = None, github_repo_ui: str = None, aws_region: str = None):
+    create_role_request = prepare_role_request(role_base_dir,
+                                               aws_account_number=aws_account_number,
+                                               environment=environment,
+                                               role_name_template=role_name_template,
+                                               github_owner=github_owner,
+                                               github_repo_aws=github_repo_aws,
+                                               github_repo_ui=github_repo_ui
+                                               )
 
     save_json(create_role_request, role_base_dir,
               create_role_request["RoleName"], "Create Role Request")
@@ -70,6 +76,7 @@ def create_role(role_base_dir: Path, aws_account_number: int | str, environment:
     inline_policies_response = create_inline_policies(role_name=role_name,
                                                       role_base_dir=role_base_dir,
                                                       aws_account_number=aws_account_number,
+                                                      aws_region=aws_region,
                                                       environment=environment)
     for policy_name, policy_result in inline_policies_response.items():
         save_json(policy_result,
@@ -79,11 +86,12 @@ def create_role(role_base_dir: Path, aws_account_number: int | str, environment:
 
     if PolicyAction.CREATE_CUSTOM_MANAGED_POLICY_IF_NEEDED in policy_actions:
         custom_policies_response = create_custom_policies(aws_account_number=aws_account_number,
+                                                          aws_region=aws_region,
                                                           environment=environment,
                                                           role_base_dir=role_base_dir,
                                                           update_if_exists=False,
                                                           fail_if_exists=False,
-                                                          name_suffix=f"-{app_config['app_id']}{environment.value}")
+                                                          name_suffix=get_manage_policy_name_suffix(environment))
 
         for policy_name, policy_result in custom_policies_response.items():
             save_json(policy_result,

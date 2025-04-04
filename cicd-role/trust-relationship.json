@@ -10,7 +10,10 @@
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {
-          "token.actions.githubusercontent.com:sub": "repo:$github_owner/$github_repo:$condition_key:$condition_value",
+          "token.actions.githubusercontent.com:sub": [
+            "repo:$github_owner/$github_repo_aws:$condition_key:aws-infra-$env_name",
+            "repo:$github_owner/$github_repo_ui:$condition_key:$env_name"
+          ],
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
         }
       }

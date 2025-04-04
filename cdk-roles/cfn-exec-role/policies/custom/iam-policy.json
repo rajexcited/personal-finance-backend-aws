@@ -43,7 +43,11 @@
     {
       "Sid": "VisualEditor1",
       "Effect": "Allow",
-      "Action": ["iam:GetRole", "iam:CreateServiceLinkedRole"],
+      "Action": [
+        "iam:GetRole",
+        "iam:CreateServiceLinkedRole",
+        "iam:DetachRolePolicy"
+      ],
       "Resource": "arn:aws:iam::$aws_principal_account:role/${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*"
     },
     {

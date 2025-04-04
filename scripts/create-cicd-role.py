@@ -16,7 +16,9 @@ def create_cicd_role(args: dict):
         environment=args["environment"] if isinstance(
             args["environment"], Environment) else Environment[args["environment"]],
         github_owner=args["github_owner"],
-        github_repo=args["github_repo"],
+        github_repo_aws=args["github_repo_aws"],
+        github_repo_ui=args["github_repo_ui"],
+        aws_region=args["aws_region"],
         role_name_template=Template("$app_name-$env_name-cicd-role"),
         policy_actions=create_role_policy_actions
     )
@@ -70,12 +72,16 @@ if __name__ == "__main__":
                                help="Provide base directory where all necessary template files located in creating cicd role. ex. 'cicd-role'")
     arg_processor.add_argument("--aws-account", value_type=int, is_required=True,
                                help="Provide AWS Account number where you want to create the role")
+    arg_processor.add_argument("--aws-region", value_type=str, is_required=False, default_value="us-east-2",
+                               help="Provide AWS Region")
     arg_processor.add_argument("--environment", value_type=Environment, choices=[e.name for e in Environment], is_required=True,
                                help="Provide Allowed Environment Name")
     arg_processor.add_argument("--github-owner", value_type=str, is_required=True,
                                help="Provide Github Owner account id")
-    arg_processor.add_argument("--github-repo", value_type=str, is_required=True,
-                               help="Provide Github Repository name from where you want to trigger the workflow through assuming cicd role")
+    arg_processor.add_argument("--github-repo-aws", value_type=str, is_required=True,
+                               help="Provide AWS Backend Github Repository name from where you want to trigger the workflow through assuming cicd role")
+    arg_processor.add_argument("--github-repo-ui", value_type=str, is_required=True,
+                               help="Provide UI Github Repository name from where you want to trigger the workflow through assuming cicd role")
     arg_processor.add_argument("--dry-run", action="store_true", value_type=bool, is_required=False, default_value=False,
                                help="Dry run to validate cicd role creation")
 

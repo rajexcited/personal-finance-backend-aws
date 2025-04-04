@@ -72,7 +72,7 @@ def get_policy_document(data: Dict[str, str], policy_path: Path) -> tuple[str, s
     return policy_document, policy_name
 
 
-def get_trust_policy(role_base_dir: Path, aws_account_number: int | str, environment: Environment, github_owner: str = None, github_repo: str = None) -> str | None:
+def get_trust_policy(role_base_dir: Path, aws_account_number: int | str, environment: Environment, github_owner: str = None, github_repo_aws: str = None, github_repo_ui: str = None) -> str | None:
     json_file = Path('trust-relationship.json')
     trust_file_path = rootpath/role_base_dir/json_file
     if not trust_file_path.exists():
@@ -82,18 +82,20 @@ def get_trust_policy(role_base_dir: Path, aws_account_number: int | str, environ
     data = {
         "aws_principal_account": aws_account_number,
         "github_owner": github_owner,
-        "github_repo": github_repo,
+        "github_repo_aws": github_repo_aws,
+        "github_repo_ui": github_repo_ui,
         "condition_key": "environment",
-        "condition_value": 'aws-infra-'+environment.name.lower(),
+        "env_name": environment.name.lower(),
     }
     trust_policy, trust_policy_name = get_policy_document(
         data, trust_file_path)
     return trust_policy
 
 
-def prepare_policies(policy_dir: Path, aws_account_number: int | str, environment: Environment) -> Dict[str, str]:
+def prepare_policies(policy_dir: Path, aws_account_number: int | str, environment: Environment, aws_region: str = None) -> Dict[str, str]:
     data = {
         "aws_principal_account": aws_account_number,
+        "aws_region": aws_region,
         "app_name": app_config["app_name"],
         "app_id": app_config["app_id"],
         "env_name": environment.name.lower(),
@@ -110,10 +112,11 @@ def prepare_policies(policy_dir: Path, aws_account_number: int | str, environmen
     return policy_dict
 
 
-def create_inline_policies(role_name: str, role_base_dir: Path, aws_account_number: int | str, environment: Environment) -> Dict[str, Dict]:
+def create_inline_policies(role_name: str, role_base_dir: Path, aws_account_number: int | str, environment: Environment, aws_region: str = None) -> Dict[str, Dict]:
     inline_policies_dir = rootpath/role_base_dir/"policies/inline"
     inline_policy_dict = prepare_policies(policy_dir=inline_policies_dir,
                                           aws_account_number=aws_account_number,
+                                          aws_region=aws_region,
                                           environment=environment)
 
     result = {}
@@ -216,10 +219,22 @@ def get_policy(policy_name: str, aws_account_number: str | int):
         raise e
 
 
-def create_custom_policies(role_base_dir: Path, aws_account_number: int | str, environment: Environment, update_if_exists: bool = True, fail_if_exists: bool = True, name_suffix: str = "", name_prefix: str = ""):
+def create_custom_policies(role_base_dir: Path, aws_account_number: int | str, aws_region: str, environment: Environment, update_if_exists: bool = True, fail_if_exists: bool = True, name_suffix: str = "", name_prefix: str = ""):
+    """
+    Arguments:
+        role_base_dir (Path): role dir path where all details and files are located  
+        aws_account_number (int | str): aws account number for arn role or policy
+        aws_region (str): aws region to be used in formatting policy
+        environment (Environment): env_id and env_name to used in formatting
+        update_if_exists (bool):  Update policy if exists in account and region. if fail flag id True, this will be ignored. default to True
+        fail_if_exists (bool): raise an error if policy already exist. This flag get highest priority. Default to True
+        name_suffix (str): suffix to be added to policy name. Default is empty
+        name_prefix (str): prefix to be added to policy name. Default is empty
+    """
     custom_policies_dir = rootpath/role_base_dir/"policies/custom"
     custom_policy_dict = prepare_policies(policy_dir=custom_policies_dir,
                                           aws_account_number=aws_account_number,
+                                          aws_region=aws_region,
                                           environment=environment)
 
     result = {}
