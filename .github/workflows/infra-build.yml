@@ -21,6 +21,18 @@ jobs:
         env:
           GITHUB_CONTEXT_JSON: ${{ toJSON(github) }}
           VARS_JSON: ${{ toJSON(vars) }}
+      - name: Print Context
+        uses: actions/github-script@v7
+        with:
+          script: |
+            console.log("Context: ", context);
+            console.log("Github Apis: ", github)
+            console.log("Github Rest API config: ", github.rest)
+            console.log("Github Rest Issues API:", github.rest.issues)
+            console.log("Github Rest Repo API:", github.rest.repos)
+            console.log("Github Rest Repo API:", github.rest.repos.getRef)
+            console.log("Github Rest Repo API:", github.rest.repos.getRef.toString())
+            console.log("Github Rest Repo API:", github.rest.repos.getRef.valueOf())
 
   build:
     name: npm Build
