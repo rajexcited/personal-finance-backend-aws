@@ -79,8 +79,9 @@ jobs:
         with:
           script: |
             console.log("Context obj: ", context);
-            console.log("Github config: ", github)
+            console.log("Github Apis: ", github)
             console.log("Github Rest API config: ", github.rest)
+            console.log("Github Rest Repo API:", github.rest.git)
             console.log("Github Rest Issues API:", github.rest.issues)
 
   run_eligible:
@@ -465,7 +466,7 @@ jobs:
                     return getBranchResponse.data;
                   }
                   if(tagName) {
-                    const getRefResponse = await github.rest.repos.getRef({
+                    const getRefResponse = await github.rest.git.getRef({
                       owner: context.repo.owner,
                       repo: context.repo.repo,
                       ref: `tags/${tagName}`

@@ -29,6 +29,10 @@ jobs:
         with:
           script: |
             console.log("Context: ", context);
+            console.log("Github Apis: ", github)
+            console.log("Github Rest API config: ", github.rest)
+            console.log("Github Rest Repo API:", github.rest.git)
+            console.log("Github Rest Issues API:", github.rest.issues)
 
   validate_payload:
     name: Validate Client Payload
@@ -184,7 +188,8 @@ jobs:
               if(!milestoneTag?.Value) {
                 throw new Error("deployed version not found");
               }
-              const getRefResponse = await github.rest.repos.getRef({
+              console.log("milestone tag from deployed stack: ", milestoneTag);
+              const getRefResponse = await github.rest.git.getRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 ref: `tags/${milestoneTag.Value}`
