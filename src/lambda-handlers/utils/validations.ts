@@ -62,7 +62,7 @@ export const isValidPassword = (password: string | undefined | null) => {
   const validLength = isValidLength(pprd, DEFAULT_PASSWORD_MIN_LENGTH, DEFAULT_PASSWORD_MAX_LENGTH);
   if (!validLength) return false;
 
-  const passwordRegex = /^(?=.*[\d])(?=.*[A-Z])(?=.*[!@#$%^&*])[\w!@#$%^&\(\)\=*]{8,25}$/;
+  const passwordRegex = /^(?=.*[\d])(?=.*[A-Z])(?=.*[!@#<$>%^&*])[\w!@#<$>%^&\(\)\=*]{8,25}$/;
   return passwordRegex.test(pprd as string);
 };
 
