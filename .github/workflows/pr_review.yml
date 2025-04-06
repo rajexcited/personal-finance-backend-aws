@@ -29,6 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       is-runnable: ${{ steps.pr-open.outputs.is-open != 'true' && steps.source-branch.outputs.non-mileston-pattern != 'true' }}
+    if: github.event.pull_request.user.login == github.repository_owner
     steps:
       - name: Display Github object
         run: |
@@ -56,7 +57,7 @@ jobs:
           echo "non-milestone-pattern=true" >> $GITHUB_OUTPUT
 
   required_props:
-    name: validate PR Props
+    name: validate PR Issues
     runs-on: ubuntu-latest
     needs:
       - workflow_eligible
