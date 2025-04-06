@@ -136,8 +136,9 @@ const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, 
     invalidFields.push({ path: ConfigResourcePath.STATUS, message: ErrorMessage.INCORRECT_VALUE });
   }
 
-  if (req.description && !validations.isValidDescription(req.description, CONFIG_DESCRIPTION_MAX_LENGTH)) {
-    invalidFields.push({ path: ConfigResourcePath.DESCRIPTION, message: ErrorMessage.INCORRECT_FORMAT });
+  if (typeof req.description !== "string" || !validations.isValidDescription(req.description, CONFIG_DESCRIPTION_MAX_LENGTH)) {
+    const msg = req.description ? ErrorMessage.INCORRECT_FORMAT : ErrorMessage.MISSING_VALUE;
+    invalidFields.push({ path: ConfigResourcePath.DESCRIPTION, message: msg });
   }
   if (req.color && !validations.isValidColor(req.color)) {
     invalidFields.push({ path: ConfigResourcePath.COLOR, message: ErrorMessage.INCORRECT_FORMAT });
