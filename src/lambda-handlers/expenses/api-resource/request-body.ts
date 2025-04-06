@@ -27,7 +27,7 @@ export const getValidatedRequestToUpdateExpenseDetails = async (event: APIGatewa
     const msg = req.billName ? ErrorMessage.INCORRECT_FORMAT : ErrorMessage.MISSING_VALUE;
     invalidFields.push({ path: ExpenseRequestResourcePath.BILLNAME, message: msg });
   }
-  if (!fieldValidator.isValidDescription(req.description)) {
+  if (typeof req.description !== "string" || !fieldValidator.isValidDescription(req.description)) {
     const msg = req.description ? ErrorMessage.INCORRECT_FORMAT : ErrorMessage.MISSING_VALUE;
     invalidFields.push({ path: ExpenseRequestResourcePath.DESCRIPTION, message: msg });
   }
@@ -55,6 +55,7 @@ export const getValidatedRequestToUpdateExpenseDetails = async (event: APIGatewa
   if (invalidFields.length > 0) {
     throw new ValidationError(invalidFields);
   }
+  req.tags = req.tags.map((t) => t.trim().replace(" ", "-"));
 
   return req;
 };

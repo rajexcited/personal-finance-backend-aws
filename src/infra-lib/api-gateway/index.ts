@@ -37,7 +37,7 @@ export class ApiConstruct extends Construct {
       appId: props.appId,
       environment: props.environment,
       layer: lambdaLayer.layer,
-      secretRotatingDuration: props.apiContext.secretRotatingDuration,
+      secretRotatingDuration: props.apiContext.secretRotatingDuration
     });
 
     const tokenAuthorizer = new TokenAuthorizerConstruct(this, "AccessTokenAuthConstruct", {
@@ -46,24 +46,31 @@ export class ApiConstruct extends Construct {
       layer: lambdaLayer.layer,
       userTable: props.allDb.userTable,
       restApiPathPrefix: props.restApiPathPrefix,
-      tokenSecret: authSecret.secret,
+      tokenSecret: authSecret.secret
     });
 
-    this.stageName = [props.environment, "stage", "api"].join("-");
+    const getRandomInt = () => {
+      const min = 1;
+      const max = 99;
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    };
+
+    this.stageName = [props.environment, "stage", "api", getRandomInt()].join("-");
     const restApi = new apigateway.RestApi(this, "MyFinanceRestApi", {
       restApiName: buildResourceName(["backend"], AwsResourceType.RestApi, props),
       binaryMediaTypes: ["*/*"],
+      retainDeployments: false,
       deployOptions: {
         stageName: this.stageName,
         description: "my personal finance rest apis",
-        loggingLevel: apigateway.MethodLoggingLevel.INFO,
+        loggingLevel: apigateway.MethodLoggingLevel.INFO
         // accessLogDestination: new apigateway.LogGroupLogDestination(
         //   new LogGroup(this, "RestApiAccessLogGroup", {
         //     // logGroupName: "apigateway/restapi/accesslogs",
         //     retention: RetentionDays.ONE_WEEK,
         //   })
         // ),
-      },
+      }
     });
     this.restApi = restApi;
 
@@ -84,7 +91,7 @@ export class ApiConstruct extends Construct {
       authSecret: authSecret.secret,
       restApi: restApi,
       apiResource: apiResource,
-      deleteExpiration: props.apiContext.deleteUserExpiration,
+      deleteExpiration: props.apiContext.deleteUserExpiration
     });
 
     const configTypeApi = new ConfigTypeApiConstruct(this, "ConfigTypeApiConstruct", {
@@ -96,7 +103,7 @@ export class ApiConstruct extends Construct {
       layer: lambdaLayer.layer,
       authorizer: tokenAuthorizer.authorizer,
       restApi: restApi,
-      apiResource: apiResource,
+      apiResource: apiResource
     });
 
     const pymtAccApi = new PymtAccApiConstruct(this, "PymtAccApiConstruct", {
@@ -108,7 +115,7 @@ export class ApiConstruct extends Construct {
       layer: lambdaLayer.layer,
       authorizer: tokenAuthorizer.authorizer,
       restApi: restApi,
-      apiResource: apiResource,
+      apiResource: apiResource
     });
 
     const expenseApi = new ExpenseApiConstruct(this, "ExpenseApiConstruct", {
@@ -120,7 +127,7 @@ export class ApiConstruct extends Construct {
       apiResource: apiResource,
       allDb: props.allDb,
       expenseReceiptContext: props.expenseReceiptContext,
-      receiptBucket: props.receiptS3.receiptBucket,
+      receiptBucket: props.receiptS3.receiptBucket
     });
 
     const statApi = new StatsApiConstruct(this, "StatsApiConstruct", {
@@ -130,7 +137,7 @@ export class ApiConstruct extends Construct {
       authorizer: tokenAuthorizer.authorizer,
       restApi: restApi,
       apiResource: apiResource,
-      allDb: props.allDb,
+      allDb: props.allDb
     });
   }
 }
