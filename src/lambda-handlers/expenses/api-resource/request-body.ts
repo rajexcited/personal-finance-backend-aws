@@ -55,6 +55,7 @@ export const getValidatedRequestToUpdateExpenseDetails = async (event: APIGatewa
   if (invalidFields.length > 0) {
     throw new ValidationError(invalidFields);
   }
+  req.tags = req.tags.map((t) => t.trim().replace(" ", "-"));
 
   return req;
 };

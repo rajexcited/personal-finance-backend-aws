@@ -151,6 +151,8 @@ const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, 
   if (inValidTags.length > 0) {
     logger.info("inValidTags =", inValidTags);
     invalidFields.push({ path: ConfigResourcePath.TAGS, message: "invalid tags [" + inValidTags + "]" });
+  } else {
+    req.tags = req.tags.map((t) => t.trim().replace(" ", "-"));
   }
 
   if (req.id && !validations.isValidUuid(req.id)) {

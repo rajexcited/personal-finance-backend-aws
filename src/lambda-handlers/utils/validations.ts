@@ -107,7 +107,7 @@ export const isValidTag = (tag: string | undefined | null) => {
   const validLength = isValidLength(tag, DEFAULT_TAG_MIN_LENGTH, DEFAULT_TAG_MAX_LENGTH);
   if (!validLength) return false;
 
-  const tagRegex = /^[\w\.-]+$/;
+  const tagRegex = /^[\w\.-\s]+$/;
   return tagRegex.test(tag as string);
 };
 

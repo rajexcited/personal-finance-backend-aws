@@ -155,6 +155,8 @@ const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, 
   if (!validations.areTagsValid(req.tags)) {
     logger.info("inValidTags =", inValidTags);
     invalidFields.push({ path: PymtAccResourcePath.TAGS, message: "invalid tags [" + inValidTags + "]" });
+  } else {
+    req.tags = req.tags.map((t) => t.trim().replace(" ", "-"));
   }
 
   logger.info("invalidFields =", invalidFields);
