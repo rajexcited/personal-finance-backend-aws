@@ -62,7 +62,7 @@ jobs:
             if(!Array.isArray(payload.stack_tags)) {
               errors.push("stack tags is not array.");
             }
-            if(payload.type !== "provision" && payload.type !== "deprovision") {
+            if(payload.type !== "provision") {
               errors.push("request type is not supported.");
             }
             if(!payload.milestone) {
@@ -207,7 +207,6 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - validate_payload
-    if: github.event.client_payload.type == 'provision'
     environment:
       name: aws-infra-${{ github.event.client_payload.env_type }}
     outputs:

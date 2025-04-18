@@ -155,3 +155,8 @@ dist
 
 
 cdk.context.json
+# python
+__pycache__
+
+# VsCode
+/.vscode
