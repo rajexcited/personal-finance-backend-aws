@@ -821,9 +821,9 @@ jobs:
           # verify stack status
           STACK_STATUS=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].StackStatus')
           # replacing status check. previously was _COMPLETE, but if status is failed, allow to redeploy
-          if [[ ! "$STACK_STATUS" =~ _IN_PROGRESS$ ]]; then
+          if [[ "$STACK_STATUS" =~ _IN_PROGRESS$ ]]; then
             STACK_STATUS_REASON=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].StackStatusReason')
-            FAILED_REASON="The Stack status is not complete, found Status: $STACK_STATUS. The Stack Status Reason: $STACK_STATUS_REASON"
+            FAILED_REASON="The Stack status is in progress, found Status: $STACK_STATUS. The Stack Status Reason: $STACK_STATUS_REASON"
             echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
             echo "Failed Reason: $FAILED_REASON"
             exit 1
@@ -924,7 +924,7 @@ jobs:
           fi
 
           STACK_STATUS=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].StackStatus')
-          if [[ ! "$STACK_STATUS" =~ _IN_PROGRESS$ ]]; then
+          if [[ "$STACK_STATUS" =~ _IN_PROGRESS$ ]]; then
             STACK_STATUS_REASON=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].StackStatusReason')
             FAILED_REASON="The Stack is still in progress with Status: $STACK_STATUS. And Status Reason: $STACK_STATUS_REASON"
             echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
