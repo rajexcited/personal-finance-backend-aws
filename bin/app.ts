@@ -52,15 +52,20 @@ const uiDeployStack = new MyFinanceUiDeployAppStack(app, "MyFinanceUiDeployStack
   uiBucketArn: myFinanceStack.uiBucketArn
 });
 
+console.log("tagsMap: ", tagsMap);
 Object.entries(tagsMap).forEach(([key, value]) => Tags.of(app).add(key, value));
 
 function getAppTags(tagsEnv?: string) {
   const tagMap: Record<string, string> = {};
   try {
     if (tagsEnv) {
+      console.log("tagEnv: ", tagsEnv, typeof tagsEnv);
+      console.log("tagEnv arr: ", tagsEnv.split(","));
       // Parse the tags parameter
-      const tagsArray = JSON.parse(tagsEnv);
-      console.log(`tagsArray: ${tagsArray}`);
+
+      // const tagsArray = JSON.parse(tagsEnv);
+      const tagsArray = tagsEnv.split(",");
+      console.log("tagsArray: ", tagsArray);
 
       for (let tag of tagsArray) {
         const [key, value] = tag.split("=");
