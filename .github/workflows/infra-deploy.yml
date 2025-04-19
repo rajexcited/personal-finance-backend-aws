@@ -335,7 +335,7 @@ jobs:
                   }
                 }
               }
-              if((process.env.TESTPLAN_REQUEST_TYPE === "provision" && context.payload.issue.milestone.state !== "open") || process.env.TESTPLAN_REQUEST_TYPE === "deprovision" && !branchDetails.name)) {
+              if((process.env.TESTPLAN_REQUEST_TYPE === "provision" && context.payload.issue.milestone.state !== "open") || (process.env.TESTPLAN_REQUEST_TYPE === "deprovision" && !branchDetails.name)) {
                 // if milestone is closed, the master branch should have milestone version
                 // for deprovisioning, if milestone is open, the master branch should have milestone version;
                 // compare package.json and milestone version
