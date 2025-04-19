@@ -899,7 +899,7 @@ jobs:
             exit 1
           fi
 
-          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].Tags[?Key=='environment'].Value")
+          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="environment").Value')
           if [[ "$TAG_VALUE" != "$INFRA_ENV" ]]; then
             FAILED_REASON="Stack is deployed for other environment $TAG_VALUE stack."
             echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
@@ -907,7 +907,7 @@ jobs:
             exit 1
           fi
 
-          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].Tags[?Key=='milestone'].Value")
+          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="milestone").Value')
           if [[ "$TAG_VALUE" != "$MILESTONE_TITLE" ]]; then
             FAILED_REASON="Other milestone branch is deployed to Test plan environment. Wait for completion of $TAG_VALUE tests."
             echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
@@ -915,7 +915,7 @@ jobs:
             exit 1
           fi
 
-          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].Tags[?Key=='testplanType'].Value")
+          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="testplanType").Value')
           if [[ "$TAG_VALUE" != "$TESTPLAN_TYPE" ]]; then
             FAILED_REASON="The testplan type is not matching with deployed stack. The stack is deployed for $TAG_VALUE testplan type, but expected $TESTPLAN_TYPE."
             echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
