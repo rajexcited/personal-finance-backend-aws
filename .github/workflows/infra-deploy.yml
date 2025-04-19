@@ -1594,10 +1594,9 @@ jobs:
         uses: youyo/aws-cdk-github-actions@v2
         with:
           cdk_subcommand: "destroy"
-          cdk_stack: "MyFinanceInfraStack"
           debug_log: true
           actions_comment: false
-          cdk_args: "--require-approval never"
+          cdk_args: "--force"
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
           TAGS: ""
