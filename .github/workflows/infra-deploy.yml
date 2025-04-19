@@ -202,6 +202,8 @@ jobs:
   validate_request:
     name: Validate Request Form
     runs-on: ubuntu-latest
+    environment:
+      name: aws-infra-development
     needs:
       - run_eligible
       - update_request
