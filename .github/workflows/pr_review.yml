@@ -12,6 +12,7 @@ on:
       - milestoned
       - demilestoned
       - ready_for_review
+      - closed
     branches:
       - "master"
 
@@ -28,12 +29,17 @@ jobs:
     name: Workflow Run eligibility
     runs-on: ubuntu-latest
     outputs:
-      is-runnable: ${{ steps.pr-open.outputs.is-open != 'true' && steps.source-branch.outputs.non-mileston-pattern != 'true' }}
-    if: github.event.pull_request.user.login == github.repository_owner
+      is-just-open: ${{ steps.pr-vars.outputs.is-just-opened }}
+      is-open: ${{ steps.pr-vars.outputs.is-open }}
+      is-milestone-source: ${{ steps.source-branch.outputs.is-milestone }}
+      for-milestone-review: ${{ steps.pr-vars.outputs.for-milestone-review }}
+      is-milestone-merged-and-closed: ${{ steps.pr-vars.outputs.is-milestone-merged-and-closed }}
     steps:
       - name: Display Github object
+        env:
+          GITHUB_JSON: ${{ toJson(github) }}
         run: |
-          echo github json: ${{ toJson(github) }}
+          echo "github json: $GITHUB_JSON"
       - name: Display Context and rest availabilities
         uses: actions/github-script@v7
         with:
@@ -42,29 +48,21 @@ jobs:
             console.log("Github config: ", github)
             console.log("Github Rest API config: ", github.rest)
             console.log("Github Rest Issues API:", github.rest.issues)
-      - id: pr-open
-        name: PR Should be open
-        if: github.event.pull_request.state != 'open'
+      - name: Pr Owner
+        if: github.event.pull_request.user.login != github.repository_owner
         run: |
-          echo "state should be open, skipping"
-          echo "is-open=true" >> $GITHUB_OUTPUT
+          echo "failing to indicate proper PR check"
+          echo "PR is not open by repo owner. Use milestone as target to merge. Only owner can have PR to merge to Master branch."
+          exit 1
       - id: source-branch
-        name: PR source branch milestone
-        if: ${{ !startsWith(github.event.pull_request.head.ref, 'ref/head/milestone/') }}
+        name: PR source branch
+        env:
+          IS_MILESTONE_SOURCE: ${{ startsWith(github.event.pull_request.head.ref, 'ref/head/milestone/') }}
         run: |
-          echo "source branch for PR should be milestone, skipping"
-          echo "found other source branch, ${{ github.event.pull_request.head.ref }}"
-          echo "non-milestone-pattern=true" >> $GITHUB_OUTPUT
-
-  required_props:
-    name: validate PR Issues
-    runs-on: ubuntu-latest
-    needs:
-      - workflow_eligible
-    if: needs.workflow_eligible.outputs.is-runnable == 'true'
-    steps:
+          echo "PR source branch is ${{ github.event.pull_request.head.ref }}"
+          echo "is-milestone=$IS_MILESTONE_SOURCE" >> $GITHUB_OUTPUT
       - name: Dont have milestone
-        if: github.event.pull_request.milestone == null
+        if: github.event.pull_request.milestone == null && steps.source-branch.outputs.is-milestone == 'true'
         run: |
           echo "failing to indicate proper PR check"
           echo "milestone is not assigned to PR, please assign the appropriate milestone."
@@ -75,14 +73,87 @@ jobs:
           echo "failing to indicate proper PR check"
           echo "PR is in draft state, not ready to review."
           exit 1
+      - id: pr-vars
+        name: PR Should be open
+        env:
+          IS_NOT_CLOSED: ${{ github.event.pull_request.state != 'closed' }}
+          IS_OPENED: ${{ endsWith(github.event.pull_request.state, 'opened') }}
+          IS_MILESTONE_SOURCE: ${{ steps.source-branch.outputs.is-milestone }}
+          IS_MERGED: ${{ github.event.pull_request.merged }}
+        run: |
+          echo "exporting variable conditions"
+          echo "is-just-opened=$IS_OPENED" >> $GITHUB_OUTPUT
+          echo "is-open=$IS_NOT_CLOSED" >> $GITHUB_OUTPUT
+          FOR_MILESTONE_REVIEW="false"
+          if [[ "$IS_NOT_CLOSED" == "true" && "$IS_MILESTONE_SOURCE" == "true" ]]; then
+            echo "eligible for Review"
+            FOR_MILESTONE_REVIEW="true"
+          fi
+          echo "for-milestone-review=$FOR_MILESTONE_REVIEW" >> $GITHUB_OUTPUT
+          JUST_MERGED="false"
+          if [[ "$IS_NOT_CLOSED" == "false" && "$IS_MERGED" == "true" && "$IS_MILESTONE_SOURCE" == "true" ]]; then
+            echo "eligible for Review"
+            JUST_MERGED="true"
+          fi
+          echo "is-milestone-merged-and-closed=$JUST_MERGED" >> $GITHUB_OUTPUT
 
-  validate:
-    name: validate PR Issues
+  delete_after_merge:
+    name: Delete After Merge
     runs-on: ubuntu-latest
     needs:
-      - required_props
-    environment:
-      name: aws-infra-development
+      - workflow_eligible
+    if: needs.workflow_eligible.outputs.is-milestone-merged-and-closed == 'true'
+    permissions:
+      contents: write
+    steps:
+      - name: Verify Merged by Owner
+        env:
+          MERGED_BY_USER: ${{ github.event.pull_request.merged_by.login }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          MERGED_ON: ${{ github.event.pull_request.merged_at }}
+        run: |
+          echo "merged timestamp: $MERGED_ON"
+          if [[ "$MERGED_BY_USER" != "$REPO_OWNER" ]]; then
+            echo "PR is not merged by owner"
+            exit 1
+          fi
+
+          ALLOWED_MERGE_AFTER=$(date -d "now - 15 minutes" +%Y-%m-%dT%H:%M:%S%z)
+          NOW=$(date +"%Y-%m-%dT%H:%M:%S%z")
+          if [[ "$MERGED_ON" <= "$ALLOWED_MERGE_AFTER" || "$MERGED_ON" >= "$NOW" ]]; then
+            echo merged timestamp is not supported automatic deletion of head branch
+            exit 1
+          fi
+      - name: Compare Milestone branch to master
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const compareResponse = await github.rest.repos.compareCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: "master",
+              base: context.payload.pull_request.head.ref
+            });
+            console.log("milestone branch as base and master branch as head, compareResponse: ", compareResponse);
+            if (compareResponse.data.behind_by > 0) {
+              throw new Error(`Milestone branch [${context.payload.pull_request.head.ref}] is not fully merged to master. and master is behind by ${compareResponse.data.behind_by} commits.`);
+            }
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Delete Milestone Branch
+        env:
+          BRANCH_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          echo "Deleting branch, $BRANCH_REF"
+          git push origin --delete $BRANCH_REF
+          git fetch --prune
+
+  validate_milestone:
+    name: Validate Milestone
+    runs-on: ubuntu-latest
+    needs:
+      - workflow_eligible
+    if: needs.workflow_eligible.outputs.for-milestone-review == 'true'
     steps:
       - name: Milestone matches
         env:
@@ -90,7 +161,9 @@ jobs:
           SOURCE_BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
         run: |
           echo "Milestone title to PR is $MILESTONE_TITLE"
-          if [[ ! "$SOURCE_BRANCH_NAME" =~ ${MILESTONE_TITLE}$ ]]; then
+          MILESTONE_BRANCH="milestone/$MILESTONE_TITLE"
+          # error if head branch is not ending with milestone branch
+          if [[ ! "$SOURCE_BRANCH_NAME" =~ ${MILESTONE_BRANCH}$ ]]; then
             echo "Source milestone branch is not matching assigned milestone. please correct the assignment"
             exit 1
           fi
@@ -110,22 +183,16 @@ jobs:
               core.setFailed(`Milestone branch is behind master by ${compareResponse.data.behind_by} commits.`);
               throw new Error(`Milestone branch is behind master by ${compareResponse.data.behind_by} commits.`);
             }
-      - name: All issues closed
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const listIssuesResponse = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              milestone: context.payload.pull_request.milestone.number
-            });
-            console.log("listIssuesResponse: ", listIssuesResponse);
-            const listIssuesWithoutPr = listIssuesResponse.data.filter(iss=>iss.url!==context.payload.pull_request._links.issue.href);
-            if(listIssuesWithoutPr.length > 0) {
-                core.setFailed(`Found ${listIssuesWithoutPr.length} open issues for milestone ${context.payload.pull_request.milestone.title}. Resolved all issues before merging.`);
-                throw new Error(`Found ${listIssuesWithoutPr.length} open issues for milestone ${context.payload.pull_request.milestone.title}. Resolved all issues before merging.`);
-            }
+
+  validate_regression:
+    name: validate Regression
+    runs-on: ubuntu-latest
+    needs:
+      - workflow_eligible
+    environment:
+      name: aws-infra-development
+    if: needs.workflow_eligible.outputs.for-milestone-review == 'true'
+    steps:
       - id: find-regression-testplan
         name: Find Regression Testplan
         uses: actions/github-script@v7
@@ -213,11 +280,166 @@ jobs:
                 throw new Error("Regression issue is closed but all critical issues are not resolved.");
             }
 
+  validate_issues:
+    name: validate Related Issues
+    runs-on: ubuntu-latest
+    needs:
+      - workflow_eligible
+    if: needs.workflow_eligible.outputs.for-milestone-review == 'true'
+    steps:
+      - name: All issues closed
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const listIssuesResponse = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              milestone: context.payload.pull_request.milestone.number
+            });
+            console.log("listIssuesResponse: ", listIssuesResponse);
+            const listIssuesWithoutPr = listIssuesResponse.data.filter(iss=>iss.url!==context.payload.pull_request._links.issue.href);
+            if(listIssuesWithoutPr.length > 0) {
+                core.setFailed(`Found ${listIssuesWithoutPr.length} open issues for milestone ${context.payload.pull_request.milestone.title}. Resolved all issues before merging.`);
+                throw new Error(`Found ${listIssuesWithoutPr.length} open issues for milestone ${context.payload.pull_request.milestone.title}. Resolved all issues before merging.`);
+            }
+
+  validate_stack:
+    name: Validate Infra Stack
+    runs-on: ubuntu-latest
+    needs:
+      - workflow_eligible
+      - validate_regression
+    environment:
+      name: aws-infra-testplan
+    if: needs.workflow_eligible.outputs.for-milestone-review == 'true'
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_CICD_ROLE_ARN }}
+          role-session-name: cdkSession
+      - id: infra-stack
+        name: Verify Infra Stack Exist
+        env:
+          INFRA_ENV: ${{ vars.INFRA_ENV }}
+          MILESTONE_TITLE: ${{ github.event.pull_request.milestone.title }}
+        run: |
+          STACK_NAME="prsfin-$INFRA_ENV-infra-stack"
+          set +e
+          DESCRIBE_STACK_OUT=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME")
+          RET_CODE=$?
+          set -e
+          echo "describe_stack<<EOF" >> $GITHUB_OUTPUT
+          echo "$DESCRIBE_STACK_OUT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          if [[ $RET_CODE -ne 0 ]]; then
+            echo "Infra Stack does not exists."
+            exit 0
+          fi
+
+          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="environment").Value')
+          if [[ "$TAG_VALUE" != "$INFRA_ENV" ]]; then
+            echo "Stack is deployed, but environment tag is different."
+            exit 1
+          fi
+      - name: Add Infra Stack Comment
+        if: needs.workflow_eligible.outputs.is-just-open == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const describeStack = ${{ steps.infra-stack.outputs.describe_stack || '{}' }};
+            if(!describeStack.Stacks) {
+              // stack may not exist
+              return;
+            }
+            // Convert UTC to Central Time
+            const centralTimeFormat = new Intl.DateTimeFormat("en-US", {
+              timeZone: "America/Chicago", 
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              timeZoneName: "short"
+            });
+            const toTime = (datetime) => {
+              const date = new Date(datetime);
+              return centralTimeFormat.format(date);
+            };
+
+            const commentBody = [
+              "## Found Deployed Infra Stack ",
+              "<br/>", 
+            ];
+
+            commentBody.push("", "### Stack Details: ", "");
+            commentBody.push("- **Environment Name:** Testplan environment");
+            commentBody.push(`- **Status Code:** ${describeStack.Stacks[0].StackStatus}`);
+            commentBody.push(`- **Status Reason:** ${describeStack.Stacks[0].StackStatusReason || "NA"}`);
+            commentBody.push(`- **Detailed Status :** ${describeStack.Stacks[0].DetailedStatus || "NA"}`);
+
+            // audit details available
+            commentBody.push("", "### Stack Audit: ", "");
+            commentBody.push("- **Created On:**  " + toTime(describeStack.Stacks[0].CreationTime));
+            commentBody.push("- **Updated On:**  " + toTime(describeStack.Stacks[0].LastUpdatedTime));
+
+            commentBody.push("", "### Stack Outputs: ", "");
+            describeStack.Stacks[0].Outputs.forEach(output => {
+              if(output.OutputKey.startsWith("DistributionDomain") && !output.OutputValue.startsWith("https:/")) {
+                commentBody.push(` - **${output.OutputKey}:** https://${output.OutputValue}  `);
+              } else {
+                commentBody.push(` - **${output.OutputKey}:** ${output.OutputValue}  `);
+              }
+            });
+            if(describeStack.Stacks[0].Outputs.length === 0) {
+              commentBody.push("  No outputs found.  ");
+            }
+
+            commentBody.push("", "### Stack Tags: ", "");
+            describeStack.Stacks[0].Tags.forEach(tag => {
+              commentBody.push(` - **${tag.Key}:** ${tag.Value}  `);
+            });
+            commentBody.push("", "");
+
+            const prCommentResponse = await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: commentBody.join("\n")
+            });
+            console.log("for PR, commentResponse: ", prCommentResponse);
+      - name: validate stack
+        env:
+          DESCRIBE_STACK_OUT: ${{ steps.infra-stack.outputs.describe_stack }}
+        run: |
+          if [[ -z "$DESCRIBE_STACK_OUT" ]]; then
+            echo "stack describe output is not available. cannot validate, stack may not exist"
+            exit 0
+          fi
+          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="milestone").Value')
+          if [[ "$TAG_VALUE" == "$MILESTONE_TITLE" ]]; then
+            echo "Stack is still deployed for milestone."
+            exit 1
+          fi
+          STACK_STATUS=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].StackStatus')
+          if [[ "$STACK_STATUS" != "DELETE_COMPLETE" ]]; then
+            STACK_STATUS_REASON=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].StackStatusReason')
+            echo "The Stack status is not deleted yet. Found status: $STACK_STATUS. The Stack Status Reason: $STACK_STATUS_REASON"
+            exit 1
+          fi
+
   wait-and-approve:
     name: Wait for PR Checks and approve
     runs-on: ubuntu-latest
     needs:
-      - validate
+      - validate_milestone
+      - validate_regression
+      - validate_issues
+      - validate_stack
     permissions:
       checks: read
       pull-requests: write
@@ -245,7 +467,6 @@ jobs:
               sleep 30
             fi
           done
-
       - name: Verify Success of Other Checks
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -256,7 +477,6 @@ jobs:
             echo "Found some failures: $RESULT"
             exit 1
           fi
-
       - name: Approve PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

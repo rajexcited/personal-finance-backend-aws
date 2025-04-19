@@ -5,18 +5,20 @@ title: "[Request] Provision / Deprovision Test Plan Environment for Regression"
 labels: [deployment, regression, test plan]
 ---
 
-# Request Form to Provision <!-- OR --> Deprovision
-
-## Test Plan Environment for Regression Testing
+# Request Form to Provision 
+<!-- OR -->
+# Request Form to Deprovision
 
 ### Test Plan:
+ _(Provide Link to testplan issue)_
 
-Regression Test Plan: <link>
+- **Regression Test Plan:** <link>
 
 ### Release Details:
+_(Provide details for the release or rollback)_
 
-- **UI Version:** v0.1.0 <!-- milestone title, e.g., v0.1.0 -->
-- **API Version:** v0.1.0 <!-- milestone title, if any, e.g., v0.1.0 -->
+- **UI Version:** v0.1.0  <!-- Specify version of UI (milestone title) -->
+- **API Version:** v0.1.0  <!-- Specify version of API (assigned milestone title) -->
 
 ### Environment Details:
 
@@ -25,7 +27,10 @@ Regression Test Plan: <link>
 ### Deployment Schedule:
 
 - **Deployment Scope:** API only / UI and API
-- **Preferred DateTime:** 03-15-2025 13:40:35 <!-- mm-dd-yyyy HH:MM:SS - 24hr time format -->
+_(Specify Only 1 scope value from allowed list)_
+
+- **Preferred Date and Time:** 03-15-2025 13:40:35 
+_(Use the format mm-dd-yyyy HH:MM:SS in 24-hour CST time.)_
 
 ### Additional Notes/Special Instructions:
 
