@@ -149,13 +149,13 @@ jobs:
           git fetch --prune
 
   validate_milestone:
-    name: Validate Milestone
+    name: Validate Milestone Branch
     runs-on: ubuntu-latest
     needs:
       - workflow_eligible
     if: needs.workflow_eligible.outputs.for-milestone-review == 'true'
     steps:
-      - name: Milestone matches
+      - name: Milestone matches head branch
         env:
           MILESTONE_TITLE: ${{ github.event.pull_request.milestone.title }}
           SOURCE_BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
@@ -324,7 +324,6 @@ jobs:
         name: Verify Infra Stack Exist
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
-          MILESTONE_TITLE: ${{ github.event.pull_request.milestone.title }}
         run: |
           STACK_NAME="prsfin-$INFRA_ENV-infra-stack"
           set +e
@@ -415,6 +414,7 @@ jobs:
       - name: validate stack
         env:
           DESCRIBE_STACK_OUT: ${{ steps.infra-stack.outputs.describe_stack }}
+          MILESTONE_TITLE: ${{ github.event.pull_request.milestone.title }}
         run: |
           if [[ -z "$DESCRIBE_STACK_OUT" ]]; then
             echo "stack describe output is not available. cannot validate, stack may not exist"
