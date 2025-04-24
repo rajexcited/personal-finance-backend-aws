@@ -1809,7 +1809,6 @@ jobs:
           FAIL_REASON: ${{ steps.prepare-error.outputs.reason }}
           ERROR_DETAILS: ${{ steps.prepare-error.outputs.details }}
           FAIL_STATUS: ${{ steps.prepare-error.outputs.status }}
-          PR_NUMBER: ${{ needs.validate_request.outputs.pr-number }}
         with:
           script: |
             const commentBody = [
@@ -1840,15 +1839,6 @@ jobs:
               body: commentBody.join("\n")
             });
             console.log("commentResponse: ", commentResponse);
-            if(process.env.PR_NUMBER) {
-              const prCommentResponse = github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: process.env.PR_NUMBER,
-                body: commentBody.join("\n")
-              });
-              console.log("PR commentResponse: ", prCommentResponse);
-            }
       - name: Close Issue
         uses: actions/github-script@v7
         env:

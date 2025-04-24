@@ -1,11 +1,12 @@
 from argparse import ArgumentParser
 from enum import Enum
+from optparse import Option
 import re
-from typing import Dict, List
+from typing import Dict, List, Optional
 from datetime import timedelta
 from ...md_parser import parsed_body, get_list_items
 from ...md_parser.models import MdHeader, MdListItemTitleContent
-from ...utils import export_to_env, get_valid_dict, get_preferred_datetime, get_now, parse_milestone_dueon
+from ...utils import get_converted_enum, get_parsed_arg_value, get_valid_dict, get_preferred_datetime, get_now, parse_milestone_dueon
 
 
 class RequestType(Enum):
@@ -17,23 +18,23 @@ def validate_test_plan_issue_link(testplan_section_list: List, request_form_issu
     if testplan_type.lower() not in request_form_issue_details["title"].lower():
         raise ValueError("Test Plan type is not included in request form title")
 
+    testplan_link_match = None
     section_list = get_list_items(testplan_section_list)
     for listitem in section_list:
         if isinstance(listitem, MdListItemTitleContent):
             if testplan_type.lower() in listitem.title.lower() and "Test Plan" in listitem.title.lower():
-                linkMatch = re.match(r".+https.+/issues/(\d+).*", listitem.content)
-                if not linkMatch:
-                    raise ValueError("Test Plan issue link is not in correct format")
+                testplan_link_match = re.match(r".+https.+/issues/(\d+).*", listitem.content)
+
+    if not testplan_link_match:
+        raise ValueError("Test Plan issue link is not in correct format")
 
 
 def validate_deployment_schedule(deployment_schedule_list: List, request_form_issue_details: dict, branch_details: dict, request_type: RequestType):
     if request_type == RequestType.Provision:
         if branch_details["name"] == "master" and request_form_issue_details["milestone"]["state"] == "open":
-            raise ValueError(
-                "Deployment on the master branch is prohibited while the milestone is open.")
+            raise ValueError("Deployment on the master branch is prohibited while the milestone is open.")
         if branch_details["name"].startswith("milestone") and request_form_issue_details["milestone"]["state"] == "closed":
-            raise ValueError(
-                "Deployment on the milestone branch is prohibited while the milestone is closed.")
+            raise ValueError("Deployment on the milestone branch is prohibited while the milestone is closed.")
 
     preferred_date_obj = None
     deploy_scope = None
@@ -83,9 +84,9 @@ def validate_env_details(env_details_contents: List):
         raise ValueError("Environment details is incorrect")
 
 
-def validate_release_details(release_detail_contents: List, request_form_issue_details: Dict) -> Dict[str, str]:
-    api_version = None
-    ui_version = None
+def validate_release_details(release_detail_contents: List, request_form_issue_details: Dict) -> Dict[str, Optional[str]]:
+    api_version: Optional[str] = None
+    ui_version: Optional[str] = None
     rdc_list = get_list_items(release_detail_contents)
     for listitem in rdc_list:
         if isinstance(listitem.parsed_content, MdListItemTitleContent):
@@ -114,7 +115,7 @@ class ValidityHeader(Enum):
     DeploymentSchedule = "Deployment Schedule"
 
 
-def validate_request_form(request_form_issue_details: dict, testplan_type: str, branch_details: dict, request_type: RequestType):
+def validate_request_form(request_form_issue_details: Dict, testplan_type: str, branch_details: Dict, request_type: RequestType):
     request_form_contents = parsed_body(request_form_issue_details["body"])
     if len(request_form_contents) <= 1:
         raise ValueError("Request form didnot follow the template properly")
@@ -125,6 +126,8 @@ def validate_request_form(request_form_issue_details: dict, testplan_type: str, 
     has_validity[ValidityHeader.EnvironmentDetails] = False
     has_validity[ValidityHeader.DeploymentSchedule] = False
 
+    deploy_scope = ""
+    version_details = {}
     for form_header in request_form_contents:
         if isinstance(form_header, MdHeader):
             if ValidityHeader.ReleaseDetails.value in form_header.title:
@@ -138,7 +141,7 @@ def validate_request_form(request_form_issue_details: dict, testplan_type: str, 
                 deploy_scope = validate_deployment_schedule(form_header.contents,
                                                             request_form_issue_details=request_form_issue_details,
                                                             branch_details=branch_details,
-                                                            request_type=req_typ)
+                                                            request_type=request_type)
                 has_validity[ValidityHeader.DeploymentSchedule] = True
             elif ValidityHeader.TestplanDetails.value in form_header.title:
                 validate_test_plan_issue_link(form_header.contents,
@@ -174,37 +177,18 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     try:
-        if not getattr(args, "validate"):
-            raise ValueError("validate arg is not provided")
-
-        request_form_issue_details = get_valid_dict(
-            getattr(args, "request_form_issue_details"))
-        if not request_form_issue_details:
-            raise ValueError("request form issue details are not provided")
-
-        testplan_type = None
-        if hasattr(args, "testplan_type"):
-            testplan_type = getattr(args, "testplan_type")
-        if not testplan_type:
-            raise ValueError("testplan type is not provided")
-
-        branch_details = get_valid_dict(getattr(args, "branch_details"))
-        if not branch_details or len(branch_details) == 0:
-            raise ValueError("branch details are not provided")
-
-        req_typ = None
-        if hasattr(args, "request_type"):
-            req_typ = getattr(args, "request_type")
-            req_typ = RequestType(req_typ)
-        if not req_typ:
-            raise ValueError("request type is not provided")
+        get_parsed_arg_value(args, key="validate", arg_type_converter=bool)
+        request_form_issue_details = get_parsed_arg_value(args, key="request_form_issue_details", arg_type_converter=get_valid_dict)
+        testplan_type = get_parsed_arg_value(args, key="testplan_type", arg_type_converter=str)
+        branch_details = get_parsed_arg_value(args, key="branch_details", arg_type_converter=get_valid_dict)
+        request_type = get_parsed_arg_value(args, key="request_type", arg_type_converter=lambda x: get_converted_enum(RequestType, str(x)))
 
     except Exception as e:
         print("error: ", e)
         parser.print_help()
         exit(1)
 
-    validate_request_form(request_form_issue_details,
+    validate_request_form(request_form_issue_details=request_form_issue_details,
                           testplan_type=testplan_type,
                           branch_details=branch_details,
-                          request_type=req_typ)
+                          request_type=RequestType(request_type))

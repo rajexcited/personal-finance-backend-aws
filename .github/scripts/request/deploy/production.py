@@ -6,7 +6,7 @@ from typing import Dict, List
 from datetime import timedelta
 from ...md_parser import parsed_body, get_list_items
 from ...md_parser.models import MdHeader, MdList, MdListItemTitleContent, MdListItemTodo
-from ...utils import export_to_env, get_valid_dict, get_preferred_datetime, get_now, parse_milestone_dueon
+from ...utils import export_to_env, get_parsed_arg_value, get_valid_dict, get_preferred_datetime, get_now, parse_milestone_dueon
 
 
 class DeploymentType(Enum):
@@ -259,18 +259,12 @@ if __name__ == "__main__":
                         help="[Required] Validation Request")
     parser.add_argument("--request-form-issue-details",
                         help="[Required] Provide request form issue details as json")
-
     args = parser.parse_args()
 
     try:
-        if not getattr(args, "validate"):
-            raise ValueError("validate arg is not provided")
-
-        request_form_issue_details = None
-        if hasattr(args, "request_form_issue_details"):
-            request_form_issue_details = get_valid_dict(getattr(args, "request_form_issue_details"))
-        if not request_form_issue_details:
-            raise ValueError("request form issue details are not provided")
+        get_parsed_arg_value(args, key="validate", arg_type_converter=bool)
+        request_form_issue_details = get_parsed_arg_value(args, key="request_form_issue_details",
+                                                          arg_type_converter=lambda x: get_valid_dict(x) or {})
 
     except Exception as e:
         print("error: ", e)
