@@ -38,7 +38,7 @@ export const validateTags = (tags: string[] | undefined | null, invalidFields: I
     invalidFields.push({ path: ExpenseRequestResourcePath.TAGS, message: ErrorMessage.LIMIT_EXCEEDED });
   } else {
     const inValidTags = tags.filter((tag) => !validations.isValidTag(tag));
-    if (!validations.areTagsValid(tags)) {
+    if (inValidTags.length > 0) {
       logger.info("inValidTags =", inValidTags);
       invalidFields.push({ path: ExpenseRequestResourcePath.TAGS, message: "invalid tags [" + inValidTags + "]" });
     }
