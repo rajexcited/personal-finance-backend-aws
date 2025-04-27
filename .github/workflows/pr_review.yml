@@ -1,5 +1,5 @@
 # For Pull request - verifies whether there are any issues for milestone opened?
-name: PR Milestone issues
+name: Milestone PR Review
 
 # https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#pull_request
 on:
@@ -57,7 +57,7 @@ jobs:
       - id: source-branch
         name: PR source branch
         env:
-          IS_MILESTONE_SOURCE: ${{ startsWith(github.event.pull_request.head.ref, 'ref/head/milestone/') }}
+          IS_MILESTONE_SOURCE: ${{ startsWith(github.event.pull_request.head.ref, 'milestone/') }}
         run: |
           echo "PR source branch is ${{ github.event.pull_request.head.ref }}"
           echo "is-milestone=$IS_MILESTONE_SOURCE" >> $GITHUB_OUTPUT
@@ -74,7 +74,7 @@ jobs:
           echo "PR is in draft state, not ready to review."
           exit 1
       - id: pr-vars
-        name: PR Should be open
+        name: Exporting PR Variables
         env:
           IS_NOT_CLOSED: ${{ github.event.pull_request.state != 'closed' }}
           IS_OPENED: ${{ endsWith(github.event.pull_request.state, 'opened') }}
@@ -163,7 +163,7 @@ jobs:
           echo "Milestone title to PR is $MILESTONE_TITLE"
           MILESTONE_BRANCH="milestone/$MILESTONE_TITLE"
           # error if head branch is not ending with milestone branch
-          if [[ ! "$SOURCE_BRANCH_NAME" =~ ${MILESTONE_BRANCH}$ ]]; then
+          if [[ "$SOURCE_BRANCH_NAME" != "$MILESTONE_BRANCH" ]]; then
             echo "Source milestone branch is not matching assigned milestone. please correct the assignment"
             exit 1
           fi
