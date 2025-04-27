@@ -9,7 +9,11 @@ import { ApiResourcePurchaseDetails, ApiResourcePurchaseItemDetails } from "./re
 import { PurchaseRequestResourcePath } from "./error";
 import { getValidatedRequestToUpdateExpenseDetails } from "../../api-resource/request-body";
 
-export const getValidatedRequestToUpdatePurchaseDetails = async (event: APIGatewayProxyEvent, currencyProfile: DbConfigTypeDetails, logger: LoggerBase) => {
+export const getValidatedRequestToUpdatePurchaseDetails = async (
+  event: APIGatewayProxyEvent,
+  currencyProfile: DbConfigTypeDetails,
+  logger: LoggerBase
+) => {
   const req = (await getValidatedRequestToUpdateExpenseDetails(event, logger)) as ApiResourcePurchaseDetails;
 
   const userId = getValidatedUserId(event);
@@ -94,9 +98,17 @@ export const validateItems = (purchaseItemDetailsList: ApiResourcePurchaseItemDe
     invalidFields.push({ path: PurchaseRequestResourcePath.PURCHASE_ITEMS, message: ErrorMessage.INCORRECT_VALUE });
     return;
   }
-  const itemIdSet = new Set(...purchaseItemDetailsList.map((pi) => pi.id));
+  const itemIdSet = new Set(purchaseItemDetailsList.map((pi) => pi.id));
   if (itemIdSet.size !== purchaseItemDetailsList.length) {
-    logger.info("item ids are not unique, unique ids=", [...itemIdSet.values()]);
+    logger.info(
+      "item ids are not unique, ",
+      itemIdSet.size,
+      " unique ids=",
+      [...itemIdSet.values()],
+      " for ",
+      purchaseItemDetailsList.length,
+      " purchaseItemDetails"
+    );
     invalidFields.push({ path: PurchaseRequestResourcePath.PURCHASE_ITEMS, message: ErrorMessage.INCORRECT_VALUE });
   }
 };

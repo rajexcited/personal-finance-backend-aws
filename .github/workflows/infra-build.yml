@@ -60,6 +60,14 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run test
+      - name: Upload Coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: unittest-coverage-report
+          path: coverage/
+          if-no-files-found: error
+          retention-days: 15
+          overwrite: true
 
   synth:
     name: Synthesize Stacks

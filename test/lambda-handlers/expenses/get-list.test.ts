@@ -1,4 +1,4 @@
-import { ConsoleMock, spyConsole } from "../../mock";
+import { ConsoleMock, spyConsole } from "../../test-utils";
 import { dateutil } from "../../../src/lambda-handlers/utils";
 import * as datetime from "date-and-time";
 

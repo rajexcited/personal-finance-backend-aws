@@ -11,7 +11,7 @@ describe("purchase details request body provided, validate", () => {
     description: "description",
     tags: ["t1", "tst2"],
     amount: "1.2",
-    purchaseTypeId: "1d778b90-a1a3-483b-aa55-968916141330",
+    purchaseTypeId: "1d778b90-a1a3-483b-aa55-968916141330"
   };
 
   test("purchase items, gives error because only itemname populated", async () => {
@@ -20,7 +20,7 @@ describe("purchase details request body provided, validate", () => {
       amount: "",
       description: "",
       id: "",
-      tags: [],
+      tags: []
     };
 
     const logger = getLogger("test.billname", null, null, "ERROR");
@@ -39,7 +39,7 @@ describe("purchase details request body provided, validate", () => {
       amount: "",
       description: "",
       id: validPurchaseItem.id,
-      tags: [],
+      tags: []
     };
 
     const logger = getLogger("test.billname", null, null, "ERROR");
@@ -53,11 +53,11 @@ describe("purchase details request body provided, validate", () => {
   });
 
   test("purchase items, gives no error because all details are valid", async () => {
-    const logger = getLogger("test.billname", null, null, "ERROR");
+    const logger = getLogger("test.billname", null, null, "INFO");
 
     const invalidFields: InvalidField[] = [];
     validateItems([{ ...validPurchaseItem }], invalidFields, logger);
 
-    expect(invalidFields.length).toEqual(0);
+    expect(invalidFields).toEqual([]);
   });
 });

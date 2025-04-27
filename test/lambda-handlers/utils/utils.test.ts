@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import { utils } from "../../../src/lambda-handlers/utils";
-import { spyConsole } from "../../mock";
+import { spyConsole } from "../../test-utils";
 import { AuthorizeUser } from "../../../src/lambda-handlers/user";
 import { AuthRole } from "../../../src/lambda-handlers/common";
 
@@ -19,7 +19,7 @@ describe("generic utils", () => {
     const auditDetails = { createdBy: "", createdOn: "", updatedBy: "", updatedOn: "" };
     const authUser: AuthorizeUser = {
       role: AuthRole.PRIMARY,
-      userId: userId,
+      userId: userId
     };
     const expectedAuditDetails = utils.updateAuditDetailsFailIfNotExists(auditDetails, authUser);
     expect(expectedAuditDetails).not.toBeNull();
