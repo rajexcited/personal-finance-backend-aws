@@ -547,13 +547,18 @@ jobs:
         with:
           cache: "pip" # caching pip dependencies
           python-version: "3.13"
+      - id: request-issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.setOutput("issueDetails", context.payload.issue);
       - id: request-form-testplan
         if: needs.run_eligible.outputs.is-testplan == 'true'
         name: Validate Request form details
         env:
           TESTPLAN_TYPE: ${{ steps.testplan-issue.outputs.testplanType }}
           TESTPLAN_REQUEST_TYPE: ${{ steps.get-request-type.outputs.request-type }}
-          ISSUE_DETAILS: ${{ toJson(github.event.issue) }}
+          ISSUE_DETAILS: ${{ steps.request-issue.outputs.issueDetails }}
           BRANCH_DETAILS: ${{ steps.get-milestone-testplan.outputs.branch }}
         run: |
           cd .github
@@ -579,9 +584,11 @@ jobs:
       - id: request-form-prod
         if: needs.run_eligible.outputs.is-production == 'true'
         name: Validate Request Form Details
+        env:
+          ISSUE_DETAILS: ${{ steps.request-issue.outputs.issueDetails }}
         run: |
           cd .github
-          echo '${{ toJson(github.event.issue) }}' > request_form_issue_details.json
+          echo $ISSUE_DETAILS > request_form_issue_details.json
           python --version
           pip install -r scripts/requirements.txt
           set +e
