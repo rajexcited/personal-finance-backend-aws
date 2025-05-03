@@ -6,7 +6,8 @@ import { AwsResourceType, buildResourceName, getValidInfraEnvironment } from "..
 const envId = getValidInfraEnvironment();
 const appId = "prsfin";
 
-const tagsMap = getAppTags(process.env.TAGS);
+const tagsMap: Record<string, string> = {};
+// tagsMap = getAppTags(process.env.TAGS);
 
 tagsMap["environment"] = envId;
 tagsMap["appId"] = appId;
