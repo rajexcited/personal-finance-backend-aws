@@ -1486,6 +1486,8 @@ jobs:
       name: aws-infra-${{ needs.run_eligible.outputs.env-ref-name }}
     outputs:
       failed-reason: ${{ steps.destroying-comment.outputs.failedReason || steps.describe-stack.outputs.failedReason || steps.update-issue-destroy-complete.outputs.failedReason || steps.empty-bucket.outputs.failedReason }}
+    permissions: 
+      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
