@@ -74,7 +74,7 @@ jobs:
           echo "event changes: ${{ github.event.changes }}"
           echo "event action: ${{ github.event.action }}"
       - run: |
-          echo 'github json: ${{ toJson(github) }}'
+          echo github json: ${{ toJson(github) }}
       - uses: actions/github-script@v7
         with:
           script: |
@@ -127,8 +127,8 @@ jobs:
           exit 1
       - if: >
           ! startsWith(github.event.issue.title, '[Request] Provision ') && 
-          ! startsWith(github.event.issue.title, '[Request] [Rollback] Provision ') && 
-          ! startsWith(github.event.issue.title, '[Request] Deprovision ')
+          ! startsWith(github.event.issue.title, '[Request] Deprovision ') && 
+          ! startsWith(github.event.issue.title, '[Request] [Rollback] Provision ')
         run: |
           echo "It is not Request form for provision or deprovision"
           echo Workflow is not eligible to process issue
