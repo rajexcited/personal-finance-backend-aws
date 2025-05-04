@@ -366,24 +366,28 @@ jobs:
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
         run: |
-          # Wait duration to execute the command and check status 
-          SLEEP_DURATION=30 # 30 sec
-          TOTAL_WAIT_DURATION=1800 # 30 min=30*60
-          REMAINING_ATTEMPTS=$((TOTAL_WAIT_DURATION / SLEEP_DURATION))
+          # Wait duration, 30 sec, to execute the command and check status 
+          SLEEP_DURATION=30
+          # initial wait for 5 min, assuming request is submitted for api stack and is getting processed
+          INITIAL_WAIT_DURATION=300
+          # total wait for 30 min
+          TOTAL_WAIT_DURATION=1800
+          TOTAL_WAITED=0
           API_STACK_NAME="prsfin-$INFRA_ENV-infra-stack"
-          echo "initial wait for 5 min, assuming request is submitted for api stack and is getting processed"
-          sleep 300
-          while [[ $REMAINING_ATTEMPTS -gt 0 ]]; do
-            echo "Deployment is in progress. Waiting for $SLEEP_DURATION."
+          while [[ $TOTAL_WAITED -lte $TOTAL_WAIT_DURATION ]]; do
+            echo "Deployment is in progress for $TOTAL_WAITED sec. Waiting for another $SLEEP_DURATION sec"
             sleep $SLEEP_DURATION
-            REMAINING_ATTEMPTS=$((REMAINING_ATTEMPTS - 1))
+            TOTAL_WAITED=$((TOTAL_WAITED + $SLEEP_DURATION))
             set +e
             DESCRIBE_API_STACK_OUT=$(aws cloudformation describe-stacks --stack-name "$API_STACK_NAME")
             RET_CODE=$?
             set -e
             if [[ $RET_CODE -ne 0 ]]; then
-              echo "Describe Stack failed with exit code, $RET_CODE. Will wait more"
-              continue
+            echo "Describe Stack failed with exit code, $RET_CODE. Will wait more"
+              if [[ $TOTAL_WAITED -lte $INITIAL_WAIT_DURATION ]]; then
+                continue
+              fi
+              break
             fi
             # verify stack status
             STACK_STATUS=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r '.Stacks[0].StackStatus')
