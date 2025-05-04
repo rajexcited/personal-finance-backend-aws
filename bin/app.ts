@@ -6,8 +6,7 @@ import { AwsResourceType, buildResourceName, getValidInfraEnvironment } from "..
 const envId = getValidInfraEnvironment();
 const appId = "prsfin";
 
-const tagsMap: Record<string, string> = {};
-// tagsMap = getAppTags(process.env.TAGS);
+const tagsMap = getAppTags(process.env.TAGS);
 
 tagsMap["environment"] = envId;
 tagsMap["appId"] = appId;
@@ -61,11 +60,11 @@ function getAppTags(tagsEnv?: string) {
   try {
     if (tagsEnv) {
       console.log("tagEnv: ", tagsEnv, typeof tagsEnv);
-      console.log("tagEnv arr: ", tagsEnv.split(","));
+      // console.log("tagEnv arr: ", tagsEnv.split(","));
       // Parse the tags parameter
 
-      // const tagsArray = JSON.parse(tagsEnv);
-      const tagsArray = tagsEnv.split(",");
+      const tagsArray = JSON.parse(tagsEnv);
+      // const tagsArray = tagsEnv.split(",");
       console.log("tagsArray: ", tagsArray);
 
       for (let tag of tagsArray) {
