@@ -15,6 +15,7 @@ permissions:
   id-token: write
   contents: write
   issues: write
+  pull-requests: write
 
 jobs:
   display_output:
@@ -1107,8 +1108,6 @@ jobs:
       name: aws-infra-${{ needs.run_eligible.outputs.env-ref-name }}
     outputs:
       failed-reason: ${{ steps.deploying-comment.outputs.failedReason || steps.describe-stack.outputs.failedReason || steps.update-issue-deploy-complete.outputs.failedReason || steps.post-deployment-verification-issue.outputs.failedReason }}
-    permissions: 
-      pull-requests: write
     steps:
       - name: Display Needs
         run: |
@@ -1488,8 +1487,6 @@ jobs:
       name: aws-infra-${{ needs.run_eligible.outputs.env-ref-name }}
     outputs:
       failed-reason: ${{ steps.destroying-comment.outputs.failedReason || steps.describe-stack.outputs.failedReason || steps.update-issue-destroy-complete.outputs.failedReason || steps.empty-bucket.outputs.failedReason }}
-    permissions: 
-      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
