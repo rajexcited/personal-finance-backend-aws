@@ -29,7 +29,7 @@ enum ExpenseCrudLambdaHandler {
   GetItem = "index.expenseDetailsGet",
   AddUpdate = "index.expenseDetailsAddUpdate",
   DeleteItem = "index.expenseDetailsDelete",
-  UpdateStatus = "index.expenseStatusUpdate",
+  UpdateStatus = "index.expenseStatusUpdate"
 }
 
 export class ExpenseCrudApiConstruct extends BaseApiConstruct {
@@ -80,7 +80,7 @@ export class ExpenseCrudApiConstruct extends BaseApiConstruct {
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: ["s3:PutObjectTagging"],
-        resources: permittedDeleteResources,
+        resources: permittedDeleteResources
       })
     );
 
@@ -94,7 +94,7 @@ export class ExpenseCrudApiConstruct extends BaseApiConstruct {
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: ["s3:DeleteObjectTagging"],
-        resources: permittedDeleteResources,
+        resources: permittedDeleteResources
       })
     );
 
@@ -108,6 +108,7 @@ export class ExpenseCrudApiConstruct extends BaseApiConstruct {
       receiptBucket: props.receiptBucket,
       resource: expenseIdResource,
       receiptContext: props.expenseReceiptContext,
+      nodeJSRuntime: props.nodeJSRuntime
     });
   }
 
@@ -136,7 +137,7 @@ export class ExpenseCrudApiConstruct extends BaseApiConstruct {
 
     const lambdaFunction = new lambda.Function(this, this.getLambdaHandlerId(lambdaHandlerName, method), {
       functionName: this.getLambdaFunctionName(lambdaHandlerName, method),
-      runtime: lambda.Runtime.NODEJS_LATEST,
+      runtime: props.nodeJSRuntime,
       handler: lambdaHandlerName,
       // asset path is relative to project
       code: lambda.Code.fromAsset("src/lambda-handlers"),
@@ -150,15 +151,15 @@ export class ExpenseCrudApiConstruct extends BaseApiConstruct {
         RECEIPT_KEY_PREFIX: props.expenseReceiptContext.finalizeReceiptKeyPrefix,
         RECEIPT_TEMP_KEY_PREFIX: props.expenseReceiptContext.temporaryKeyPrefix,
         DEFAULT_LOG_LEVEL: this.props.environment === InfraEnvironmentId.Development ? "debug" : "undefined",
-        ...additionalEnvs,
+        ...additionalEnvs
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
-      timeout: Duration.seconds(30),
+      timeout: Duration.seconds(30)
     });
 
     const lambdaIntegration = new apigateway.LambdaIntegration(lambdaFunction, {
       proxy: true,
-      passthroughBehavior: apigateway.PassthroughBehavior.NEVER,
+      passthroughBehavior: apigateway.PassthroughBehavior.NEVER
     });
 
     const baseMethodOption = this.getRequestMethodOptions(lambdaHandlerName, resource, queryParams);
@@ -166,7 +167,7 @@ export class ExpenseCrudApiConstruct extends BaseApiConstruct {
     const resourceMethod = resource.addMethod(String(method), lambdaIntegration, {
       authorizationType: apigateway.AuthorizationType.CUSTOM,
       authorizer: props.authorizer,
-      ...baseMethodOption,
+      ...baseMethodOption
     });
 
     return lambdaFunction;

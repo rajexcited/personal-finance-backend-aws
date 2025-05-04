@@ -20,10 +20,10 @@ export class UiAssetDeployS3Construct extends Construct {
       destinationBucket: uiBucket,
       sources: [
         s3Deploy.Source.asset("dist/ui", {
-          exclude: ["**/*.html"],
-        }),
+          exclude: ["**/*.html"]
+        })
       ],
-      destinationKeyPrefix: props.uiPathPrefix.slice(1) + "/",
+      destinationKeyPrefix: props.uiPathPrefix.slice(1) + "/"
     });
 
     const homepageBucketDeploymentConstructId = buildResourceName(["homepage"], AwsResourceType.BucketDeployment, props);
@@ -31,10 +31,14 @@ export class UiAssetDeployS3Construct extends Construct {
       destinationBucket: uiBucket,
       sources: [
         s3Deploy.Source.asset("dist/ui", {
-          exclude: ["**/static/**", "*.jpeg", "*.png", "*.json", "*.ico", "*.txt", "*.css", "*.js"],
-        }),
+          exclude: ["**/static/**", "*.jpeg", "*.png", "*.json", "*.ico", "*.txt", "*.css", "*.js"]
+        })
       ],
-      destinationKeyPrefix: props.homepagePath + "/",
+      destinationKeyPrefix: props.homepagePath + "/"
     });
+
+    // due to different folder structure of dist against CF S3 structure requirements, if both runs are overlapping, 1 of them will fail.
+    // by having dependency making sure that both runs are in proper order so that we dont loose files and deployment doesn't hang.
+    uiDeployment.node.addDependency(homepageDeployment);
   }
 }

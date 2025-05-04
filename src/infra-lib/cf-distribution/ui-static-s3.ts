@@ -30,8 +30,8 @@ export class UiStaticS3Construct extends Construct {
       destinationKeyPrefix: props.errorsPathPrefix.slice(1) + "/"
     });
 
-    const cfCountryDataBucketDeploymentConstructId = buildResourceName(["cf", "country"], AwsResourceType.BucketDeployment, props);
     // TBD: revisit this later. it not used anywhere and causing deployment error
+    // const cfCountryDataBucketDeploymentConstructId = buildResourceName(["cf", "country"], AwsResourceType.BucketDeployment, props);
     // const cntryDataDeployment = new s3Deploy.BucketDeployment(this, cfCountryDataBucketDeploymentConstructId, {
     //   destinationBucket: uiBucket,
     //   sources: [s3Deploy.Source.asset("src/config-data", { exclude: ["**/default-*.json"] })],

@@ -1,12 +1,13 @@
 import { Construct } from "constructs";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
+import { IBucket } from "aws-cdk-lib/aws-s3";
+import * as lambda from "aws-cdk-lib/aws-lambda";
 import { UserApiConstruct } from "./user-api-gateway";
 import { AwsResourceType, ConstructProps, buildResourceName, ApigatewayContextInfo, ExpenseReceiptContextInfo } from "../common";
 import { DBConstruct } from "../db";
 import { LambdaLayerConstruct } from "./lambda-layer";
 import { TokenAuthorizerConstruct } from "./authorizer-lambda";
 import { ConfigTypeApiConstruct } from "./config-types-api-gateway";
-import { IBucket } from "aws-cdk-lib/aws-s3";
 import { PymtAccApiConstruct } from "./pymt-acc-api-gateway";
 import { ExpenseApiConstruct } from "./expenses";
 import { ReceiptS3Construct } from "../receipts-s3";
@@ -32,12 +33,18 @@ export class ApiConstruct extends Construct {
   constructor(scope: Construct, id: string, props: ApiProps) {
     super(scope, id);
 
-    const lambdaLayer = new LambdaLayerConstruct(this, "LayerConstruct", props);
+    const lambdaRuntimeNodeJs = lambda.Runtime.NODEJS_22_X;
+
+    const lambdaLayer = new LambdaLayerConstruct(this, "LayerConstruct", {
+      ...props,
+      nodeJSRuntime: lambdaRuntimeNodeJs
+    });
     const authSecret = new AuthSecretConstruct(this, "AuthSecretConstruct", {
       appId: props.appId,
       environment: props.environment,
       layer: lambdaLayer.layer,
-      secretRotatingDuration: props.apiContext.secretRotatingDuration
+      secretRotatingDuration: props.apiContext.secretRotatingDuration,
+      nodeJSRuntime: lambdaRuntimeNodeJs
     });
 
     const tokenAuthorizer = new TokenAuthorizerConstruct(this, "AccessTokenAuthConstruct", {
@@ -46,7 +53,8 @@ export class ApiConstruct extends Construct {
       layer: lambdaLayer.layer,
       userTable: props.allDb.userTable,
       restApiPathPrefix: props.restApiPathPrefix,
-      tokenSecret: authSecret.secret
+      tokenSecret: authSecret.secret,
+      nodeJSRuntime: lambdaRuntimeNodeJs
     });
 
     const getRandomInt = () => {
@@ -91,7 +99,8 @@ export class ApiConstruct extends Construct {
       authSecret: authSecret.secret,
       restApi: restApi,
       apiResource: apiResource,
-      deleteExpiration: props.apiContext.deleteUserExpiration
+      deleteExpiration: props.apiContext.deleteUserExpiration,
+      nodeJSRuntime: lambdaRuntimeNodeJs
     });
 
     const configTypeApi = new ConfigTypeApiConstruct(this, "ConfigTypeApiConstruct", {
@@ -103,7 +112,8 @@ export class ApiConstruct extends Construct {
       layer: lambdaLayer.layer,
       authorizer: tokenAuthorizer.authorizer,
       restApi: restApi,
-      apiResource: apiResource
+      apiResource: apiResource,
+      nodeJSRuntime: lambdaRuntimeNodeJs
     });
 
     const pymtAccApi = new PymtAccApiConstruct(this, "PymtAccApiConstruct", {
@@ -115,7 +125,8 @@ export class ApiConstruct extends Construct {
       layer: lambdaLayer.layer,
       authorizer: tokenAuthorizer.authorizer,
       restApi: restApi,
-      apiResource: apiResource
+      apiResource: apiResource,
+      nodeJSRuntime: lambdaRuntimeNodeJs
     });
 
     const expenseApi = new ExpenseApiConstruct(this, "ExpenseApiConstruct", {
@@ -127,7 +138,8 @@ export class ApiConstruct extends Construct {
       apiResource: apiResource,
       allDb: props.allDb,
       expenseReceiptContext: props.expenseReceiptContext,
-      receiptBucket: props.receiptS3.receiptBucket
+      receiptBucket: props.receiptS3.receiptBucket,
+      nodeJSRuntime: lambdaRuntimeNodeJs
     });
 
     const statApi = new StatsApiConstruct(this, "StatsApiConstruct", {
@@ -137,7 +149,8 @@ export class ApiConstruct extends Construct {
       authorizer: tokenAuthorizer.authorizer,
       restApi: restApi,
       apiResource: apiResource,
-      allDb: props.allDb
+      allDb: props.allDb,
+      nodeJSRuntime: lambdaRuntimeNodeJs
     });
   }
 }

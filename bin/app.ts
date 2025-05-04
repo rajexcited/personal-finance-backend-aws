@@ -57,25 +57,37 @@ Object.entries(tagsMap).forEach(([key, value]) => Tags.of(app).add(key, value));
 
 function getAppTags(tagsEnv?: string) {
   const tagMap: Record<string, string> = {};
-  try {
-    if (tagsEnv) {
-      console.log("tagEnv: ", tagsEnv, typeof tagsEnv);
-      // console.log("tagEnv arr: ", tagsEnv.split(","));
-      // Parse the tags parameter
+  const tagsArray = convertTagsArray(tagsEnv);
+  console.log("tagEnv: ", tagsEnv, "tagsArray: ", tagsArray);
 
-      const tagsArray = JSON.parse(tagsEnv);
-      // const tagsArray = tagsEnv.split(",");
-      console.log("tagsArray: ", tagsArray);
-
-      for (let tag of tagsArray) {
-        const [key, value] = tag.split("=");
-        console.log(`key: ${key}, value: ${value}`);
-
-        tagMap[key.trim()] = value.trim();
-      }
-    }
-  } catch (error) {
-    console.error("error in getAppTags.", 'Comma-separated list of tags, set Env e.g. "TAGS=Key1=Value1,Key2=Value2"', error);
+  if (tagsArray.length === 0) {
+    throw new Error(`there are no tags array provided. Comma-separated list of tags, set Env e.g. "TAGS=Key1=Value1,Key2=Value2"`);
+  }
+  for (let tag of tagsArray) {
+    const [key, value] = tag.split("=");
+    tagMap[key.trim()] = value.trim();
   }
   return tagMap;
+}
+
+function convertTagsArray(tagsEnv?: string) {
+  if (!tagsEnv) {
+    return [];
+  }
+
+  try {
+    const tagsArray = () => JSON.parse(tagsEnv);
+    if (Array.isArray(tagsArray)) {
+      return tagsArray;
+    }
+  } catch (e) {}
+
+  try {
+    const tagsArray = () => tagsEnv.split(",");
+    if (Array.isArray(tagsArray)) {
+      return tagsArray;
+    }
+  } catch (e) {}
+
+  return [];
 }

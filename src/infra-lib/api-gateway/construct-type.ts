@@ -7,4 +7,5 @@ export interface RestApiProps extends ConstructProps {
   authorizer: apigateway.IAuthorizer;
   restApi: apigateway.RestApi;
   apiResource: apigateway.IResource;
+  nodeJSRuntime: lambda.Runtime;
 }

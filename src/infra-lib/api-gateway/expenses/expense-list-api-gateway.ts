@@ -18,7 +18,7 @@ interface ExpenseListApiProps extends RestApiProps {
 
 enum ExpenseListLambdaHandler {
   GetList = "index.expenseListGet",
-  GetCount = "index.expenseCountGet",
+  GetCount = "index.expenseCountGet"
 }
 
 export class ExpenseListApiConstruct extends BaseApiConstruct {
@@ -31,7 +31,7 @@ export class ExpenseListApiConstruct extends BaseApiConstruct {
       pageNo: true,
       status: false,
       pageMonths: false,
-      belongsTo: false,
+      belongsTo: false
     };
     const getListLambdaFunction = this.buildApi(props.expenseResource, HttpMethod.GET, ExpenseListLambdaHandler.GetList, getListRequestQueryParams);
     props.userTable.table.ref.grantReadData(getListLambdaFunction);
@@ -55,7 +55,7 @@ export class ExpenseListApiConstruct extends BaseApiConstruct {
 
     const lambdaFunction = new lambda.Function(this, this.getLambdaHandlerId(lambdaHandlerName, method), {
       functionName: this.getLambdaFunctionName(lambdaHandlerName, method),
-      runtime: lambda.Runtime.NODEJS_LATEST,
+      runtime: props.nodeJSRuntime,
       handler: lambdaHandlerName,
       // asset path is relative to project
       code: lambda.Code.fromAsset("src/lambda-handlers"),
@@ -66,15 +66,15 @@ export class ExpenseListApiConstruct extends BaseApiConstruct {
         EXPENSE_USERID_STATUS_GSI_NAME: props.expenseTable.globalSecondaryIndexes.userIdStatusIndex.name,
         CONFIG_TYPE_TABLE_NAME: props.configTypeTable.table.name,
         CONFIG_TYPE_BELONGS_TO_GSI_NAME: props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name,
-        DEFAULT_LOG_LEVEL: this.props.environment === InfraEnvironmentId.Development ? "debug" : "undefined",
+        DEFAULT_LOG_LEVEL: this.props.environment === InfraEnvironmentId.Development ? "debug" : "undefined"
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
-      timeout: Duration.seconds(30),
+      timeout: Duration.seconds(30)
     });
 
     const lambdaIntegration = new apigateway.LambdaIntegration(lambdaFunction, {
       proxy: true,
-      passthroughBehavior: apigateway.PassthroughBehavior.NEVER,
+      passthroughBehavior: apigateway.PassthroughBehavior.NEVER
     });
 
     const baseMethodOption = this.getRequestMethodOptions(lambdaHandlerName, resource, queryParams);
@@ -82,7 +82,7 @@ export class ExpenseListApiConstruct extends BaseApiConstruct {
     const resourceMethod = resource.addMethod(String(method), lambdaIntegration, {
       authorizationType: apigateway.AuthorizationType.CUSTOM,
       authorizer: props.authorizer,
-      ...baseMethodOption,
+      ...baseMethodOption
     });
 
     return lambdaFunction;

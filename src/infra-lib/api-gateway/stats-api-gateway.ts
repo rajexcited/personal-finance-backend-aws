@@ -61,7 +61,7 @@ export class StatsApiConstruct extends BaseApiConstruct {
 
     const lambdaFunction = new lambda.Function(this, this.getLambdaHandlerId(lambdaHandlerName, method), {
       functionName: this.getLambdaFunctionName(lambdaHandlerName, method),
-      runtime: lambda.Runtime.NODEJS_LATEST,
+      runtime: props.nodeJSRuntime,
       handler: lambdaHandlerName,
       // asset path is relative to project
       code: lambda.Code.fromAsset("src/lambda-handlers"),
