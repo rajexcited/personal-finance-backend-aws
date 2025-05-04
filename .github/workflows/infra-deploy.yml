@@ -73,10 +73,10 @@ jobs:
           echo "event name: ${{ github.event_name }}"
           echo "event changes: ${{ github.event.changes }}"
           echo "event action: ${{ github.event.action }}"
-      - run: |
-          echo github json: $GITHUB_JSON
-        env:
+      - env:
           GITHUB_JSON: ${{ toJson(github) }}
+        run: |
+          echo github json= $GITHUB_JSON
       - uses: actions/github-script@v7
         with:
           script: |
@@ -1107,9 +1107,9 @@ jobs:
       name: aws-infra-${{ needs.run_eligible.outputs.env-ref-name }}
     outputs:
       failed-reason: ${{ steps.deploying-comment.outputs.failedReason || steps.describe-stack.outputs.failedReason || steps.update-issue-deploy-complete.outputs.failedReason || steps.post-deployment-verification-issue.outputs.failedReason }}
-      permissions: 
-        pull-requests: write
-      steps:
+    permissions: 
+      pull-requests: write
+    steps:
       - name: Display Needs
         run: |
           echo "Needs of Validate Request: ${{ toJson(needs.validate_request) }}"
