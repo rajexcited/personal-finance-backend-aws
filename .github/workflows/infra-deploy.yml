@@ -127,8 +127,8 @@ jobs:
           exit 1
       - if: >
           ! startsWith(github.event.issue.title, '[Request] Provision ') && 
-          ! startsWith(github.event.issue.title, '[Request] Deprovision ') && 
-          ! startsWith(github.event.issue.title, '[Request] [Rollback] Provision ')
+          ! startsWith(github.event.issue.title, '[Request] [Rollback] Provision ') && 
+          ! startsWith(github.event.issue.title, '[Request] Deprovision ') 
         run: |
           echo "It is not Request form for provision or deprovision"
           echo Workflow is not eligible to process issue
