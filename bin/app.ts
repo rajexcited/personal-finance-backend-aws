@@ -76,14 +76,14 @@ function convertTagsArray(tagsEnv?: string) {
   }
 
   try {
-    const tagsArray = () => JSON.parse(tagsEnv);
+    const tagsArray = JSON.parse(tagsEnv);
     if (Array.isArray(tagsArray)) {
       return tagsArray;
     }
   } catch (e) {}
 
   try {
-    const tagsArray = () => tagsEnv.split(",");
+    const tagsArray = tagsEnv.split(",");
     if (Array.isArray(tagsArray)) {
       return tagsArray;
     }
