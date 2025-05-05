@@ -374,17 +374,17 @@ jobs:
           TOTAL_WAIT_DURATION=1800
           TOTAL_WAITED=0
           API_STACK_NAME="prsfin-$INFRA_ENV-infra-stack"
-          while [[ $TOTAL_WAITED -lte $TOTAL_WAIT_DURATION ]]; do
+          while [[ $TOTAL_WAITED -le $TOTAL_WAIT_DURATION ]]; do
             echo "Deployment is in progress for $TOTAL_WAITED sec. Waiting for another $SLEEP_DURATION sec"
             sleep $SLEEP_DURATION
-            TOTAL_WAITED=$((TOTAL_WAITED + $SLEEP_DURATION))
+            TOTAL_WAITED=$((TOTAL_WAITED + SLEEP_DURATION))
             set +e
             DESCRIBE_API_STACK_OUT=$(aws cloudformation describe-stacks --stack-name "$API_STACK_NAME")
             RET_CODE=$?
             set -e
             if [[ $RET_CODE -ne 0 ]]; then
             echo "Describe Stack failed with exit code, $RET_CODE. Will wait more"
-              if [[ $TOTAL_WAITED -lte $INITIAL_WAIT_DURATION ]]; then
+              if [[ $TOTAL_WAITED -le $INITIAL_WAIT_DURATION ]]; then
                 continue
               fi
               break

@@ -691,7 +691,7 @@ jobs:
       - id: provision-stack-prod
         name: Verify branch is deployable
         # release or rollback
-        if: needs.run_eligible.outputs.is-is-prod-provision == 'true'
+        if: needs.run_eligible.outputs.is-prod-provision == 'true'
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
           REQUEST_ISS_REPO: ${{ github.event.repository.name }}
