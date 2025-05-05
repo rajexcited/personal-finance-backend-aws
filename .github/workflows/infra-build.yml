@@ -87,3 +87,4 @@ jobs:
           actions_comment: false
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
+          TAGS: 'job=synth'

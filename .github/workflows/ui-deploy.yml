@@ -339,7 +339,7 @@ jobs:
         with:
           cdk_subcommand: "diff"
           actions_comment: false
-          cdk_args: "MyFinanceUiDeployStack"
+          cdk_stack: "MyFinanceUiDeployStack"
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
           TAGS: ${{ join(github.event.client_payload.stack_tags, ',') }}
