@@ -438,19 +438,19 @@ jobs:
           npm ci
           npm run build
           mkdir -p dist/lambda_layer/nodejs
-          mkdir -p dist/ui
+          mkdir -p dist/ui/ui
       - name: download UI artifact
         uses: actions/download-artifact@v4
         with:
-          path: dist/ui/
+          path: dist/ui/ui
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.event.client_payload.ui_repository }}
           run-id: ${{ github.event.client_payload.workflow_run_id }}
           name: ${{ github.event.client_payload.artifact_name }}
-      # - run: ls -lrt dist/${{ github.event.client_payload.artifact_name }}
       - run: |
-          # cp -r dist/$ARTIFACT_NAME/* dist/ui
           ls -lrt dist/ui
+          mkdir dist/ui/personal-finance
+          mv dist/ui/ui/index.html dist/ui/personal-finance/
         env:
           ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
       - name: Configure AWS credentials
