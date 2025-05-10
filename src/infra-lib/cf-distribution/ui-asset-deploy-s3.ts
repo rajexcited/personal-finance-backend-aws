@@ -20,7 +20,8 @@ export class UiAssetDeployS3Construct extends Construct {
     const uiDeployment = new s3Deploy.BucketDeployment(this, uiStaticBucketDeploymentConstructId, {
       destinationBucket: uiBucket,
       sources: [s3Deploy.Source.asset("dist/ui")],
-      logRetention: logs.RetentionDays.ONE_MONTH
+      logRetention: logs.RetentionDays.ONE_MONTH,
+      prune: false
     });
   }
 }
