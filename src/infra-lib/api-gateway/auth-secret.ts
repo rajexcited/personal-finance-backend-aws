@@ -12,6 +12,7 @@ interface AuthSecretProps extends ConstructProps {
   layer: lambda.ILayerVersion;
   /** duration with unit to rotate secret. e.g. 1 month */
   secretRotatingDuration: string;
+  nodeJSRuntime: lambda.Runtime;
 }
 
 interface JwtDetail {
@@ -69,7 +70,7 @@ export class AuthSecretConstruct extends Construct {
 
     const tokenSecretLambdaFunction = new lambda.Function(this, "SecretRotationLambda", {
       functionName: buildResourceName(["token", "salt", "secret", "rotation"], AwsResourceType.Lambda, props),
-      runtime: lambda.Runtime.NODEJS_LATEST,
+      runtime: props.nodeJSRuntime,
       handler: "index.secretRotator",
       code: lambda.Code.fromAsset("src/lambda-handlers"),
       layers: [props.layer],

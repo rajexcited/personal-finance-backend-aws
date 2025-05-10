@@ -3,7 +3,7 @@ import { JSONObject, JSONValue, MethodType, ValidationError } from "../../../../
 import { ApiResourceExpense, ErrorMessage } from "../../../../src/lambda-handlers/expenses/api-resource";
 import { ExpenseBelongsTo, ExpenseStatus } from "../../../../src/lambda-handlers/expenses/base-config";
 import { getLogger } from "../../../../src/lambda-handlers/utils";
-import { getMockApiGatewayProxyEvent } from "../../../mock";
+import { getMockApiGatewayProxyEvent } from "../../../test-utils";
 
 describe("base expense request body provided, validate", () => {
   const validExpenseBase: ApiResourceExpense = {
@@ -15,11 +15,11 @@ describe("base expense request body provided, validate", () => {
     receipts: [],
     auditDetails: {
       createdOn: "2024-10-23T04:47:27.569Z",
-      updatedOn: "2024-10-23T04:47:27.569Z",
+      updatedOn: "2024-10-23T04:47:27.569Z"
     },
     belongsTo: ExpenseBelongsTo.Purchase,
     profileId: "currency-profile",
-    status: ExpenseStatus.ENABLE,
+    status: ExpenseStatus.ENABLE
   };
 
   const testValidationError = async (fieldName: keyof ApiResourceExpense, fieldValue: JSONValue, errorMessage: string) => {
@@ -28,7 +28,7 @@ describe("base expense request body provided, validate", () => {
     const mockEvent = getMockApiGatewayProxyEvent({
       method: MethodType.POST,
       body: req as JSONObject,
-      pathParameters: {},
+      pathParameters: {}
     });
     const logger = getLogger("test." + fieldName, null, null, "ERROR");
     try {
@@ -66,8 +66,8 @@ describe("base expense request body provided, validate", () => {
           contentType: "image/png",
           id: "1d778b90-a1a3-483b-aa55-968916141330",
           relationId: "48b3786d-0553-4222-b0bb-f8ac025fdf67",
-          belongsTo: "purchase",
-        },
+          belongsTo: "purchase"
+        }
       ],
       ErrorMessage.INCORRECT_VALUE
     )

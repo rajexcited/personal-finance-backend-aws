@@ -1,6 +1,6 @@
 import { getGsiSkDetailsExpenseDate } from "../../../src/lambda-handlers/expenses/db-config";
 import { getLogger } from "../../../src/lambda-handlers/utils";
-import { ConsoleMock, spyConsole } from "../../mock";
+import { ConsoleMock, spyConsole } from "../../test-utils";
 import * as datetime from "date-and-time";
 
 describe("base config", () => {

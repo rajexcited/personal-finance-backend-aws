@@ -29,6 +29,7 @@ export class ExpenseApiConstruct extends Construct {
       expenseTable: props.allDb.expenseTable,
       expenseResource: expensesResource,
       configTypeTable: props.allDb.configTypeTable,
+      nodeJSRuntime: props.nodeJSRuntime
     });
 
     const expenseCrudApi = new ExpenseCrudApiConstruct(this, "PurchaseApiConstruct", {
@@ -45,6 +46,7 @@ export class ExpenseApiConstruct extends Construct {
       expenseReceiptContext: props.expenseReceiptContext,
       expenseResource: expensesResource,
       receiptBucket: props.receiptBucket,
+      nodeJSRuntime: props.nodeJSRuntime
     });
 
     // end

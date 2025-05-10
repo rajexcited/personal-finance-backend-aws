@@ -21,7 +21,9 @@ export class PymtAccDBConstruct extends Construct {
       tableName: buildResourceName(["pymt", "acc"], AwsResourceType.Dynamodb, props),
       partitionKey: { name: "PK", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      pointInTimeRecovery: props.environment === InfraEnvironmentId.Production,
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: props.environment === InfraEnvironmentId.Production
+      },
       removalPolicy: RemovalPolicy.DESTROY
     });
 

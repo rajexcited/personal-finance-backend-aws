@@ -129,8 +129,9 @@ const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, 
     invalidFields.push({ path: PymtAccResourcePath.STATUS, message: ErrorMessage.INCORRECT_VALUE });
   }
 
-  if (req.description && !validations.isValidDescription(req.description)) {
-    invalidFields.push({ path: PymtAccResourcePath.DESCRIPTION, message: ErrorMessage.INCORRECT_FORMAT });
+  if (typeof req.description !== "string" || !validations.isValidDescription(req.description)) {
+    const msg = req.description ? ErrorMessage.INCORRECT_FORMAT : ErrorMessage.MISSING_VALUE;
+    invalidFields.push({ path: PymtAccResourcePath.DESCRIPTION, message: msg });
   }
   if (req.id && !validations.isValidUuid(req.id)) {
     invalidFields.push({ path: PymtAccResourcePath.ID, message: ErrorMessage.INCORRECT_FORMAT });
@@ -154,6 +155,8 @@ const getValidatedRequestForUpdateDetails = async (event: APIGatewayProxyEvent, 
   if (!validations.areTagsValid(req.tags)) {
     logger.info("inValidTags =", inValidTags);
     invalidFields.push({ path: PymtAccResourcePath.TAGS, message: "invalid tags [" + inValidTags + "]" });
+  } else {
+    req.tags = req.tags.map((t) => t.trim().replace(" ", "-"));
   }
 
   logger.info("invalidFields =", invalidFields);

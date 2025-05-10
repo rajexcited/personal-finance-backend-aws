@@ -12,6 +12,7 @@ interface TokenAuthorizerProps extends ConstructProps {
   userTable: UserDbProps;
   restApiPathPrefix: string;
   tokenSecret: secretsmanager.Secret;
+  nodeJSRuntime: lambda.Runtime;
 }
 
 export class TokenAuthorizerConstruct extends Construct {
@@ -23,7 +24,7 @@ export class TokenAuthorizerConstruct extends Construct {
 
     const tokenAuthorizerFunction = new lambda.Function(this, "TokenAuthorizerLambda", {
       functionName: buildResourceName(["token", "auth"], AwsResourceType.Lambda, props),
-      runtime: lambda.Runtime.NODEJS_LATEST,
+      runtime: props.nodeJSRuntime,
       handler: "index.authorizer",
       // asset path is relative to project
       code: lambda.Code.fromAsset("src/lambda-handlers"),

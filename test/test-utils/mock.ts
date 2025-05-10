@@ -1,6 +1,6 @@
 import { APIGatewayProxyEvent, APIGatewayProxyEventHeaders, Context } from "aws-lambda";
-import { MethodType } from "../src/lambda-handlers/apigateway";
-import { JSONValue } from "../src/lambda-handlers";
+import { MethodType } from "../../src/lambda-handlers/apigateway";
+import { JSONValue } from "../../src/lambda-handlers";
 
 export const noop = () => {};
 
@@ -17,7 +17,7 @@ export const getMockContext = () => {
     getRemainingTimeInMillis: () => 1,
     done: noop,
     fail: noop,
-    succeed: noop,
+    succeed: noop
   };
   return cxt;
 };
@@ -58,7 +58,7 @@ export const getMockApiGatewayProxyEvent = (mockParamEvent: MockApiGatewayProxyE
       apiId: "api-id",
       authorizer: {
         principalId: "b89241ee-7ff2-48ea-bd30-d322fdcde6d1",
-        role: "primary",
+        role: "primary"
       },
       httpMethod: mockParamEvent.method,
       identity: {
@@ -76,7 +76,7 @@ export const getMockApiGatewayProxyEvent = (mockParamEvent: MockApiGatewayProxyE
         sourceIp: "0.0.0.0",
         user: null,
         userAgent: null,
-        userArn: null,
+        userArn: null
       },
       path: "/path",
       protocol: "https",
@@ -84,10 +84,10 @@ export const getMockApiGatewayProxyEvent = (mockParamEvent: MockApiGatewayProxyE
       requestTimeEpoch: 0,
       resourceId: "rsc-id",
       resourcePath: "rsc-path",
-      stage: "stage",
+      stage: "stage"
     },
     resource: "rsc",
-    stageVariables: null,
+    stageVariables: null
   };
 
   return mockEvent;
@@ -141,6 +141,6 @@ export const spyConsole = () => {
     log,
     info,
     warn,
-    error,
+    error
   } as ConsoleMock;
 };

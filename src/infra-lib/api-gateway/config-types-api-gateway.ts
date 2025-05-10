@@ -22,7 +22,7 @@ enum ConfigTypeLambdaHandler {
   GetTagList = "index.configTypeTagList",
   GetItem = "index.configTypeDetailsGet",
   DeleteItem = "index.configTypeDelete",
-  UpdateStatus = "index.configTypeStatusUpdate",
+  UpdateStatus = "index.configTypeStatusUpdate"
 }
 
 export class ConfigTypeApiConstruct extends BaseApiConstruct {
@@ -73,7 +73,7 @@ export class ConfigTypeApiConstruct extends BaseApiConstruct {
     const props = this.props as ConfigTypeApiProps;
     const lambdaFunction = new lambda.Function(this, this.getLambdaHandlerId(lambdaHandlerName, method), {
       functionName: this.getLambdaFunctionName(lambdaHandlerName, method),
-      runtime: lambda.Runtime.NODEJS_LATEST,
+      runtime: props.nodeJSRuntime,
       handler: lambdaHandlerName,
       // asset path is relative to project
       code: lambda.Code.fromAsset("src/lambda-handlers"),
@@ -83,15 +83,15 @@ export class ConfigTypeApiConstruct extends BaseApiConstruct {
         CONFIG_TYPE_TABLE_NAME: props.configTypeTable.table.name,
         CONFIG_TYPE_BELONGS_TO_GSI_NAME: props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name,
         CONFIG_DATA_BUCKET_NAME: props.configBucket.bucketName,
-        DEFAULT_LOG_LEVEL: this.props.environment === InfraEnvironmentId.Development ? "debug" : "undefined",
+        DEFAULT_LOG_LEVEL: this.props.environment === InfraEnvironmentId.Development ? "debug" : "undefined"
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
-      timeout: Duration.seconds(30),
+      timeout: Duration.seconds(30)
     });
 
     const lambdaIntegration = new apigateway.LambdaIntegration(lambdaFunction, {
       proxy: true,
-      passthroughBehavior: apigateway.PassthroughBehavior.NEVER,
+      passthroughBehavior: apigateway.PassthroughBehavior.NEVER
     });
 
     const baseMethodOption = this.getRequestMethodOptions(lambdaHandlerName, resource, queryParams);
@@ -99,7 +99,7 @@ export class ConfigTypeApiConstruct extends BaseApiConstruct {
     const resourceMethod = resource.addMethod(String(method), lambdaIntegration, {
       authorizationType: apigateway.AuthorizationType.CUSTOM,
       authorizer: props.authorizer,
-      ...baseMethodOption,
+      ...baseMethodOption
     });
 
     return lambdaFunction;

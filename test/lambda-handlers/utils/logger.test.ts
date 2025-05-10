@@ -1,5 +1,5 @@
 import { LoggerBase, getLogger } from "../../../src/lambda-handlers/utils/logger";
-import { ConsoleMock, spyConsole } from "../../mock";
+import { ConsoleMock, spyConsole } from "../../test-utils";
 
 describe("logger level without any parent", () => {
   let mockConsole: ConsoleMock;

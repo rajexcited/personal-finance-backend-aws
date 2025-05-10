@@ -22,7 +22,7 @@ enum PaymentAccountLambdaHandler {
   GetTagList = "index.pymtAccTagList",
   GetItem = "index.pymtAccGet",
   DeleteItem = "index.pymtAccDelete",
-  UpdateStatus = "index.pymtAccStatusUpdate",
+  UpdateStatus = "index.pymtAccStatusUpdate"
 }
 
 export class PymtAccApiConstruct extends BaseApiConstruct {
@@ -34,7 +34,7 @@ export class PymtAccApiConstruct extends BaseApiConstruct {
     //  request validator setup
     // https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-method-request-validation.html
     const pymtAccListRequestQueryParams = {
-      status: false,
+      status: false
     };
     const getListLambdaFunction = this.buildApi(pymtAccResource, HttpMethod.GET, PaymentAccountLambdaHandler.GetList, pymtAccListRequestQueryParams);
     props.userTable.table.ref.grantReadData(getListLambdaFunction);
@@ -79,7 +79,7 @@ export class PymtAccApiConstruct extends BaseApiConstruct {
 
     const lambdaFunction = new lambda.Function(this, this.getLambdaHandlerId(lambdaHandler, method), {
       functionName: this.getLambdaFunctionName(lambdaHandler, method),
-      runtime: lambda.Runtime.NODEJS_LATEST,
+      runtime: props.nodeJSRuntime,
       handler: lambdaHandler,
       // asset path is relative to project
       code: lambda.Code.fromAsset("src/lambda-handlers"),
@@ -90,15 +90,15 @@ export class PymtAccApiConstruct extends BaseApiConstruct {
         CONFIG_TYPE_BELONGS_TO_GSI_NAME: props.configTypeTable.globalSecondaryIndexes.userIdBelongsToIndex.name,
         PAYMENT_ACCOUNT_TABLE_NAME: props.pymtAccTable.table.name,
         PAYMENT_ACCOUNT_USERID_GSI_NAME: props.pymtAccTable.globalSecondaryIndexes.userIdStatusShortnameIndex.name,
-        DEFAULT_LOG_LEVEL: this.props.environment === InfraEnvironmentId.Development ? "debug" : "undefined",
+        DEFAULT_LOG_LEVEL: this.props.environment === InfraEnvironmentId.Development ? "debug" : "undefined"
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
-      timeout: Duration.seconds(30),
+      timeout: Duration.seconds(30)
     });
 
     const lambdaIntegration = new apigateway.LambdaIntegration(lambdaFunction, {
       proxy: true,
-      passthroughBehavior: apigateway.PassthroughBehavior.NEVER,
+      passthroughBehavior: apigateway.PassthroughBehavior.NEVER
     });
 
     const baseMethodOption = this.getRequestMethodOptions(lambdaHandler, resource, queryParams);
@@ -106,7 +106,7 @@ export class PymtAccApiConstruct extends BaseApiConstruct {
     const resourceMethod = resource.addMethod(String(method), lambdaIntegration, {
       authorizationType: apigateway.AuthorizationType.CUSTOM,
       authorizer: props.authorizer,
-      ...baseMethodOption,
+      ...baseMethodOption
     });
 
     return lambdaFunction;
@@ -133,35 +133,35 @@ export class PymtAccApiConstruct extends BaseApiConstruct {
         properties: {
           id: {
             type: apigateway.JsonSchemaType.STRING,
-            maxLength: 36,
+            maxLength: 36
           },
           shortName: {
             type: apigateway.JsonSchemaType.STRING,
             maxLength: 20,
-            pattern: "[\\w\\s\\.@#\\$&\\+-]+",
+            pattern: "[\\w\\s\\.@#\\$&\\+-]+"
           },
           accountIdNum: {
             type: apigateway.JsonSchemaType.STRING,
             maxLength: 25,
-            pattern: "[\\w\\.,|\\+-]+",
+            pattern: "[\\w\\.,|\\+-]+"
           },
           institutionName: {
             type: apigateway.JsonSchemaType.STRING,
             maxLength: 25,
-            pattern: "[\\w\\s\\.,\\?|#\\+-]+",
+            pattern: "[\\w\\s\\.,\\?|#\\+-]+"
           },
           typeId: {
             type: apigateway.JsonSchemaType.STRING,
-            maxLength: 36,
+            maxLength: 36
           },
           description: {
             type: apigateway.JsonSchemaType.STRING,
             maxLength: 400,
-            pattern: "[\\w\\s\\.,<>\\?\\/'\";:\\{\\}\\[\\]|\\\\`~!@#\\$%\\^&\\*\\(\\)\\+=-\\Sc]+",
+            pattern: "[\\w\\s\\.,<>\\?\\/'\";:\\{\\}\\[\\]|\\\\`~!@#\\$%\\^&\\*\\(\\)\\+=-\\Sc]+"
           },
           status: {
             type: apigateway.JsonSchemaType.STRING,
-            enum: [ConfigStatus.ENABLE, ConfigStatus.DISABLE, ConfigStatus.DELETED],
+            enum: [ConfigStatus.ENABLE, ConfigStatus.DISABLE, ConfigStatus.DELETED]
           },
           tags: {
             type: apigateway.JsonSchemaType.ARRAY,
@@ -169,11 +169,11 @@ export class PymtAccApiConstruct extends BaseApiConstruct {
             items: {
               type: apigateway.JsonSchemaType.STRING,
               maxLength: 15,
-              pattern: "^[\\w\\.-]+$",
-            },
-          },
-        },
-      },
+              pattern: "^[\\w\\.-]+$"
+            }
+          }
+        }
+      }
     });
     return model;
   }

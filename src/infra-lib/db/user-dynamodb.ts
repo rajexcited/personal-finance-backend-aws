@@ -20,7 +20,9 @@ export class UserDBConstruct extends Construct {
       tableName: buildResourceName(["user", "info"], AwsResourceType.Dynamodb, props),
       partitionKey: { name: "PK", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      pointInTimeRecovery: props.environment === InfraEnvironmentId.Production,
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: props.environment === InfraEnvironmentId.Production
+      },
       timeToLiveAttribute: "ExpiresAt",
       removalPolicy: RemovalPolicy.DESTROY
     });
