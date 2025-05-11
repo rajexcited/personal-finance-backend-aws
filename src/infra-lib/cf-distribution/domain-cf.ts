@@ -15,11 +15,13 @@ export interface DomainCfProps extends ConstructProps {
 }
 
 export class DomainCfConstruct extends Construct {
+  public readonly cfDistribution: cf.IDistribution;
+
   constructor(scope: Construct, id: string, props: DomainCfProps) {
     super(scope, id);
 
     const defaultBucketOrigin = cfo.S3BucketOrigin.withOriginAccessControl(props.uiBucket, {
-      originId: "s3-static-ui",
+      originId: "s3-static-ui"
     });
 
     // https://www.iso.org/obp/ui/#search/code/
@@ -36,8 +38,8 @@ export class DomainCfConstruct extends Construct {
       function: new cf.Function(this, "RedirectHomepage", {
         code: cf.FunctionCode.fromInline(getRedirectHomeHandlerFunctionString(props)),
         runtime: cf.FunctionRuntime.JS_2_0,
-        functionName: buildResourceName(["redirect", "homepage"], AwsResourceType.CloudFrontFunction, props),
-      }),
+        functionName: buildResourceName(["redirect", "homepage"], AwsResourceType.CloudFrontFunction, props)
+      })
     };
 
     const distribution = new cf.Distribution(this, "DistributionConstruct", {
@@ -46,27 +48,28 @@ export class DomainCfConstruct extends Construct {
       defaultBehavior: {
         origin: defaultBucketOrigin,
         viewerProtocolPolicy: cf.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        functionAssociations: [redirectHomepageCfFunction],
+        functionAssociations: [redirectHomepageCfFunction]
       },
       priceClass: cf.PriceClass.PRICE_CLASS_100,
       // webAclId: props.cfContext.enableWebAcl ? props.webAclId : undefined,
       geoRestriction: geoRestriction,
-      errorResponses: this.getErrorResponses(props),
+      errorResponses: this.getErrorResponses(props)
     });
+    this.cfDistribution = distribution;
 
     const apiOrigin = new cfo.RestApiOrigin(props.restApi, {
       originId: "rest-api",
-      originPath: "/" + props.apiStageName,
+      originPath: "/" + props.apiStageName
     });
     distribution.addBehavior(relativeApiPath + "/*", apiOrigin, {
       allowedMethods: cf.AllowedMethods.ALLOW_ALL,
       viewerProtocolPolicy: cf.ViewerProtocolPolicy.HTTPS_ONLY,
       cachePolicy: cf.CachePolicy.CACHING_DISABLED,
-      originRequestPolicy: cf.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+      originRequestPolicy: cf.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER
     });
 
     distribution.addBehavior(relativeUiPath + "/*", defaultBucketOrigin, {
-      viewerProtocolPolicy: cf.ViewerProtocolPolicy.HTTPS_ONLY,
+      viewerProtocolPolicy: cf.ViewerProtocolPolicy.HTTPS_ONLY
     });
 
     const loadHomepageCfFunction = {
@@ -74,22 +77,22 @@ export class DomainCfConstruct extends Construct {
       function: new cf.Function(this, "LoadHomepage", {
         code: cf.FunctionCode.fromInline(getLoadHomepageHandlerFunctionString(props)),
         runtime: cf.FunctionRuntime.JS_2_0,
-        functionName: buildResourceName(["load", "homepage"], AwsResourceType.CloudFrontFunction, props),
-      }),
+        functionName: buildResourceName(["load", "homepage"], AwsResourceType.CloudFrontFunction, props)
+      })
     };
     distribution.addBehavior(props.cfContext.homepageUrl + "*", defaultBucketOrigin, {
       viewerProtocolPolicy: cf.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-      functionAssociations: [loadHomepageCfFunction],
+      functionAssociations: [loadHomepageCfFunction]
     });
 
     const cfDistributionDomainOutput = new CfnOutput(this, "CfDistributionDomainOutput", {
       value: distribution.distributionDomainName,
-      key: buildResourceName(["distribution", "domain"], AwsResourceType.CftOutput, props),
+      key: buildResourceName(["distribution", "domain"], AwsResourceType.CftOutput, props)
     });
 
     const cfDistributionIdOutput = new CfnOutput(this, "CfDistributionIdOutput", {
       value: distribution.distributionId,
-      key: buildResourceName(["distribution", "id"], AwsResourceType.CftOutput, props),
+      key: buildResourceName(["distribution", "id"], AwsResourceType.CftOutput, props)
     });
   }
 
@@ -97,13 +100,13 @@ export class DomainCfConstruct extends Construct {
     const errorResponse404: cf.ErrorResponse = {
       httpStatus: 404,
       responseHttpStatus: 404,
-      responsePagePath: props.cfContext.pathPrefix.errors + "/not-found.html",
+      responsePagePath: props.cfContext.pathPrefix.errors + "/not-found.html"
     };
 
     const errorResponse403: cf.ErrorResponse = {
       httpStatus: 403,
       responseHttpStatus: 403,
-      responsePagePath: props.cfContext.pathPrefix.errors + "/access-denied.html",
+      responsePagePath: props.cfContext.pathPrefix.errors + "/access-denied.html"
     };
 
     return [errorResponse403, errorResponse404];
@@ -143,9 +146,9 @@ function getRedirectHomeHandlerFunctionString(props: DomainCfProps) {
         statusDescription: "Found",
         headers: {
           location: {
-            value: `https://${request.headers.host.value}/${homepageUrl}`,
-          },
-        },
+            value: `https://${request.headers.host.value}/${homepageUrl}`
+          }
+        }
       };
       return response;
     }

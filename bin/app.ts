@@ -30,7 +30,7 @@ const props: ConstructProps = { environment: envId, appId: appId };
 // https://awscli.amazonaws.com/v2/documentation/api/latest/reference/cloudfront/create-invalidation.html
 const myFinanceStack = new MyFinanceAppStack(app, "MyFinanceInfraStack", {
   stackName: buildResourceName(["infra"], AwsResourceType.Stack, props),
-  // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
+  env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
   ...props,
   synthesizer: new DefaultStackSynthesizer({
     qualifier: appId + envId
@@ -49,7 +49,8 @@ const uiDeployStack = new MyFinanceUiDeployAppStack(app, "MyFinanceUiDeployStack
   synthesizer: new DefaultStackSynthesizer({
     qualifier: appId + envId
   }),
-  uiBucketArn: myFinanceStack.uiBucketArn
+  uiBucketArn: myFinanceStack.uiBucketArn,
+  cfDistribution: myFinanceStack.cfDistribution
 });
 
 console.log("tagsMap: ", tagsMap);
