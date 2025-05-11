@@ -7,7 +7,7 @@ on:
       - on-demand-ui-stack
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.client_payload.env_type }}
+  group: ${{ github.workflow }}-${{ github.event.client_payload.env.env_type }}
   cancel-in-progress: true
 
 permissions:
@@ -38,7 +38,7 @@ jobs:
     name: Validate Client Payload
     runs-on: ubuntu-latest
     environment:
-      name: aws-infra-${{ github.event.client_payload.env_type }}
+      name: aws-infra-${{ github.event.client_payload.env.env_type }}
     outputs:
       branch-name: ${{ steps.get-milestone-testplan.outputs.branchName || steps.get-milestone-prod.outputs.tagRefName }}
       failed-reason: ${{ steps.payload-schema.outputs.failedReason || steps.get-milestone-testplan.outputs.failedReason || steps.get-milestone-prod.outputs.failedReason }}
@@ -68,17 +68,17 @@ jobs:
             if(!payload.milestone) {
               errors.push("milestone is not provided");
             }
-            if(!payload.ui_repository) {
+            if(!payload.artifact.ui_repository) {
               errors.push("ui_repository is not provided");
             }
-            if(!payload.ui_repository.startsWith(context.repo.owner)) {
+            if(!payload.artifact.ui_repository.startsWith(context.repo.owner)) {
               errors.push("ui_repository owner is not correct");
             }
-            if(!payload.workflow_run_id) {
+            if(!payload.artifact.workflow_run_id) {
               errors.push("workflow_run_id is not provided");
             }
-            if(!payload.artifact_name) {
-              errors.push("artifact_name is not provided");
+            if(!payload.artifact.name) {
+              errors.push("artifact name is not provided");
             }
             if(payload.infraStack?.isDeploying === undefined || payload.infraStack?.initialStatus === undefined) {
               errors.push("infra stack props is not provided");
@@ -91,7 +91,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - id: get-milestone-testplan
-        if: github.event.client_payload.is_testplan == 'true'
+        if: github.event.client_payload.env.is_testplan == 'true'
         name: Validate Milestone and Branch
         uses: actions/github-script@v7
         with:
@@ -167,7 +167,7 @@ jobs:
           role-session-name: cdkSession
       - id: get-milestone-prod
         name: Validate Milestone and Branch
-        if: github.event.client_payload.is_prod == 'true'
+        if: github.event.client_payload.env.is_prod == 'true'
         uses: actions/github-script@v7
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
@@ -211,7 +211,7 @@ jobs:
     needs:
       - validate_payload
     environment:
-      name: aws-infra-${{ github.event.client_payload.env_type }}
+      name: aws-infra-${{ github.event.client_payload.env.env_type }}
     outputs:
       failed-reason: ${{ steps.validate-uistack-status.outputs.failedReason }}
     steps:
@@ -221,9 +221,9 @@ jobs:
         with:
           path: dist/ui/
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.event.client_payload.ui_repository }}
-          run-id: ${{ github.event.client_payload.workflow_run_id }}
-          name: ${{ github.event.client_payload.artifact_name }}
+          repository: ${{ github.event.client_payload.artifact.ui_repository }}
+          run-id: ${{ github.event.client_payload.artifact.workflow_run_id }}
+          name: ${{ github.event.client_payload.artifact.name }}
       - name: Copy artifact files to UI asset directory
         run: |
           pwd
@@ -231,12 +231,6 @@ jobs:
           ls -lrt
           echo ls -lrt dist
           ls -lrt dist
-          # echo ls -lrt dist/$ARTIFACT_NAME
-          # ls -lrt dist/$ARTIFACT_NAME
-          # echo "copying artifact folder to ui"
-          # cp -r dist/$ARTIFACT_NAME/* dist/ui
-        env:
-          ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
       - name: validate UI asset directory structure
         run: |
           echo ls -lrt dist
@@ -267,7 +261,7 @@ jobs:
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
           MILESTONE_TITLE: ${{ github.event.client_payload.milestone }}
-          IS_TESTPLAN: ${{ github.event.client_payload.is_testplan }}
+          IS_TESTPLAN: ${{ github.event.client_payload.env.is_testplan }}
         run: |
           FAILED_REASON=""
           UI_STACK_NAME="prsfin-$INFRA_ENV-ui-deploy-stack"
@@ -314,7 +308,7 @@ jobs:
       - validate_payload
       - validate_deployment
     environment:
-      name: aws-infra-${{ github.event.client_payload.env_type }}
+      name: aws-infra-${{ github.event.client_payload.env.env_type }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -353,7 +347,7 @@ jobs:
     needs:
       - validate_deployment
     environment:
-      name: aws-infra-${{ github.event.client_payload.env_type }}
+      name: aws-infra-${{ github.event.client_payload.env.env_type }}
     outputs:
       distribution-id: ${{ steps.wait-stack.outputs.distribution_id }}
     steps:
@@ -379,7 +373,7 @@ jobs:
           TOTAL_WAIT_DURATION=3600
           TOTAL_WAITED=0
           API_STACK_NAME="prsfin-$INFRA_ENV-infra-stack"
-          IS_STACK_STATUS_CHANGED="no"
+          IS_STACK_STATUS_CHANGED="false"
           while [[ $TOTAL_WAITED -le $TOTAL_WAIT_DURATION ]]; do
             echo "Deployment is in progress for $TOTAL_WAITED sec. Waiting for another $SLEEP_DURATION sec"
             sleep $SLEEP_DURATION
@@ -388,24 +382,24 @@ jobs:
             DESCRIBE_API_STACK_OUT=$(aws cloudformation describe-stacks --stack-name "$API_STACK_NAME")
             RET_CODE=$?
             set -e
-            CONTINUE_WAITING="no"
+            CONTINUE_WAITING="false"
             if [[ $RET_CODE -ne 0 ]]; then
               echo "Describe Stack failed with exit code, $RET_CODE. Will wait more"
-              CONTINUE_WAITING="yes"
+              CONTINUE_WAITING="true"
             fi
             # verify stack status
             STACK_STATUS=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r '.Stacks[0].StackStatus')
-            if [[ "$STACK_STATUS" == "$INITIAL_INFRA_STACK_STATUS" && "$IS_INFRA_STACK_DEPLOYING" == "true" && "$IS_STACK_STATUS_CHANGED" == "no" ]]; then
+            if [[ "$STACK_STATUS" == "$INITIAL_INFRA_STACK_STATUS" && "$IS_INFRA_STACK_DEPLOYING" == "true" && "$IS_STACK_STATUS_CHANGED" == "false" ]]; then
               echo "stack status is not changed. Will wait more"
-              CONTINUE_WAITING="yes"
+              CONTINUE_WAITING="true"
             fi
-            if [[ "$CONTINUE_WAITING" == "yes" ]]; then
+            if [[ "$CONTINUE_WAITING" == "true" ]]; then
               if [[ $TOTAL_WAITED -le $INITIAL_WAIT_DURATION ]]; then
                 continue
               fi
               break
             fi
-            IS_STACK_STATUS_CHANGED="yes"
+            IS_STACK_STATUS_CHANGED="true"
 
             if [[ "$STACK_STATUS" =~ _COMPLETE$ ]]; then
               echo "Infra Api Stack deployment is complete."
@@ -438,7 +432,7 @@ jobs:
       - diff_stack
       - wait_infra_deploy
     environment:
-      name: aws-infra-${{ github.event.client_payload.env_type }}
+      name: aws-infra-${{ github.event.client_payload.env.env_type }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -458,11 +452,11 @@ jobs:
       - name: download UI artifact
         uses: actions/download-artifact@v4
         with:
-          path: dist/ui
+          path: dist/ui/
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.event.client_payload.ui_repository }}
-          run-id: ${{ github.event.client_payload.workflow_run_id }}
-          name: ${{ github.event.client_payload.artifact_name }}
+          repository: ${{ github.event.client_payload.artifact.ui_repository }}
+          run-id: ${{ github.event.client_payload.artifact.workflow_run_id }}
+          name: ${{ github.event.client_payload.artifact.name }}
       - run: |
           ls -lrt dist/ui
       - name: Configure AWS credentials
