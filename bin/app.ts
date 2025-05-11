@@ -53,7 +53,7 @@ const uiDeployStack = new MyFinanceUiDeployAppStack(app, "MyFinanceUiDeployStack
   cfDistribution: myFinanceStack.cfDistribution
 });
 
-console.log("tagsMap: ", tagsMap);
+// console.log("tagsMap: ", tagsMap);
 Object.entries(tagsMap).forEach(([key, value]) => Tags.of(app).add(key, value));
 
 function getAppTags(tagsEnv?: string) {
