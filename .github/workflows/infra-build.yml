@@ -87,13 +87,27 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run build
-      - run: mkdir -p dist/lambda_layer/nodejs
-      - run: mkdir -p dist/ui
-      - name: cdk synth
+      - name: mkdir
+        run: |
+          mkdir -p dist/lambda_layer/nodejs
+          mkdir -p dist/ui
+      - name: cdk synth MyFinanceInfraStack
         uses: youyo/aws-cdk-github-actions@v2
         with:
           cdk_subcommand: "synth"
           actions_comment: false
+          cdk_stack: "MyFinanceInfraStack"
+          debug_log: true
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
-          TAGS: 'job=synth'
+          TAGS: "job=synth"
+      - name: cdk synth MyFinanceUiDeployStack
+        uses: youyo/aws-cdk-github-actions@v2
+        with:
+          cdk_subcommand: "synth"
+          actions_comment: false
+          cdk_stack: "MyFinanceUiDeployStack"
+          debug_log: true
+        env:
+          INFRA_ENV: ${{ vars.INFRA_ENV }}
+          TAGS: "job=synth"
