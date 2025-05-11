@@ -80,6 +80,9 @@ jobs:
             if(!payload.artifact_name) {
               errors.push("artifact_name is not provided");
             }
+            if(payload.infraStack?.isDeploying === undefined || payload.infraStack?.initialStatus === undefined) {
+              errors.push("infra stack props is not provided");
+            }
             if(errors.length>0) {
               const failedMessage = "client payload schema invalid. errors: [" + errors.join(",") + "]";
               core.setOutput("failedReason", failedMessage);
@@ -365,15 +368,18 @@ jobs:
         name: Wait for Stack Completion
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
+          IS_INFRA_STACK_DEPLOYING: ${{ github.event.client_payload.infraStack.isDeploying }}
+          INITIAL_INFRA_STACK_STATUS: ${{ github.event.client_payload.infraStack.initialStatus }}
         run: |
           # Wait duration, 30 sec, to execute the command and check status 
           SLEEP_DURATION=30
           # initial wait for 5 min, assuming request is submitted for api stack and is getting processed
-          INITIAL_WAIT_DURATION=300
+          INITIAL_WAIT_DURATION=600
           # total wait for 30 min
-          TOTAL_WAIT_DURATION=1800
+          TOTAL_WAIT_DURATION=3600
           TOTAL_WAITED=0
           API_STACK_NAME="prsfin-$INFRA_ENV-infra-stack"
+          IS_STACK_STATUS_CHANGED="no"
           while [[ $TOTAL_WAITED -le $TOTAL_WAIT_DURATION ]]; do
             echo "Deployment is in progress for $TOTAL_WAITED sec. Waiting for another $SLEEP_DURATION sec"
             sleep $SLEEP_DURATION
@@ -382,15 +388,25 @@ jobs:
             DESCRIBE_API_STACK_OUT=$(aws cloudformation describe-stacks --stack-name "$API_STACK_NAME")
             RET_CODE=$?
             set -e
+            CONTINUE_WAITING="no"
             if [[ $RET_CODE -ne 0 ]]; then
-            echo "Describe Stack failed with exit code, $RET_CODE. Will wait more"
+              echo "Describe Stack failed with exit code, $RET_CODE. Will wait more"
+              CONTINUE_WAITING="yes"
+            fi
+            # verify stack status
+            STACK_STATUS=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r '.Stacks[0].StackStatus')
+            if [[ "$STACK_STATUS" == "$INITIAL_INFRA_STACK_STATUS" && "$IS_INFRA_STACK_DEPLOYING" == "true" && "$IS_STACK_STATUS_CHANGED" == "no" ]]; then
+              echo "stack status is not changed. Will wait more"
+              CONTINUE_WAITING="yes"
+            fi
+            if [[ "$CONTINUE_WAITING" == "yes" ]]; then
               if [[ $TOTAL_WAITED -le $INITIAL_WAIT_DURATION ]]; then
                 continue
               fi
               break
             fi
-            # verify stack status
-            STACK_STATUS=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r '.Stacks[0].StackStatus')
+            IS_STACK_STATUS_CHANGED="yes"
+
             if [[ "$STACK_STATUS" =~ _COMPLETE$ ]]; then
               echo "Infra Api Stack deployment is complete."
               break
@@ -438,21 +454,17 @@ jobs:
           npm ci
           npm run build
           mkdir -p dist/lambda_layer/nodejs
-          mkdir -p dist/ui/ui
+          mkdir -p dist/ui
       - name: download UI artifact
         uses: actions/download-artifact@v4
         with:
-          path: dist/ui/ui
+          path: dist/ui
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.event.client_payload.ui_repository }}
           run-id: ${{ github.event.client_payload.workflow_run_id }}
           name: ${{ github.event.client_payload.artifact_name }}
       - run: |
           ls -lrt dist/ui
-          mkdir dist/ui/personal-finance
-          mv dist/ui/ui/index.html dist/ui/personal-finance/
-        env:
-          ARTIFACT_NAME: ${{ github.event.client_payload.artifact_name }}
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -471,22 +483,3 @@ jobs:
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
           TAGS: ${{ github.event.client_payload.stack_tags }}
-      - name: Invalidate old UI Cf cache
-        env:
-          INFRA_ENV: ${{ vars.INFRA_ENV }}
-          DISTRIBUTION_ID: ${{ needs.wait_infra_deploy.outputs.distribution-id }}
-          UI_BASE_PATH: ${{ vars.UI_BASE_PATH }}
-        run: |
-          echo aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "$UI_BASE_PATH/index.html" --query "Invalidation.Id" --output text
-          INVALIDATION_ID=$(aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "$UI_BASE_PATH/index.html" --query "Invalidation.Id" --output text)
-          echo Invalidation Id = $INVALIDATION_ID
-          INVALIDATION_STATUS="inprogress"
-          SLEEP_DURATION=30
-          until [ "$INVALIDATION_STATUS" == "Completed" ]; do
-            echo "sleeping $SLEEP_DURATION sec since cf cache hasn't been invalidated"
-            sleep $SLEEP_DURATION
-            echo aws cloudfront get-invalidation --id $INVALIDATION_ID --distribution-id $DISTRIBUTION_ID --query "Invalidation.Status" --output text
-            INVALIDATION_STATUS=$(aws cloudfront get-invalidation --id $INVALIDATION_ID --distribution-id $DISTRIBUTION_ID --query "Invalidation.Status" --output text)
-            echo "Invalidation Status: $INVALIDATION_STATUS"
-          done
-          echo "The task, to invalidate cache for index.html, is now completed."
