@@ -486,6 +486,9 @@ jobs:
               });
               const toTime = (datetime) => {
                 const date = new Date(datetime);
+                if(date.toString() === "Invalid Date") {
+                  return "NA";
+                }
                 return centralTimeFormat.format(date);
               };
               const getBranch = async (branchName, tagName) => {
@@ -1111,9 +1114,10 @@ jobs:
     steps:
       - name: Display Needs
         run: |
-          echo "Needs of Validate Request: ${{ toJson(needs.validate_request) }}"
-          echo "Needs of Update Request: ${{ toJson(needs.update_request) }}"
-          echo "Needs of Diff: ${{ toJson(needs.diff) }}"
+          echo "Needs of Validate Request: ${{ toJson(needs.validate_request.outputs) }}"
+          echo "Needs of Update Request: ${{ toJson(needs.update_request.outputs) }}"
+          echo "Needs of Diff: ${{ toJson(needs.diff.outputs) }}"
+          echo "Needs of Validate Request Stack: ${{ toJson(needs.validate_request_stack.outputs) }}"
           echo "from validate request, Milestone branch name: ${{ needs.validate_request.outputs.branch-name }}"
           echo "from validate request, Testplan Type: ${{ needs.validate_request.outputs.testplan-type }}"
           echo "from update request, Original Issue Title: ${{ needs.update_request.outputs.original-issue-title }}"
@@ -1176,6 +1180,9 @@ jobs:
               });
               const toTime = (datetime) => {
                 const date = new Date(datetime);
+                if(date.toString() === "Invalid Date") {
+                  return "NA";
+                }
                 return centralTimeFormat.format(date);
               };
               const deploymentStartTime = new Date().toISOString();
@@ -1335,6 +1342,9 @@ jobs:
               });
               const toTime = (datetime) => {
                 const date = new Date(datetime);
+                if(date.toString() === "Invalid Date") {
+                  return "NA";
+                }
                 return centralTimeFormat.format(date);
               };
               const deploymentEndTime = new Date();
@@ -1529,6 +1539,9 @@ jobs:
               });
               const toTime = (datetime) => {
                 const date = new Date(datetime);
+                if(date.toString() === "Invalid Date") {
+                  return "NA";
+                }
                 return centralTimeFormat.format(date);
               };
               const destroyStartTime = new Date().toISOString();
