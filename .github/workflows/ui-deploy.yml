@@ -339,7 +339,7 @@ jobs:
           cdk_stack: "MyFinanceUiDeployStack"
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
-          TAGS: ${{ github.event.client_payload.stack_tags }}
+          TAGS: ${{ join(github.event.client_payload.stack_tags) }}
 
   wait_infra_deploy:
     name: Wait for Infra Stack deployment
@@ -476,4 +476,4 @@ jobs:
           cdk_args: "--require-approval never --exclusively"
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
-          TAGS: ${{ github.event.client_payload.stack_tags }}
+          TAGS: ${{ join(github.event.client_payload.stack_tags) }}
