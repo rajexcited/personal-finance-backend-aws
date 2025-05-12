@@ -28,7 +28,8 @@ export class UiAssetDeployS3Construct extends Construct {
       ],
       retainOnDelete: false,
       logRetention: logs.RetentionDays.ONE_MONTH,
-      destinationKeyPrefix: props.uiPathPrefix.slice(1) + "/"
+      destinationKeyPrefix: props.uiPathPrefix.slice(1) + "/",
+      memoryLimit: 256
     });
 
     const homepageBucketDeploymentConstructId = buildResourceName(["homepage"], AwsResourceType.BucketDeployment, props);
