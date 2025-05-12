@@ -389,7 +389,7 @@ jobs:
             fi
             # verify stack status
             STACK_STATUS=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r '.Stacks[0].StackStatus')
-            if [[ "$STACK_STATUS" == "$INITIAL_INFRA_STACK_STATUS" && "$IS_INFRA_STACK_DEPLOYING" == "true" && "$IS_STACK_STATUS_CHANGED" == "false" ]]; then
+            if [[ "$CONTINUE_WAITING" == "false" && "$STACK_STATUS" == "$INITIAL_INFRA_STACK_STATUS" && "$IS_INFRA_STACK_DEPLOYING" == "true" && "$IS_STACK_STATUS_CHANGED" == "false" ]]; then
               echo "stack status is not changed. Will wait more"
               CONTINUE_WAITING="true"
             fi
