@@ -19,7 +19,7 @@ export class UiStaticS3Construct extends Construct {
     const uiBucket = new s3.Bucket(this, "UIStaticBucketS3", {
       autoDeleteObjects: true,
       bucketName: buildResourceName(["ui", "static"], AwsResourceType.S3Bucket, props),
-      removalPolicy: RemovalPolicy.DESTROY,
+      removalPolicy: RemovalPolicy.DESTROY
     });
     this.uiBucket = uiBucket;
 
@@ -27,14 +27,15 @@ export class UiStaticS3Construct extends Construct {
     const cfErrorDeployment = new s3Deploy.BucketDeployment(this, cfErrorBucketDeploymentConstructId, {
       destinationBucket: uiBucket,
       sources: [s3Deploy.Source.asset("src/error-pages")],
-      destinationKeyPrefix: props.errorsPathPrefix.slice(1) + "/",
+      destinationKeyPrefix: props.errorsPathPrefix.slice(1) + "/"
     });
 
-    const cfCountryDataBucketDeploymentConstructId = buildResourceName(["cf", "country"], AwsResourceType.BucketDeployment, props);
-    const cntryDataDeployment = new s3Deploy.BucketDeployment(this, cfCountryDataBucketDeploymentConstructId, {
-      destinationBucket: uiBucket,
-      sources: [s3Deploy.Source.asset("src/config-data", { exclude: ["**/default-*.json"] })],
-      destinationKeyPrefix: props.uiPathPrefix.slice(1) + "/config/",
-    });
+    // TBD: revisit this later. it not used anywhere and causing deployment error
+    // const cfCountryDataBucketDeploymentConstructId = buildResourceName(["cf", "country"], AwsResourceType.BucketDeployment, props);
+    // const cntryDataDeployment = new s3Deploy.BucketDeployment(this, cfCountryDataBucketDeploymentConstructId, {
+    //   destinationBucket: uiBucket,
+    //   sources: [s3Deploy.Source.asset("src/config-data", { exclude: ["**/default-*.json"] })],
+    //   destinationKeyPrefix: props.uiPathPrefix.slice(1) + "/config/",
+    // });
   }
 }

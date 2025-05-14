@@ -1,5 +1,6 @@
 import { Construct } from "constructs";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
+import * as cf from "aws-cdk-lib/aws-cloudfront";
 import { ConstructProps, ContextInfo } from "../common";
 import { DomainCfConstruct } from "./domain-cf";
 import { UiStaticS3Construct } from "./ui-static-s3";
@@ -16,6 +17,7 @@ interface MyCfDistributionProps extends ConstructProps {
 
 export class MyCfDistributionConstruct extends Construct {
   public readonly uiBucketArn: string;
+  public readonly cfDistribution: cf.IDistribution;
 
   constructor(scope: Construct, id: string, props: MyCfDistributionProps) {
     super(scope, id);
@@ -25,7 +27,7 @@ export class MyCfDistributionConstruct extends Construct {
       environment: props.environment,
       uiPathPrefix: props.contextInfo.cloudfront.pathPrefix.ui,
       errorsPathPrefix: props.contextInfo.cloudfront.pathPrefix.errors,
-      homepagePath: props.contextInfo.cloudfront.homepageUrl,
+      homepagePath: props.contextInfo.cloudfront.homepageUrl
     });
     this.uiBucketArn = uiS3.uiBucket.bucketArn;
 
@@ -36,7 +38,8 @@ export class MyCfDistributionConstruct extends Construct {
       // webAclId: props.webAclId,
       uiBucket: uiS3.uiBucket,
       apiStageName: props.stageName,
-      cfContext: props.contextInfo.cloudfront,
+      cfContext: props.contextInfo.cloudfront
     });
+    this.cfDistribution = domainCf.cfDistribution;
   }
 }

@@ -24,13 +24,7 @@ export const isValidFileExtension = (fileName?: string | null) => {
   // filename with or without extension. or simply file extension
   const extension = splitFilenameAndExtension(fileName).extension;
   // extension is optional. if present it must be one of acceptable values
-  if (
-    extension &&
-    extension !== FileExtension.JPG &&
-    extension !== FileExtension.JPEG &&
-    extension !== FileExtension.PDF &&
-    extension !== FileExtension.PNG
-  ) {
+  if (extension && extension !== FileExtension.JPG && extension !== FileExtension.JPEG && extension !== FileExtension.PDF && extension !== FileExtension.PNG) {
     return false;
   }
   return true;
@@ -43,12 +37,12 @@ const splitFilenameAndExtension = (filename?: string | null) => {
     const parts = filename.split(".");
     if (parts.length > 1) {
       name = parts.slice(0, -1).join(".");
-      extension = parts.slice(-1)[0];
+      extension = parts.slice(-1)[0].toLowerCase();
     }
   }
   return {
     name,
-    extension,
+    extension
   };
 };
 
@@ -65,31 +59,44 @@ export const isValidFileSize = (size?: number | null) => {
   return size > ONE_KB && size < FILESIZE_MAX_BYTES;
 };
 
-export const areValidReceipts = (
-  receipts: ApiResourceReceipt[] | null | undefined,
-  expenseId: string | undefined,
-  belongsTo: ExpenseBelongsTo,
-  _logger: LoggerBase
-) => {
+export const areValidReceipts = (receipts: ApiResourceReceipt[] | null | undefined, expenseId: string | undefined, belongsTo: ExpenseBelongsTo, _logger: LoggerBase) => {
   const logger = getLogger("areValidReceipts", _logger);
   if (!receipts) return false;
   if (!Array.isArray(receipts) || receipts.length > RECEIPTS_MAX_ALLOWED) return false;
   if (!expenseId && receipts.length > 0) return false;
 
   const validReceipts = receipts.filter((rct) => {
-    if (!isValidFilename(rct.name)) return false;
-    if (!isValidFileExtension(rct.name)) return false;
+    if (!isValidFilename(rct.name)) {
+      logger.info(`filename[${rct.name}] is invalid`);
+      return false;
+    }
+    if (!isValidFileExtension(rct.name)) {
+      logger.info(`file extension[${rct.name}] is invalid`);
+      return false;
+    }
 
-    if (!isValidReceiptType(rct.contentType)) return false;
-    if (!validations.isValidUuid(rct.id)) return false;
-
-    if (rct.relationId !== expenseId) return false;
-    if (rct.belongsTo !== belongsTo) return false;
+    if (!isValidReceiptType(rct.contentType)) {
+      logger.info(`receipt type [${rct.contentType}] is invalid`);
+      return false;
+    }
+    if (!validations.isValidUuid(rct.id)) {
+      logger.info(`receipt id [${rct.id}] is not uuid`);
+      return false;
+    }
+    if (rct.relationId !== expenseId) {
+      logger.info(`receipt with name [${rct.name}] relationId [${rct.relationId}] is not matching with purchaseId[${expenseId}]`);
+      return false;
+    }
+    if (rct.belongsTo !== belongsTo) {
+      logger.info(`receipt with name [${rct.name}] belongsTo [${rct.belongsTo}] is not [${belongsTo}]`);
+      return false;
+    }
 
     return true;
   });
 
-  logger.debug("validReceipts.length=", validReceipts.length, ", receipts.length =", receipts.length, ", validReceipts=", validReceipts);
+  logger.info(`${validReceipts.length} / ${receipts.length} receipts are valid.`);
+  logger.debug("validReceipts = ", validReceipts);
   return validReceipts.length === receipts.length;
 };
 
@@ -105,11 +112,7 @@ export const isValidPathKey = async (s3Key: string, _logger: LoggerBase) => {
 export const isValidContentType = async (s3Key: string, _logger: LoggerBase) => {
   const logger = getLogger("isValidContentType", _logger);
   const headOutput = await getReceiptFileHeadDetails(s3Key, logger);
-  if (
-    headOutput?.ContentType === ReceiptContentType.JPG ||
-    headOutput?.ContentType === ReceiptContentType.PNG ||
-    headOutput?.ContentType === ReceiptContentType.PDF
-  ) {
+  if (headOutput?.ContentType === ReceiptContentType.JPG || headOutput?.ContentType === ReceiptContentType.PNG || headOutput?.ContentType === ReceiptContentType.PDF) {
     return true;
   }
   return false;

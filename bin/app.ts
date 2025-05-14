@@ -6,8 +6,7 @@ import { AwsResourceType, buildResourceName, getValidInfraEnvironment } from "..
 const envId = getValidInfraEnvironment();
 const appId = "prsfin";
 
-const tagsMap: Record<string, string> = {};
-// tagsMap = getAppTags(process.env.TAGS);
+const tagsMap = getAppTags(process.env.TAGS);
 
 tagsMap["environment"] = envId;
 tagsMap["appId"] = appId;
@@ -31,7 +30,7 @@ const props: ConstructProps = { environment: envId, appId: appId };
 // https://awscli.amazonaws.com/v2/documentation/api/latest/reference/cloudfront/create-invalidation.html
 const myFinanceStack = new MyFinanceAppStack(app, "MyFinanceInfraStack", {
   stackName: buildResourceName(["infra"], AwsResourceType.Stack, props),
-  // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
+  env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
   ...props,
   synthesizer: new DefaultStackSynthesizer({
     qualifier: appId + envId
@@ -50,28 +49,46 @@ const uiDeployStack = new MyFinanceUiDeployAppStack(app, "MyFinanceUiDeployStack
   synthesizer: new DefaultStackSynthesizer({
     qualifier: appId + envId
   }),
-  uiBucketArn: myFinanceStack.uiBucketArn
+  uiBucketArn: myFinanceStack.uiBucketArn,
+  cfDistribution: myFinanceStack.cfDistribution
 });
 
+// console.log("tagsMap: ", tagsMap);
 Object.entries(tagsMap).forEach(([key, value]) => Tags.of(app).add(key, value));
 
 function getAppTags(tagsEnv?: string) {
   const tagMap: Record<string, string> = {};
-  try {
-    if (tagsEnv) {
-      // Parse the tags parameter
-      const tagsArray = JSON.parse(tagsEnv);
-      console.log(`tagsArray: ${tagsArray}`);
+  const tagsArray = convertTagsArray(tagsEnv);
+  console.log("tagEnv: ", tagsEnv, "tagsArray: ", tagsArray);
 
-      for (let tag of tagsArray) {
-        const [key, value] = tag.split("=");
-        console.log(`key: ${key}, value: ${value}`);
-
-        tagMap[key.trim()] = value.trim();
-      }
-    }
-  } catch (error) {
-    console.error("error in getAppTags.", 'Comma-separated list of tags, set Env e.g. "TAGS=Key1=Value1,Key2=Value2"', error);
+  if (tagsArray.length === 0) {
+    throw new Error(`there are no tags array provided. Comma-separated list of tags, set Env e.g. "TAGS=Key1=Value1,Key2=Value2"`);
+  }
+  for (let tag of tagsArray) {
+    const [key, value] = tag.split("=");
+    tagMap[key.trim()] = value.trim();
   }
   return tagMap;
+}
+
+function convertTagsArray(tagsEnv?: string) {
+  if (!tagsEnv) {
+    return [];
+  }
+
+  try {
+    const tagsArray = JSON.parse(tagsEnv);
+    if (Array.isArray(tagsArray)) {
+      return tagsArray;
+    }
+  } catch (e) {}
+
+  try {
+    const tagsArray = tagsEnv.split(",");
+    if (Array.isArray(tagsArray)) {
+      return tagsArray;
+    }
+  } catch (e) {}
+
+  return [];
 }

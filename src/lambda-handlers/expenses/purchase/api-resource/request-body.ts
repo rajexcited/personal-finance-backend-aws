@@ -63,18 +63,52 @@ export const validateItems = (purchaseItemDetailsList: ApiResourcePurchaseItemDe
   const logger = getLogger("validateItems", _logger);
 
   const invalidPrchItms = purchaseItemDetailsList.filter((ei) => {
-    if (!validations.isValidUuid(ei.id)) return true;
-    if (!expenseFieldValidator.isValidBillName(ei.billName)) return true;
-    if (!expenseFieldValidator.isValidAmount(ei.amount)) return true;
-    if (!expenseFieldValidator.isValidDescription(ei.description)) return true;
-    if (!expenseFieldValidator.areTagsValid(ei.tags)) return true;
-    if (ei.purchaseTypeId && !validations.isValidUuid(ei.purchaseTypeId)) return true;
+    if (!ei.id) {
+      logger.info(`purchase item id[${ei.id}] is invalid`);
+      return true;
+    }
+    if (!expenseFieldValidator.isValidBillName(ei.billName)) {
+      logger.info(`purchase item billName[${ei.billName}] is invalid`);
+      return true;
+    }
+    if (!expenseFieldValidator.isValidAmount(ei.amount)) {
+      logger.info(`purchase item amount[${ei.amount}] is invalid`);
+      return true;
+    }
+    ei.description = ei.description || "";
+    if (!expenseFieldValidator.isValidDescription(ei.description)) {
+      logger.info(`purchase item description[${ei.description}] is invalid`);
+      return true;
+    }
+    if (!expenseFieldValidator.areTagsValid(ei.tags)) {
+      logger.info(`purchase item tags[${ei.tags}] is invalid`);
+      return true;
+    }
+    ei.tags = ei.tags.map((it) => it.trim().replace(" ", "-"));
+    if (ei.purchaseTypeId && !validations.isValidUuid(ei.purchaseTypeId)) {
+      logger.info(`purchase item purchaseTypeId[${ei.purchaseTypeId}] is invalid`);
+      return true;
+    }
 
     return false;
   });
 
   logger.warn("invalidExpItms.length =", invalidPrchItms.length, ", invalidExpItms =", invalidPrchItms);
   if (invalidPrchItms.length > 0) {
+    invalidFields.push({ path: PurchaseRequestResourcePath.PURCHASE_ITEMS, message: ErrorMessage.INCORRECT_VALUE });
+    return;
+  }
+  const itemIdSet = new Set(purchaseItemDetailsList.map((pi) => pi.id));
+  if (itemIdSet.size !== purchaseItemDetailsList.length) {
+    logger.info(
+      "item ids are not unique, ",
+      itemIdSet.size,
+      " unique ids=",
+      [...itemIdSet.values()],
+      " for ",
+      purchaseItemDetailsList.length,
+      " purchaseItemDetails"
+    );
     invalidFields.push({ path: PurchaseRequestResourcePath.PURCHASE_ITEMS, message: ErrorMessage.INCORRECT_VALUE });
   }
 };
@@ -89,8 +123,8 @@ const validateItemPurchaseTypeExists = async (items: ApiResourcePurchaseItemDeta
       throw new ValidationError([
         {
           path: PurchaseRequestResourcePath.PURCHASE_ITEMS + "." + PurchaseRequestResourcePath.PURCHASE_TYPE,
-          message: ErrorMessage.INCORRECT_VALUE,
-        },
+          message: ErrorMessage.INCORRECT_VALUE
+        }
       ]);
     }
   }

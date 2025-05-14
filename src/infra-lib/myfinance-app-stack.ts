@@ -1,4 +1,5 @@
 import { Stack, StackProps } from "aws-cdk-lib";
+import * as cf from "aws-cdk-lib/aws-cloudfront";
 import { Construct } from "constructs";
 import { DBConstruct } from "./db";
 import { ConstructProps, ContextInfo } from "./common";
@@ -20,6 +21,7 @@ interface MyFinanceAppStackProps extends StackProps, ConstructProps {
 
 export class MyFinanceAppStack extends Stack {
   public readonly uiBucketArn: string;
+  public readonly cfDistribution: cf.IDistribution;
 
   constructor(scope: Construct, id: string, props: MyFinanceAppStackProps) {
     super(scope, id, props);
@@ -28,18 +30,18 @@ export class MyFinanceAppStack extends Stack {
 
     const allDbs = new DBConstruct(this, "DatabaseConstruct", {
       environment: props.environment,
-      appId: props.appId,
+      appId: props.appId
     });
 
     const configS3 = new ConfigS3Construct(this, "ConfigS3Construct", {
       environment: props.environment,
-      appId: props.appId,
+      appId: props.appId
     });
 
     const receiptS3 = new ReceiptS3Construct(this, "ReceiptS3Construct", {
       environment: props.environment,
       appId: props.appId,
-      expenseReceiptContext: contextInfo.expenseReceipt,
+      expenseReceiptContext: contextInfo.expenseReceipt
     });
 
     const allApis = new ApiConstruct(this, "RestApiConstruct", {
@@ -50,19 +52,20 @@ export class MyFinanceAppStack extends Stack {
       restApiPathPrefix: contextInfo.cloudfront.pathPrefix.restApi,
       configBucket: configS3.configBucket,
       receiptS3: receiptS3,
-      expenseReceiptContext: contextInfo.expenseReceipt,
+      expenseReceiptContext: contextInfo.expenseReceipt
     });
 
-    const cfDistribution = new MyCfDistributionConstruct(this, "MyCfDistributionConstruct", {
+    const cloudfrontDistribution = new MyCfDistributionConstruct(this, "MyCfDistributionConstruct", {
       environment: props.environment,
       appId: props.appId,
       restApi: allApis.restApi,
       contextInfo: contextInfo,
-      stageName: allApis.stageName,
+      stageName: allApis.stageName
       // webAclId: props.webAclId,
     });
 
-    this.uiBucketArn = cfDistribution.uiBucketArn;
+    this.uiBucketArn = cloudfrontDistribution.uiBucketArn;
+    this.cfDistribution = cloudfrontDistribution.cfDistribution;
     // upload image, textextract to invoice details, retireve image
   }
 }

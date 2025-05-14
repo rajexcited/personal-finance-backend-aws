@@ -1,4 +1,5 @@
 import { Stack, StackProps } from "aws-cdk-lib";
+import * as cf from "aws-cdk-lib/aws-cloudfront";
 import { Construct } from "constructs";
 import { ConstructProps, ContextInfo } from "./common";
 import { UiAssetDeployS3Construct } from "./cf-distribution";
@@ -12,6 +13,7 @@ import { UiAssetDeployS3Construct } from "./cf-distribution";
  */
 interface MyFinanceUiDeployAppStackProps extends StackProps, ConstructProps {
   uiBucketArn: string;
+  cfDistribution: cf.IDistribution;
 }
 
 export class MyFinanceUiDeployAppStack extends Stack {
@@ -26,6 +28,7 @@ export class MyFinanceUiDeployAppStack extends Stack {
       uiBucketArn: props.uiBucketArn,
       uiPathPrefix: contextInfo.cloudfront.pathPrefix.ui,
       homepagePath: contextInfo.cloudfront.homepageUrl,
+      cfDistribution: props.cfDistribution
     });
   }
 }

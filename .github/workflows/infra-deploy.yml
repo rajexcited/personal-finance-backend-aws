@@ -1270,7 +1270,7 @@ jobs:
           cdk_args: "--require-approval never --exclusively"
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
-          TAGS: ${{ join(needs.diff.outputs.stack-tags) }}
+          TAGS: ${{ needs.diff.outputs.stack-tags }}
         continue-on-error: true
       - id: describe-stack
         name: Describe stack

@@ -27,33 +27,33 @@ export class StatsApiConstruct extends BaseApiConstruct {
     const statsResource = props.apiResource.addResource("stats");
     const statsQueryParams = { year: false };
 
-    const belongsToResource = statsResource.addResource("{belongsTo}");
-    const getBelongsToStatsLambdaFunction = this.buildApi(belongsToResource, HttpMethod.GET, StatsLambdaHandler.GetBelongsToStats, statsQueryParams);
-    props.allDb.userTable.table.ref.grantReadData(getBelongsToStatsLambdaFunction);
-    props.allDb.expenseTable.table.ref.grantReadData(getBelongsToStatsLambdaFunction);
-    props.allDb.configTypeTable.table.ref.grantReadData(getBelongsToStatsLambdaFunction);
-    props.allDb.paymentAccountTable.table.ref.grantReadData(getBelongsToStatsLambdaFunction);
+    // const belongsToResource = statsResource.addResource("{belongsTo}");
+    // const getBelongsToStatsLambdaFunction = this.buildApi(belongsToResource, HttpMethod.GET, StatsLambdaHandler.GetBelongsToStats, statsQueryParams);
+    // props.allDb.userTable.table.ref.grantReadData(getBelongsToStatsLambdaFunction);
+    // props.allDb.expenseTable.table.ref.grantReadData(getBelongsToStatsLambdaFunction);
+    // props.allDb.configTypeTable.table.ref.grantReadData(getBelongsToStatsLambdaFunction);
+    // props.allDb.paymentAccountTable.table.ref.grantReadData(getBelongsToStatsLambdaFunction);
 
-    // const purchaseResource = statsResource.addResource("purchase");
-    // const getPurchaseStatsLambdaFunction = this.buildApi(purchaseResource, HttpMethod.GET, StatsLambdaHandler.GetPurchaseStats, statsQueryParams);
-    // props.allDb.userTable.table.ref.grantReadData(getPurchaseStatsLambdaFunction);
-    // props.allDb.expenseTable.table.ref.grantReadData(getPurchaseStatsLambdaFunction);
-    // props.allDb.configTypeTable.table.ref.grantReadData(getPurchaseStatsLambdaFunction);
-    // props.allDb.paymentAccountTable.table.ref.grantReadData(getPurchaseStatsLambdaFunction);
+    const purchaseResource = statsResource.addResource("purchase");
+    const getPurchaseStatsLambdaFunction = this.buildApi(purchaseResource, HttpMethod.GET, StatsLambdaHandler.GetPurchaseStats, statsQueryParams);
+    props.allDb.userTable.table.ref.grantReadData(getPurchaseStatsLambdaFunction);
+    props.allDb.expenseTable.table.ref.grantReadData(getPurchaseStatsLambdaFunction);
+    props.allDb.configTypeTable.table.ref.grantReadData(getPurchaseStatsLambdaFunction);
+    props.allDb.paymentAccountTable.table.ref.grantReadData(getPurchaseStatsLambdaFunction);
 
-    // const refundResource = statsResource.addResource("refund");
-    // const getRefundStatsLambdaFunction = this.buildApi(refundResource, HttpMethod.GET, StatsLambdaHandler.GetRefundStats, statsQueryParams);
-    // props.allDb.userTable.table.ref.grantReadData(getRefundStatsLambdaFunction);
-    // props.allDb.expenseTable.table.ref.grantReadData(getRefundStatsLambdaFunction);
-    // props.allDb.configTypeTable.table.ref.grantReadData(getRefundStatsLambdaFunction);
-    // props.allDb.paymentAccountTable.table.ref.grantReadData(getRefundStatsLambdaFunction);
+    const refundResource = statsResource.addResource("refund");
+    const getRefundStatsLambdaFunction = this.buildApi(refundResource, HttpMethod.GET, StatsLambdaHandler.GetRefundStats, statsQueryParams);
+    props.allDb.userTable.table.ref.grantReadData(getRefundStatsLambdaFunction);
+    props.allDb.expenseTable.table.ref.grantReadData(getRefundStatsLambdaFunction);
+    props.allDb.configTypeTable.table.ref.grantReadData(getRefundStatsLambdaFunction);
+    props.allDb.paymentAccountTable.table.ref.grantReadData(getRefundStatsLambdaFunction);
 
-    // const incomeResource = statsResource.addResource("income");
-    // const getIncomeStatsLambdaFunction = this.buildApi(incomeResource, HttpMethod.GET, StatsLambdaHandler.GetIncomeStats, statsQueryParams);
-    // props.allDb.userTable.table.ref.grantReadData(getIncomeStatsLambdaFunction);
-    // props.allDb.expenseTable.table.ref.grantReadData(getIncomeStatsLambdaFunction);
-    // props.allDb.configTypeTable.table.ref.grantReadData(getIncomeStatsLambdaFunction);
-    // props.allDb.paymentAccountTable.table.ref.grantReadData(getIncomeStatsLambdaFunction);
+    const incomeResource = statsResource.addResource("income");
+    const getIncomeStatsLambdaFunction = this.buildApi(incomeResource, HttpMethod.GET, StatsLambdaHandler.GetIncomeStats, statsQueryParams);
+    props.allDb.userTable.table.ref.grantReadData(getIncomeStatsLambdaFunction);
+    props.allDb.expenseTable.table.ref.grantReadData(getIncomeStatsLambdaFunction);
+    props.allDb.configTypeTable.table.ref.grantReadData(getIncomeStatsLambdaFunction);
+    props.allDb.paymentAccountTable.table.ref.grantReadData(getIncomeStatsLambdaFunction);
   }
 
   private buildApi(resource: apigateway.Resource, method: HttpMethod, lambdaHandlerName: StatsLambdaHandler, queryParams?: Record<string, boolean>) {
@@ -61,7 +61,7 @@ export class StatsApiConstruct extends BaseApiConstruct {
 
     const lambdaFunction = new lambda.Function(this, this.getLambdaHandlerId(lambdaHandlerName, method), {
       functionName: this.getLambdaFunctionName(lambdaHandlerName, method),
-      runtime: lambda.Runtime.NODEJS_LATEST,
+      runtime: props.nodeJSRuntime,
       handler: lambdaHandlerName,
       // asset path is relative to project
       code: lambda.Code.fromAsset("src/lambda-handlers"),
