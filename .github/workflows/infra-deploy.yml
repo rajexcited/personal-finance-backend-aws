@@ -884,8 +884,8 @@ jobs:
             exit 1
           fi
 
-          API_CREATED_TIME=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r ".Stacks[0].CreationTime")
-          API_UPDATED_TIME=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r ".Stacks[0].LastUpdatedTime")
+          API_CREATED_TIME=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].CreationTime")
+          API_UPDATED_TIME=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].LastUpdatedTime")
           API_STACK_AUDIT='{"created_time":"'$API_CREATED_TIME'","updated_time":"'$API_UPDATED_TIME'"}'
 
           STACK_AUDIT='{"api":'$API_STACK_AUDIT'}'
