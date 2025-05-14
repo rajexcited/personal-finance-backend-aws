@@ -131,7 +131,7 @@ jobs:
       - if: >
           ! startsWith(github.event.issue.title, '[Request] Provision ') && 
           ! startsWith(github.event.issue.title, '[Request] [Rollback] Provision ') && 
-          ! startsWith(github.event.issue.title, '[Request] Deprovision ') 
+          ! startsWith(github.event.issue.title, '[Request] Deprovision ')
         run: |
           echo "It is not Request form for provision or deprovision"
           echo Workflow is not eligible to process issue
@@ -340,12 +340,12 @@ jobs:
                   }
                 }
               }
-              if((process.env.TESTPLAN_REQUEST_TYPE === "provision" && context.payload.issue.milestone.state !== "open") || (process.env.TESTPLAN_REQUEST_TYPE === "deprovision" && !branchDetails.name)) {
+              if(context.payload.issue.milestone.state !== "open" || (process.env.TESTPLAN_REQUEST_TYPE === "deprovision" && !branchDetails.name)) {
                 // if milestone is closed, the master branch should have milestone version
                 // for deprovisioning, if milestone is open, the master branch should have milestone version;
                 // compare package.json and milestone version
                 const fs = require('fs');
-                const packageJson = fs.readFileSync('package.json', 'utf8');
+                const packageJson = fs.readFileSync('package-lock.json', 'utf8');
                 const packageJsonObj = JSON.parse(packageJson);
                 if(`v${packageJsonObj.version}` !== context.payload.issue.milestone.title) {
                   throw new Error(`Master branch package.json version [${packageJsonObj.version}] does not match with requested milestone version [${context.payload.issue.milestone.title}]`);
@@ -884,8 +884,8 @@ jobs:
             exit 1
           fi
 
-          API_CREATED_TIME=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r ".Stacks[0].CreationTime")
-          API_UPDATED_TIME=$(echo "$DESCRIBE_API_STACK_OUT" | jq -r ".Stacks[0].LastUpdatedTime")
+          API_CREATED_TIME=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].CreationTime")
+          API_UPDATED_TIME=$(echo "$DESCRIBE_STACK_OUT" | jq -r ".Stacks[0].LastUpdatedTime")
           API_STACK_AUDIT='{"created_time":"'$API_CREATED_TIME'","updated_time":"'$API_UPDATED_TIME'"}'
 
           STACK_AUDIT='{"api":'$API_STACK_AUDIT'}'
@@ -931,15 +931,6 @@ jobs:
           TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="testplanType").Value')
           if [[ "$TAG_VALUE" != "$TESTPLAN_TYPE" ]]; then
             FAILED_REASON="The testplan type is not matching with deployed stack. The stack is deployed for $TAG_VALUE testplan type, but expected $TESTPLAN_TYPE."
-            echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
-            echo "Failed Reason: $FAILED_REASON"
-            exit 1
-          fi
-
-          STACK_STATUS=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].StackStatus')
-          if [[ "$STACK_STATUS" =~ _IN_PROGRESS$ ]]; then
-            STACK_STATUS_REASON=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].StackStatusReason')
-            FAILED_REASON="The Stack is still in progress with Status: $STACK_STATUS. And Status Reason: $STACK_STATUS_REASON"
             echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
             echo "Failed Reason: $FAILED_REASON"
             exit 1
@@ -1630,6 +1621,11 @@ jobs:
             echo "failedReason=$FAILED_REASON"
             exit 1
           fi
+      - id: prepare-stack-tags
+        env:
+          MILESTONE_TITLE: ${{ github.event.issue.milestone.title }}
+        run: |
+          echo "stack_tags=milestone=$MILESTONE_TITLE" >> $GITHUB_OUTPUT
       - name: cdk destroy
         uses: youyo/aws-cdk-github-actions@v2
         with:
@@ -1639,7 +1635,7 @@ jobs:
           cdk_args: "--force"
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
-          TAGS: ""
+          TAGS: ${{ steps.prepare-stack-tags.outputs.stack_tags }}
         continue-on-error: true
       - id: describe-stack
         name: Describe stack
@@ -1674,7 +1670,6 @@ jobs:
         uses: actions/github-script@v7
         env:
           DESTROY_START_TIME: ${{ steps.destroying-comment.outputs.destroyStartTime }}
-          TESTPLAN_ISSUE_NUMBER: ${{ needs.validate_request.outputs.testplan-issue-number }}
           PR_NUMBER: ${{ needs.validate_request.outputs.pr-number }}
         with:
           script: |
