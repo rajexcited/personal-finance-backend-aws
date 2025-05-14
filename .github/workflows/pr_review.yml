@@ -48,7 +48,7 @@ jobs:
             console.log("Github config: ", github)
             console.log("Github Rest API config: ", github.rest)
             console.log("Github Rest Issues API:", github.rest.issues)
-      - name: Pr Owner
+      - name: PR Owner
         if: github.event.pull_request.user.login != github.repository_owner
         run: |
           echo "failing to indicate proper PR check"
@@ -191,18 +191,17 @@ jobs:
         env:
           MILESTONE_TITLE: ${{ github.event.pull_request.milestone.title }}
         run: |
-            # read version of package.json file
-            PACKAGE_VERSION=$(jq -r '.version' package.json)
-            PACKAGE_LOCK_VERSION=$(jq -r '.version' package-lock.json)
-            if [[ "$PACKAGE_VERSION" != "$PACKAGE_LOCK_VERSION" ]]; then
-              echo "version in package.json and package-lock.json files are mismatched"
-              exit 1
-            fi
-            if [[ "v$PACKAGE_VERSION" != "$MILESTONE_TITLE" ]]; then
-              echo "version in package file is mismatched with milestone title"
-              exit 1
-            fi
-
+          # read version of package.json file
+          PACKAGE_VERSION=$(jq -r '.version' package.json)
+          PACKAGE_LOCK_VERSION=$(jq -r '.version' package-lock.json)
+          if [[ "$PACKAGE_VERSION" != "$PACKAGE_LOCK_VERSION" ]]; then
+            echo "version in package.json and package-lock.json files are mismatched"
+            exit 1
+          fi
+          if [[ "v$PACKAGE_VERSION" != "$MILESTONE_TITLE" ]]; then
+            echo "version in package file is mismatched with milestone title"
+            exit 1
+          fi
 
   validate_regression:
     name: validate Regression
@@ -212,55 +211,63 @@ jobs:
     environment:
       name: aws-infra-development
     if: needs.workflow_eligible.outputs.for-milestone-review == 'true'
+    outputs:
+      testplan-issue-number: ${{ steps.find-validate-regression-testplan.outputs.testplanIssueNumber }}
+      testplan-issue-repo: ${{ steps.find-validate-regression-testplan.outputs.testplanIssueRepo }}
     steps:
-      - id: find-regression-testplan
-        name: Find Regression Testplan
+      - id: find-validate-regression-testplan
+        name: Find and Validate Regression Testplan
         uses: actions/github-script@v7
         with:
           script: |
-            // Fetch all comments on the pull request
-            const listCommentsResponse = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number
-            });
-            console.log("listCommentsResponse: ", listCommentsResponse);
-            const testplanIssueRegex = new RegExp(".*regression test plan:.+https://github.com/"+context.repo.owner+"/([^/]+)/issues/(\\d+).*", "i");
-            const matchedComment = listCommentsResponse.data.find(comment=>testplanIssueRegex.test(comment.body));
-            if(!matchedComment) {
-              core.setFailed("regression testplan execution issue is not found.");
-              throw new Error("regression testplan execution issue is not found.");
+            try {
+              // Fetch all comments on the pull request
+              const listCommentsResponse = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number
+              });
+              console.log("listCommentsResponse: ", listCommentsResponse);
+              const testplanIssueRegex = new RegExp(".*regression test plan:.+https://github.com/"+context.repo.owner+"/([^/]+)/issues/(\\d+).*", "i");
+              const matchedComment = listCommentsResponse.data.find(comment=>testplanIssueRegex.test(comment.body));
+              if(!matchedComment) {
+                throw new Error("regression testplan issue link is not found.");
+              }
+              const matchedTestplanGroups = testplanIssueRegex.exec(matchedComment.body);
+              console.log("found matched testplan groups: ", matchedTestplanGroups);
+              const testplanIssueRepo = matchedTestplanGroups[1];
+              const testplanIssueNumber = matchedTestplanGroups[2];
+              core.setOutput("testplanIssueRepo", testplanIssueRepo);
+              core.setOutput("testplanIssueNumber", testplanIssueNumber);
+              if(testplanIssueRepo !== context.repo.repo) {
+                // skip further validations
+                return;
+              }
+              const getIssueResponse = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: testplanIssueNumber
+              });
+              console.log("getIssueResponse: ", getIssueResponse);
+              core.setOutput("testplanIssue", getIssueResponse.data);
+              const listCommentsResponse2 = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: testplanIssueNumber
+              });
+              console.log("listCommentsResponse2: ", listCommentsResponse2);
+              core.setOutput("testplanIssueComments", listCommentsResponse2.data);
+            } catch(err) {
+              console.error("failed", err);
+              core.setFailed(err.message);
             }
-            const matchedTestplanGroups = testplanIssueRegex.exec(matchedComment.body);
-            console.log("found matched testplan groups: ", matchedTestplanGroups);
-            const testplanIssueRepo = matchedTestplanGroups[1];
-            const testplanIssueNumber = matchedTestplanGroups[2];
-            core.setOutput("testplanIssueRepo", testplanIssueRepo);
-            core.setOutput("testplanIssueNumber", testplanIssueNumber);
-            if(testplanIssueRepo !== context.repo.repo) {
-              return;
-            }
-            const getIssueResponse = await github.rest.issues.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: testplanIssueNumber
-            });
-            console.log("getIssueResponse: ", getIssueResponse);
-            core.setOutput("testplanIssue", getIssueResponse.data);
-            const listCommentsResponse2 = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: testplanIssueNumber
-            });
-            console.log("listCommentsResponse2: ", listCommentsResponse2);
-            core.setOutput("testplanIssueComments", listCommentsResponse2.data);
       - id: find-ui-regression-testplan
         name: Find Ui Regression Testplan
-        if: steps.find-regression-testplan.outputs.testplanIssueRepo != github.event.pull_request.base.repo.name
+        if: steps.find-validate-regression-testplan.outputs.testplanIssueRepo != github.event.pull_request.base.repo.name
         uses: actions/github-script@v7
         env:
-          TESTPLAN_ISSUE_NUMBER: ${{ steps.find-regression-testplan.outputs.testplanIssueNumber }}
-          TESTPLAN_ISSUE_REPO: ${{ steps.find-regression-testplan.outputs.testplanIssueRepo }}
+          TESTPLAN_ISSUE_NUMBER: ${{ steps.find-validate-regression-testplan.outputs.testplanIssueNumber }}
+          TESTPLAN_ISSUE_REPO: ${{ steps.find-validate-regression-testplan.outputs.testplanIssueRepo }}
         with:
           github-token: ${{ secrets.REPO_AWS_PAT }}
           script: |
@@ -282,22 +289,24 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const testplanIssue = ${{ steps.find-regression-testplan.outputs.testplanIssue || steps.find-ui-regression-testplan.outputs.testplanIssue || '{}' }};
-            const testplanIssueComments = ${{ steps.find-regression-testplan.outputs.testplanIssueComments || steps.find-ui-regression-testplan.outputs.testplanIssueComments || '[]' }};
-            if(!testplanIssue.number || testplanIssueComments.length===0 || testplanIssue.state !== "closed") {
-              core.setFailed("completed regression testplan not found");
-              throw new Error("completed regression testplan not found");
-            }
-            const allowedLabels = ["regression", "test plan"];
-            const issueLables = testplanIssue.labels.filter(lbl=>allowedLabels.includes(lbl.name));
-            if(issueLables.length !== allowedLabels.length) {
-              core.setFailed("provided issue link in comment is not regression testplan");
-              throw new Error("provided issue link in comment is not regression testplan");
-            }
-            const foundCompleteComment=!!testplanIssueComments.find(comment=> comment.body.includes("There are no critical issues") && comment.body.includes("Status-All%20Good"));
-            if (!foundCompleteComment) {
-                core.setFailed("Regression issue is closed but all critical issues are not resolved.");
-                throw new Error("Regression issue is closed but all critical issues are not resolved.");
+            try {
+              const testplanIssue = ${{ steps.find-validate-regression-testplan.outputs.testplanIssue || steps.find-ui-regression-testplan.outputs.testplanIssue || 'null' }};
+              const testplanIssueComments = ${{ steps.find-regression-testplan.outputs.testplanIssueComments || steps.find-ui-regression-testplan.outputs.testplanIssueComments || '[]' }};
+              if(!testplanIssue || testplanIssueComments.length===0 || testplanIssue.state !== "closed") {
+                throw new Error("completed regression testplan not found");
+              }
+              const allowedLabels = ["regression", "test plan"];
+              const issueLables = testplanIssue.labels.filter(lbl=>allowedLabels.includes(lbl.name));
+              if(issueLables.length !== allowedLabels.length) {
+                throw new Error("provided issue link in comment is not regression testplan");
+              }
+              const foundCompleteComment=!!testplanIssueComments.find(comment=> comment.body.includes("There are no critical issues") && comment.body.includes("Status-All%20Good"));
+              if (!foundCompleteComment) {
+                  throw new Error("Regression issue is closed but all critical issues are not resolved.");
+              }
+            } catch(err) {
+              console.error("failed", err);
+              core.setFailed(err.message);
             }
 
   validate_issues:
@@ -438,6 +447,8 @@ jobs:
         env:
           DESCRIBE_STACK_OUT: ${{ steps.infra-stack.outputs.describe_stack }}
           MILESTONE_TITLE: ${{ github.event.pull_request.milestone.title }}
+          TESTPLAN_ISS_REPO: ${{ needs.validate_regression.outputs.testplan-issue-repo }}
+          TESTPLAN_ISS_NUMBER: ${{ needs.validate_regression.outputs.testplan-issue-number }}
         run: |
           if [[ -z "$DESCRIBE_STACK_OUT" ]]; then
             echo "stack describe output is not available. cannot validate, stack may not exist"
@@ -446,6 +457,17 @@ jobs:
           TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="milestone").Value')
           if [[ "$TAG_VALUE" == "$MILESTONE_TITLE" ]]; then
             echo "Stack is still deployed for milestone."
+            exit 1
+          fi
+          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="testplanType").Value')
+          if [[ "$TAG_VALUE" == "regression" ]]; then
+            echo "deployed Stack is not for regression testplan."
+            exit 1
+          fi
+          TAG_VALUE=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="testplanIssueNumber").Value')
+          EXPECTED_TESTPLAN_ISS="$TESTPLAN_ISS_REPO/issue-$TESTPLAN_ISS_NUMBER"
+          if [[ "$TAG_VALUE" == "$EXPECTED_TESTPLAN_ISS" ]]; then
+            echo "deployed Stack for regression testplan issue is not same."
             exit 1
           fi
           STACK_STATUS=$(echo "$DESCRIBE_STACK_OUT" | jq -r '.Stacks[0].StackStatus')
