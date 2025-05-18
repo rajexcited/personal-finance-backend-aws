@@ -1023,9 +1023,12 @@ jobs:
       stack-tags: ${{ steps.prepare-tags.outputs.stackTags }}
     steps:
       - name: Display Needs
+        env:
+          VALIDATE_REQ_JSON: ${{ toJson(needs.validate_request) }}
+          UPDATE_REQ_JSON: ${{ toJson(needs.update_request) }}
         run: |
-          echo "Needs of Validate Request: ${{ toJson(needs.validate_request) }}"
-          echo "Needs of Update Request: ${{ toJson(needs.update_request) }}"
+          echo "Needs of Validate Request: $VALIDATE_REQ_JSON"
+          echo "Needs of Update Request: $UPDATE_REQ_JSON"
           echo "Milestone branch name: ${{ needs.validate_request.outputs.branch-name }}"
           echo "Testplan Type: ${{ needs.validate_request.outputs.testplan-type }}"
           echo "Testplan Issue Number: ${{ needs.validate_request.outputs.testplan-issue-number }}"
