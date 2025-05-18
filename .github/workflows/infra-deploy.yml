@@ -598,7 +598,7 @@ jobs:
               }
               // verify tag ref
               const tagRef = await getBranch(null, context.payload.issue.milestone.title);
-              if(tagRef && (process.env.IS_ROLLBACK != "true" || process.env.USE_EXISTING_TAG != "true")) {
+              if(tagRef && process.env.IS_ROLLBACK != "true" && process.env.USE_EXISTING_TAG != "true") {
                 throw new Error(`for production deploy, tag [${context.payload.issue.milestone.title}] cannot exist.`);
               }
               if(!tagRef && process.env.IS_ROLLBACK == "true") {
