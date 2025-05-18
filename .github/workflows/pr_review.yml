@@ -297,7 +297,7 @@ jobs:
               if(!testplanIssue || testplanIssueComments.length===0 || testplanIssue.state !== "closed") {
                 throw new Error("completed regression testplan not found");
               }
-              const allowedLabels = ["regression", "test plan"];
+              const allowedLabels = ["regression", "env: testplan"];
               const issueLables = testplanIssue.labels.filter(lbl=>allowedLabels.includes(lbl.name));
               if(issueLables.length !== allowedLabels.length) {
                 throw new Error("provided issue link in comment is not regression testplan");

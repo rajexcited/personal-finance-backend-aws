@@ -2,7 +2,7 @@
 name: Request - Deploy or Rollback Production Environment
 about: Submit a request for release deployment or rollback to a previous version in the production environment.
 title: "[Request] [Rollback] Provision Production Environment"
-labels: [deployment, production, rollback]
+labels: [deployment, "env: production", rollback]
 ---
 
 # Production Environment Deployment Form
@@ -25,18 +25,24 @@ _(Provide details for the release or rollback)_
 
 #### Release Notes
 
-_(Provide a link to release notes or specify "Not Applicable" for rollbacks)_
+_(Provide priority changes or specify "Not Applicable" for rollbacks)_
+
+https://github.com/rajexcited/personal-finance-backend-aws/releases/tag/v0.2.0 <!--  tag version  -->
+
+- Not Applicable for rollbacks
 
 ### Reason for Deployment / Rollback:
 
 _(Briefly explan purpose, e.g., feature updates, bug fixes, performance improvements.)_
 
 - **Trigger Conditions (for Rollback):** _(Specify conditions initiating rollback, e.g., critical failures detected.)_
+<!--  Remove this trigger conditions item if rollback is selected  -->
 
 #### Risk Assessment
 
 - **Risk Level:** Low / Medium / High
 - **Justification for Risk level:** _(Provide reasoning for the chosen risk level.)_
+  _(Include why risk level is chosen for release notes, not the notes itself)_
 
 ### Environment Details:
 

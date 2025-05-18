@@ -115,15 +115,15 @@ jobs:
           echo Workflow is not eligible to process issue
           exit 1
       - if: >
-          ! contains(github.event.issue.labels.*.name, 'production') && 
-          ! contains(github.event.issue.labels.*.name, 'test plan')
+          ! contains(github.event.issue.labels.*.name, 'env: production') && 
+          ! contains(github.event.issue.labels.*.name, 'env: testplan')
         run: |
           echo "environment label is not defined to issue"
           echo Workflow is not eligible to process issue
           exit 1
       - if: >
-          contains(github.event.issue.labels.*.name, 'production') && 
-          contains(github.event.issue.labels.*.name, 'test plan')
+          contains(github.event.issue.labels.*.name, 'env: production') && 
+          contains(github.event.issue.labels.*.name, 'env: testplan')
         run: |
           echo "both environment labels are defined to issue"
           echo Workflow is not eligible to process issue
@@ -139,10 +139,10 @@ jobs:
       - id: request-form-issue
         name: Request Form Issue categorized
         env:
-          IS_TESTPLAN: ${{ contains(github.event.issue.labels.*.name, 'test plan') }}
+          IS_TESTPLAN: "${{ contains(github.event.issue.labels.*.name, 'env: testplan') }}"
           IS_TESTPLAN_PROVISION: ${{ startsWith(github.event.issue.title, '[Request] Provision Test Plan Environment') }}
           IS_TESTPLAN_DEPROVISION: ${{ startsWith(github.event.issue.title, '[Request] Deprovision Test Plan Environment') }}
-          IS_PRODUCTION: ${{ contains(github.event.issue.labels.*.name, 'production') }}
+          IS_PRODUCTION: "${{ contains(github.event.issue.labels.*.name, 'env: production') }}"
           IS_PRODUCTION_PROVISION: ${{ startsWith(github.event.issue.title, '[Request] Provision Production Environment') }}
           IS_PROD_ROLLBACK_PROVISION: ${{ startsWith(github.event.issue.title, '[Request] [Rollback] Provision Production Environment') }}
         run: |
@@ -396,7 +396,7 @@ jobs:
                 // this is unlikely, only in case of ambiguous request form 
                 throw new Error("Test plan issue link is not properly formatted.");
               }
-              const allowedLabels = [foundTypeLabel.name, "test plan"];
+              const allowedLabels = [foundTypeLabel.name, "env: testplan"];
               if(testplanIssueRepo === context.repo.repo) {
                 const getIssueResponse = await github.rest.issues.get({
                   owner: context.repo.owner,
@@ -636,7 +636,7 @@ jobs:
               const listIssuesResponse = await github.rest.issues.listForRepo({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                labels: ["deployment", "production"],
+                labels: ["deployment", "env: production"],
                 state: "closed",
                 milestone: deployedMilestone.number
               });
@@ -1107,17 +1107,19 @@ jobs:
       failed-reason: ${{ steps.deploying-comment.outputs.failedReason || steps.describe-stack.outputs.failedReason || steps.update-issue-deploy-complete.outputs.failedReason || steps.post-deployment-verification-issue.outputs.failedReason }}
     steps:
       - name: Display Needs
+        env:
+          VALIDATE_REQ_JSON: ${{ toJson(needs.validate_request) }}
+          UPDATE_REQ_JSON: ${{ toJson(needs.update_request) }}
+          DIFF_JSON: ${{ toJson(needs.diff) }}
+          STACK_REQ_JSON: ${{ toJson(needs.validate_request_stack) }}
         run: |
-          echo "Needs of Validate Request: ${{ toJson(needs.validate_request.outputs) }}"
-          echo "Needs of Update Request: ${{ toJson(needs.update_request.outputs) }}"
-          echo "Needs of Diff: ${{ toJson(needs.diff.outputs) }}"
-          echo "Needs of Validate Request Stack: ${{ toJson(needs.validate_request_stack.outputs) }}"
+          echo "Needs of Validate Request: $VALIDATE_REQ_JSON"
+          echo "Needs of Update Request: $UPDATE_REQ_JSON"
+          echo "Needs of Diff: $DIFF_JSON"
+          echo "Needs of Validate Request Stack: $STACK_REQ_JSON"
           echo "from validate request, Milestone branch name: ${{ needs.validate_request.outputs.branch-name }}"
           echo "from validate request, Testplan Type: ${{ needs.validate_request.outputs.testplan-type }}"
           echo "from update request, Original Issue Title: ${{ needs.update_request.outputs.original-issue-title }}"
-          echo "from validate request, Stack Details: ${{ needs.validate_request.outputs.stack-details }}"
-          echo "from validate request, Stack Details: ${{ toJson(needs.validate_request.outputs.stack-details) }}"
-          echo "from diff, Stack Tags: ${{ join(needs.diff.outputs.stack-tags) }}"
       - name: Checkout
         uses: actions/checkout@v4
         with:
