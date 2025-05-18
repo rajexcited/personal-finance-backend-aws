@@ -604,8 +604,10 @@ jobs:
               if(!tagRef && process.env.IS_ROLLBACK == "true") {
                 throw new Error(`for production rollback deploy, tag [${context.payload.issue.milestone.title}] not found.`);
               }
-              core.setOutput("tagRefName", tagRef?.name);
-              core.setOutput("tagRefUrl", tagRef?._links.html);
+              if(tagRef?.name) {
+                core.setOutput("tagRefName", tagRef.name);
+                core.setOutput("tagRefUrl", `https://github.com/${context.repo.owner}/${context.repo.repo}/tree/${context.payload.issue.milestone.title}`);
+              }
             } catch (error) {
               console.error("failed reason: ", error);
               core.setOutput("failedReason", `Error during milestone validation, reason: ${error.message}`);
