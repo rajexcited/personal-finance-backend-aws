@@ -219,6 +219,7 @@ jobs:
       testplan-issue-number: ${{ steps.testplan-issue.outputs.testplanIssue-number }}
       testplan-issue-repo: ${{ steps.testplan-issue.outputs.testplanIssue-repo }}
       post-deployment-section: ${{ steps.request-form-prod.outputs.post_deployment_tasks_section }}
+      use-existing-tag: ${{ steps.request-form-prod.outputs.use_existing_tag }}
       pr-number: ${{ steps.branch-pr.outputs.prNumber }}
       pr-url: ${{ steps.branch-pr.outputs.prUrl }}
     steps:
@@ -464,12 +465,74 @@ jobs:
               core.setOutput("failedReason", `Error during test plan validation, reason: ${error.message}`);
               core.setFailed(error.message);
             }
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          cache: "pip" # caching pip dependencies
+          python-version: "3.13"
+      - id: request-issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.setOutput("issueDetails", context.payload.issue);
+      - id: request-form-testplan
+        if: needs.run_eligible.outputs.is-testplan == 'true'
+        name: Validate Request form details
+        env:
+          TESTPLAN_TYPE: ${{ steps.testplan-issue.outputs.testplanType }}
+          TESTPLAN_REQUEST_TYPE: ${{ steps.get-request-type.outputs.request-type }}
+          ISSUE_DETAILS: ${{ steps.request-issue.outputs.issueDetails }}
+          BRANCH_DETAILS: ${{ steps.get-milestone-testplan.outputs.branch }}
+        run: |
+          cd .github
+          echo $ISSUE_DETAILS > request_form_issue_details.json
+          echo $BRANCH_DETAILS > branch_details.json
+          python --version
+          pip install -r scripts/requirements.txt
+          # capture error code +-e
+          set +e
+          python -m scripts.request.deploy.testplan --validate \
+              --request-form-issue-details "request_form_issue_details.json" \
+              --testplan-type "$TESTPLAN_TYPE" --request-type $TESTPLAN_REQUEST_TYPE \
+              --branch-details "branch_details.json" > deploy_request_output.log 2>&1
+          RETURN_CODE=$?
+          set -e
+          if [ $RETURN_CODE -ne 0 ]; then
+            echo "failedReason<<EOF" >> $GITHUB_OUTPUT
+            cat deploy_request_output.log >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+          cat deploy_request_output.log
+          exit $RETURN_CODE
+      - id: request-form-prod
+        if: needs.run_eligible.outputs.is-production == 'true'
+        name: Validate Request Form Details
+        env:
+          ISSUE_DETAILS: ${{ steps.request-issue.outputs.issueDetails }}
+        run: |
+          cd .github
+          echo $ISSUE_DETAILS > request_form_issue_details.json
+          python --version
+          pip install -r scripts/requirements.txt
+          set +e
+          python -m scripts.request.deploy.production --validate \
+              --request-form-issue-details "request_form_issue_details.json"  > deploy_request_output.log 2>&1
+          RETURN_CODE=$?
+          set -e
+          if [ $RETURN_CODE -ne 0 ]; then
+            echo "failedReason<<EOF" >> $GITHUB_OUTPUT
+            cat deploy_request_output.log >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+          cat deploy_request_output.log
+          exit $RETURN_CODE
       - id: get-milestone-prod
         if: needs.run_eligible.outputs.is-production == 'true'
         name: Validate Milestone and Branch
         uses: actions/github-script@v7
         env:
           IS_ROLLBACK: ${{ needs.run_eligible.outputs.is-prod-rollback }}
+          USE_EXISTING_TAG: ${{ steps.request-form-prod.outputs.use_existing_tag }}
         with:
           script: |
             try {
@@ -535,7 +598,7 @@ jobs:
               }
               // verify tag ref
               const tagRef = await getBranch(null, context.payload.issue.milestone.title);
-              if(tagRef && process.env.IS_ROLLBACK != "true") {
+              if(tagRef && (process.env.IS_ROLLBACK != "true" || process.env.USE_EXISTING_TAG != "true")) {
                 throw new Error(`for production deploy, tag [${context.payload.issue.milestone.title}] cannot exist.`);
               }
               if(!tagRef && process.env.IS_ROLLBACK == "true") {
@@ -548,67 +611,6 @@ jobs:
               core.setOutput("failedReason", `Error during milestone validation, reason: ${error.message}`);
               core.setFailed(error.message);
             }
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          cache: "pip" # caching pip dependencies
-          python-version: "3.13"
-      - id: request-issue
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.setOutput("issueDetails", context.payload.issue);
-      - id: request-form-testplan
-        if: needs.run_eligible.outputs.is-testplan == 'true'
-        name: Validate Request form details
-        env:
-          TESTPLAN_TYPE: ${{ steps.testplan-issue.outputs.testplanType }}
-          TESTPLAN_REQUEST_TYPE: ${{ steps.get-request-type.outputs.request-type }}
-          ISSUE_DETAILS: ${{ steps.request-issue.outputs.issueDetails }}
-          BRANCH_DETAILS: ${{ steps.get-milestone-testplan.outputs.branch }}
-        run: |
-          cd .github
-          echo $ISSUE_DETAILS > request_form_issue_details.json
-          echo $BRANCH_DETAILS > branch_details.json
-          python --version
-          pip install -r scripts/requirements.txt
-          # capture error code +-e
-          set +e
-          python -m scripts.request.deploy.testplan --validate \
-              --request-form-issue-details "request_form_issue_details.json" \
-              --testplan-type "$TESTPLAN_TYPE" --request-type $TESTPLAN_REQUEST_TYPE \
-              --branch-details "branch_details.json" > deploy_request_output.log 2>&1
-          RETURN_CODE=$?
-          set -e
-          if [ $RETURN_CODE -ne 0 ]; then
-            echo "failedReason<<EOF" >> $GITHUB_OUTPUT
-            cat deploy_request_output.log >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          fi
-          cat deploy_request_output.log
-          exit $RETURN_CODE
-      - id: request-form-prod
-        if: needs.run_eligible.outputs.is-production == 'true'
-        name: Validate Request Form Details
-        env:
-          ISSUE_DETAILS: ${{ steps.request-issue.outputs.issueDetails }}
-        run: |
-          cd .github
-          echo $ISSUE_DETAILS > request_form_issue_details.json
-          python --version
-          pip install -r scripts/requirements.txt
-          set +e
-          python -m scripts.request.deploy.production --validate \
-              --request-form-issue-details "request_form_issue_details.json"  > deploy_request_output.log 2>&1
-          RETURN_CODE=$?
-          set -e
-          if [ $RETURN_CODE -ne 0 ]; then
-            echo "failedReason<<EOF" >> $GITHUB_OUTPUT
-            cat deploy_request_output.log >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          fi
-          cat deploy_request_output.log
-          exit $RETURN_CODE
       - name: Validate Rollback
         if: needs.run_eligible.outputs.is-prod-rollback == 'true'
         uses: actions/github-script@v7
@@ -962,6 +964,7 @@ jobs:
           IS_PROD_ROLLBACK: ${{ needs.run_eligible.outputs.is-prod-rollback }}
           IS_PROD_PROVISION: ${{ needs.run_eligible.outputs.is-prod-provision }}
           IS_TESTPLAN: ${{ needs.run_eligible.outputs.is-testplan }}
+          USE_EXISTING_TAG: ${{ needs.validate_request.outputs.use-existing-tag }}
         run: |
           if [[ -z "$BRANCH_NAME" ]]; then
             if [[ "$IS_PROD_ROLLBACK" == "true" ]]; then
@@ -976,17 +979,24 @@ jobs:
               echo "$FAILED_REASON"
               exit 1
             fi
-          elif [[ "$IS_PROD_PROVISION" == "true" ]]; then
+          elif [[ "$IS_PROD_PROVISION" == "true" && "$USE_EXISTING_TAG" != "true" ]]; then
             FAILED_REASON="Tag cannot be available for prod."
             echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
             echo "$FAILED_REASON"
             exit 1
           fi
+          CREATE_TAG="false"
+          if [[ "$IS_PROD_PROVISION" == "true" ]]; then
+            if [[ -z "$BRANCH_NAME" ]]; then
+              CREATE_TAG="true"
+            fi
+          fi
+          echo "create_tag=$CREATE_TAG" >> $GITHUB_OUTPUT
       - name: Checkout
         uses: actions/checkout@v4
       - id: create-prod-tag
         name: Create Tag
-        if: needs.run_eligible.outputs.is-prod-provision == 'true'
+        if: steps.no-branch.outputs.create_tag == 'true'
         env:
           TAG_VER: ${{ github.event.issue.milestone.title }}
         run: |

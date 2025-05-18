@@ -22,6 +22,7 @@ _(Provide details for the release or rollback)_
 
 - **Version to Deploy (Release/Rollback):** v0.2.0 <!-- Specify the version for release or rollback deployment. -->
 - **Existing Deployed Version:** v0.1.0 <!-- Indicate the current production version. -->
+- [ ] use existing tag if available
 
 #### Release Notes
 
