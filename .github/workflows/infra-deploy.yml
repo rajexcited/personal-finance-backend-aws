@@ -604,8 +604,8 @@ jobs:
               if(!tagRef && process.env.IS_ROLLBACK == "true") {
                 throw new Error(`for production rollback deploy, tag [${context.payload.issue.milestone.title}] not found.`);
               }
-              if(tagRef?.name) {
-                core.setOutput("tagRefName", tagRef.name);
+              if(tagRef?.ref) {
+                core.setOutput("tagRefName", tagRef.ref);
                 core.setOutput("tagRefUrl", `https://github.com/${context.repo.owner}/${context.repo.repo}/tree/${context.payload.issue.milestone.title}`);
               }
             } catch (error) {
@@ -994,6 +994,7 @@ jobs:
             fi
           fi
           echo "create_tag=$CREATE_TAG" >> $GITHUB_OUTPUT
+          echo "create_tag=$CREATE_TAG"
       - name: Checkout
         uses: actions/checkout@v4
       - id: create-prod-tag
