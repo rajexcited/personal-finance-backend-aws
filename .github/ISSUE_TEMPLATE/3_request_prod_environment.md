@@ -7,18 +7,18 @@ labels: [deployment, "env: production", rollback]
 
 # Production Environment Deployment Form
 
-This form standardizes deployment requests for production environment, ensuring clarity and completeness.
+> **Note:** _This form standardizes deployment requests for production environment, ensuring clarity and completeness._
 
 ### Deployment Type:
 
-_(Select one option by marking an "X" in the corresponding checkbox.)_
+> **Note:** _Select one option by marking an "X" in the corresponding checkbox._
 
 - [ ] **Release**
 - [ ] **Rollback**
 
 ### Release Deployment / Rollback Details:
 
-_(Provide details for the release or rollback)_
+> **Note:** _Provide details for the release or rollback_
 
 - **Version to Deploy (Release/Rollback):** v0.2.0 <!-- Specify the version for release or rollback deployment. -->
 - **Existing Deployed Version:** v0.1.0 <!-- Indicate the current production version. -->
@@ -26,7 +26,7 @@ _(Provide details for the release or rollback)_
 
 #### Release Notes
 
-_(Provide priority changes or specify "Not Applicable" for rollbacks)_
+> **Note:** _Provide priority changes or specify "Not Applicable" for rollbacks_
 
 https://github.com/rajexcited/personal-finance-backend-aws/releases/tag/v0.2.0 <!--  tag version  -->
 
@@ -34,16 +34,17 @@ https://github.com/rajexcited/personal-finance-backend-aws/releases/tag/v0.2.0 <
 
 ### Reason for Deployment / Rollback:
 
-_(Briefly explan purpose, e.g., feature updates, bug fixes, performance improvements.)_
+> **Note:** _Briefly explan purpose, e.g., feature updates, bug fixes, performance improvements._
 
-- **Trigger Conditions (for Rollback):** _(Specify conditions initiating rollback, e.g., critical failures detected.)_
-<!--  Remove this trigger conditions item if rollback is selected  -->
+- **Trigger Conditions (for Rollback):**
+  > **Note:** _Specify conditions initiating rollback, e.g., critical failures detected._
+  <!--  Remove this trigger conditions item if rollback is selected  -->
 
 #### Risk Assessment
 
 - **Risk Level:** Low / Medium / High
-- **Justification for Risk level:** _(Provide reasoning for the chosen risk level.)_
-  _(Include why risk level is chosen for release notes, not the notes itself)_
+- **Justification for Risk level:**
+  > **Note:** _Provide reasoning for the chosen risk level. Include why risk level is chosen for release notes, not the notes itself_
 
 ### Environment Details:
 
@@ -51,13 +52,13 @@ _(Briefly explan purpose, e.g., feature updates, bug fixes, performance improvem
 
 ### Deployment Schedule:
 
-_(Use the format mm-dd-yyyy HH:MM:SS in 24-hour CST time.)_
+> **Note:** _Use the format mm-dd-yyyy HH:MM:SS in 24-hour CST time._
 
 - **Preferred Date and Time:** 03-15-2025 13:40:35
 
 ### Pre Deployment Validations:
 
-_(Checks off tasks to verify readiness for deployment.)_
+> **Note:** _Checks off tasks to verify readiness for deployment._
 
 - [ ] Milestone Pull Requests validated
 - [ ] Regression test plan executed (provide link to test plan)
@@ -67,7 +68,7 @@ _(Checks off tasks to verify readiness for deployment.)_
 
 #### Smoke Test Verification:
 
-_(Provide verification tasks to be performed after release deployment / rollback)_
+> **Note:** _Provide verification tasks to be performed after release deployment / rollback_
 
 - [ ] list of deployed Api gateway resources and methods are in proper status
 - [ ] Successful login on Desktop Chrome browser v134.x
@@ -75,7 +76,7 @@ _(Provide verification tasks to be performed after release deployment / rollback
 
 #### Health Check Verification:
 
-_(List manual or automated verification tasks for system health.)_
+> **Note:** _List manual or automated verification tasks for system health._
 
 - [ ] Deployment downtime is under one hour
 - [ ] Rest login api is accessible
@@ -83,7 +84,7 @@ _(List manual or automated verification tasks for system health.)_
 
 ### Additional Notes or Special Instructions:
 
-_(Include any additional notes, considerations, or requirements, e.g. major upgrade, ensure backups are created)_
+> **Note:** _Include any additional notes, considerations, or requirements, e.g. major upgrade, ensure backups are created_
 
 > [!IMPORTANT]  
 > If a release deployment fails and a rollback is required, submit a rollback request form as a sub-issue of this request.
