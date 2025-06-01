@@ -126,18 +126,21 @@ jobs:
           IS_TESTPLAN: "${{ contains(github.event.issue.labels.*.name, 'env: testplan') }}"
           IS_DEVELOPMENT: "${{ contains(github.event.issue.labels.*.name, 'env: development') }}"
         run: |
-          # Count the number of "true" values
+          echo "Count the number of 'true' values"
           TRUE_ENV_COUNT=0
           if [[ "$IS_PRODUCTION" == "true" ]]; then
             ((TRUE_ENV_COUNT++))
+            echo "updated count for production"
             echo "env-ref-name=production" >> $GITHUB_OUTPUT
           fi
           if [[ "$IS_TESTPLAN" == "true" ]]; then
             ((TRUE_ENV_COUNT++))
+            echo "updated count for testplan"
             echo "env-ref-name=testplan" >> $GITHUB_OUTPUT
           fi
           if [[ "$IS_DEVELOPMENT" == "true" ]]; then
             ((TRUE_ENV_COUNT++))
+            echo "updated count for development"
             echo "env-ref-name=development" >> $GITHUB_OUTPUT
           fi
 
@@ -155,6 +158,8 @@ jobs:
           echo "for-production=$IS_PRODUCTION" >> $GITHUB_OUTPUT
           echo "for-testplan=$IS_TESTPLAN" >> $GITHUB_OUTPUT
           echo "for-development=$IS_DEVELOPMENT" >> $GITHUB_OUTPUT
+          echo "all vars are exported"
+          cat $GITHUB_OUTPUT
       - id: request-title
         uses: actions/github-script@v7
         env:
