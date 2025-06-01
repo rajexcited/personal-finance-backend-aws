@@ -829,7 +829,7 @@ jobs:
               });
               console.log("getContentResponse=", getContentResponse);
               // compare package.json and milestone version in master or milestone branch
-              const packageJsonContent = Buffer.from(response.data.content, 'base64').toString();
+              const packageJsonContent = Buffer.from(getContentResponse.data.content, 'base64').toString();
               const packageJsonObj = JSON.parse(packageJsonContent);
               if(`v${packageJsonObj.version}` !== context.payload.issue.milestone.title) {
                 throw new Error(`package.json version [${packageJsonObj.version}] in branch [${branchName}] does not match with requested release/milestone version [${context.payload.issue.milestone.title}]`);
