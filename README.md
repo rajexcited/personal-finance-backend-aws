@@ -18,7 +18,7 @@ Command to create ci cd role
 ```cmd
 python -m scripts.create-cicd-role --create --cicd-role-base-dir cicd-role --aws-account <aws account number> --environment <one of supported value> --github-owner <github account id> --github-repo <repository where workflow will be connecting to AWS>
 # example,
-python -m scripts.create-cicd-role --create --cicd-role-base-dir cicd-role --aws-account 111111111111 --environment experiment --github-owner rajexcited --github-repo-aws personal-finance-backend-aws github-repo-ui personal-finance-ui
+python -m scripts.create-cicd-role --create --cicd-role-base-dir cicd-role --aws-account 111111111111 --environment experiment --github-owner rajexcited --github-repo-aws personal-finance-backend-aws --github-repo-ui personal-finance-ui
 ```
 
 add `--dry-run` param, if you would like to simulate the role creation. Each IAM request and response are stored under `dist` directory,
