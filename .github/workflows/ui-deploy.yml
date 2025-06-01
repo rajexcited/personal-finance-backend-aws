@@ -40,8 +40,8 @@ jobs:
     environment:
       name: aws-infra-${{ github.event.client_payload.env.env_type }}
     outputs:
-      branch-name: ${{ steps.get-milestone-testplan.outputs.branchName || steps.get-milestone-prod.outputs.tagRefName }}
-      failed-reason: ${{ steps.payload-schema.outputs.failedReason || steps.get-milestone-testplan.outputs.failedReason || steps.get-milestone-prod.outputs.failedReason }}
+      branch-name: ${{ steps.get-milestone-testplan.outputs.branchName || steps.get-milestone-development.outputs.branchName || steps.get-milestone-prod.outputs.tagRefName }}
+      failed-reason: ${{ steps.payload-schema.outputs.failedReason || steps.get-milestone-testplan.outputs.failedReason || steps.get-milestone-prod.outputs.failedReason || steps.get-milestone-development.outputs.failedReason }}
     steps:
       - name: Env Config
         run: |
@@ -137,6 +137,64 @@ jobs:
               } else {
                 // The master branch should have api version, old versions deployment is not supported
                 // compare package.json and milestone version
+                const fs = require('fs');
+                const packageJson = fs.readFileSync('package.json', 'utf8');
+                const packageJsonObj = JSON.parse(packageJson);
+                if(`v${packageJsonObj.version}` !== context.payload.client_payload.apiVersion) {
+                  throw new Error(`Master branch package.json version [${packageJsonObj.version}] does not match with requested version [${context.payload.client_payload.apiVersion}]`);
+                }
+              }
+              core.setOutput("branchName", branchName);
+            } catch (error) {
+              console.error("failed reason: ", error);
+              core.setOutput("failedReason", `Error during milestone validation, reason: ${error.message}`);
+              core.setFailed(error.message);
+            }
+      - id: get-milestone-development
+        if: github.event.client_payload.env.is_development == 'true'
+        name: Validate Milestone and Branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              var branchName = "";
+              if(!context.payload.client_payload.apiVersion) {
+                core.setOutput("branchName", "master");
+              }
+
+              // get milestone
+              const listMilestonesResponse = await github.rest.issues.listMilestones({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: "all"
+              });
+              console.log("listMilestonesResponse=", listMilestonesResponse);
+              const matchedMilestone = listMilestonesResponse.data.find(mlst=>mlst.title===context.payload.client_payload.apiVersion);
+              if(!matchedMilestone) {
+                throw Error(`milestone for matching api version[${context.payload.client_payload.apiVersion}] not found.`);
+              }
+              if(matchedMilestone.state === "open") {
+                // check milestone branch
+                if(!matchedMilestone.due_on) {
+                  throw new Error("Milestone due date is not set");
+                }
+                const milestoneBranch = `milestone/${matchedMilestone.title}`;
+                try {
+                  const getBranchResponse = await github.rest.repos.getBranch({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    branch: milestoneBranch
+                  });
+                  console.log("getBranchResponse: ", getBranchResponse);
+                  branchName=milestoneBranch;
+                } catch(ignore) {
+                  console.error("ignoring error:", ignore);
+                }
+              }
+              if(!branchName) {
+                // The master branch should have api version, old versions deployment is not supported
+                // compare package.json and milestone version
+                branchName="master";
                 const fs = require('fs');
                 const packageJson = fs.readFileSync('package.json', 'utf8');
                 const packageJsonObj = JSON.parse(packageJson);
@@ -262,6 +320,7 @@ jobs:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
           MILESTONE_TITLE: ${{ github.event.client_payload.milestone }}
           IS_TESTPLAN: ${{ github.event.client_payload.env.is_testplan }}
+          IS_DEVELOPMENT: ${{ github.event.client_payload.env.is_development }}
         run: |
           FAILED_REASON=""
           UI_STACK_NAME="prsfin-$INFRA_ENV-ui-deploy-stack"
@@ -273,14 +332,16 @@ jobs:
             echo "UI Stack does not exist. given branch for milestone can be deployed."
             exit 0
           fi
-          # verify stack status
-          STACK_STATUS=$(echo "$DESCRIBE_UI_STACK_OUT" | jq -r '.Stacks[0].StackStatus')
-          if [[ ! "$STACK_STATUS" =~ _COMPLETE$ ]]; then
-            STACK_STATUS_REASON=$(echo "$DESCRIBE_UI_STACK_OUT" | jq -r '.Stacks[0].StackStatusReason')
-            FAILED_REASON="The system cannot start UI deployment, because the Stack status is not complete, found Status: $STACK_STATUS. The Stack Status Reason: $STACK_STATUS_REASON"
-            echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
-            echo "Failed Reason: $FAILED_REASON"
-            exit 1
+          if [[ "$IS_DEVELOPMENT" != "true" ]]; then
+            # verify stack status
+            STACK_STATUS=$(echo "$DESCRIBE_UI_STACK_OUT" | jq -r '.Stacks[0].StackStatus')
+            if [[ ! "$STACK_STATUS" =~ _COMPLETE$ ]]; then
+              STACK_STATUS_REASON=$(echo "$DESCRIBE_UI_STACK_OUT" | jq -r '.Stacks[0].StackStatusReason')
+              FAILED_REASON="The system cannot start UI deployment, because the Stack status is not complete, found Status: $STACK_STATUS. The Stack Status Reason: $STACK_STATUS_REASON"
+              echo "failedReason=$FAILED_REASON" >> $GITHUB_OUTPUT
+              echo "Failed Reason: $FAILED_REASON"
+              exit 1
+            fi
           fi
           # environment tag match must never fail
           TAG_VALUE=$(echo "$DESCRIBE_UI_STACK_OUT" | jq -r '.Stacks[0].Tags[] | select(.Key=="environment").Value')

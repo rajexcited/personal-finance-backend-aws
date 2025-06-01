@@ -337,34 +337,6 @@ jobs:
         with:
           script: |
             try {
-              const getEndOfDayCentral = (datetime) => {
-                const date = new Date(datetime);
-                if (isNaN(date.getTime())) {
-                  return null; // Invalid Date
-                }
-                date.setHours(23);
-
-                // Convert UTC to Central Time (America/Chicago) using timeZone offset
-                const centralTimeFormat = new Intl.DateTimeFormat("en-US", {
-                  timeZone: "America/Chicago",
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                  timeZoneName: "short"
-                });
-
-                // Format and extract adjusted time
-                const centralTimeString = centralTimeFormat.format(date);
-                const centralDate = new Date(centralTimeString);
-
-                // Ensure time is set to 23:59:59 (end of the day)
-                centralDate.setHours(23, 59, 59, 999);
-
-                return centralDate;
-              };
               // verify milestone branch exists
               console.log("issue has milestone title: ", context.payload.issue.milestone.title);
               // if milestone is open, there should be branch with milestone title
@@ -372,11 +344,6 @@ jobs:
               if(context.payload.issue.milestone.state === "open") {
                 if(!context.payload.issue.milestone.due_on) {
                   throw new Error("Milestone due date is not set");
-                }
-                const milestoneDueOn = new Date(context.payload.issue.milestone.due_on);
-                const endOfToday = getEndOfDayCentral(new Date());
-                if(milestoneDueOn.toDateString() < endOfToday.toDateString()) {
-                  throw new Error("Milestone due date is already passed");
                 }
                 const milestoneBranch = `milestone/${context.payload.issue.milestone.title}`;
                 try {
@@ -834,7 +801,7 @@ jobs:
               console.log(`Latest run status: ${latestRun.status}, conclusion: ${latestRun.conclusion}`);
 
               if (latestRun.conclusion !== "success") {
-                throw new Error(`Latest [Build workflow](${latestRun.html_url}) did not succeed. but found conclusion ${latestRun.conclusion} updated at ${toTime(latestRun.updated_at)}.");
+                throw new Error(`Latest [Build workflow](${latestRun.html_url}) did not succeed. but found conclusion ${latestRun.conclusion} updated at ${toTime(latestRun.updated_at)}.`);
               }
             } catch(error) {
               console.error("failed reason: ", error);
