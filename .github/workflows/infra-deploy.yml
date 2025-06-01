@@ -127,6 +127,9 @@ jobs:
           IS_DEVELOPMENT: "${{ contains(github.event.issue.labels.*.name, 'env: development') }}"
         run: |
           echo "Count the number of 'true' values"
+          echo "for-production=$IS_PRODUCTION"
+          echo "for-testplan=$IS_TESTPLAN"
+          echo "for-development=$IS_DEVELOPMENT"
           TRUE_ENV_COUNT=0
           if [[ "$IS_PRODUCTION" == "true" ]]; then
             ((TRUE_ENV_COUNT++))
@@ -139,9 +142,10 @@ jobs:
             echo "env-ref-name=testplan" >> $GITHUB_OUTPUT
           fi
           if [[ "$IS_DEVELOPMENT" == "true" ]]; then
-            ((TRUE_ENV_COUNT++))
             echo "updated count for development"
+            ((TRUE_ENV_COUNT++))
             echo "env-ref-name=development" >> $GITHUB_OUTPUT
+            echo "env-ref-name=development"
           fi
 
           # Check if only one variable is true
