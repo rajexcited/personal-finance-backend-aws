@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 from datetime import timedelta
 from ...md_parser import parsed_body, get_list_items
 from ...md_parser.models import MdHeader, MdListItemTitleContent, MdListItemTodo
-from ...utils import convert_to_human_readable, export_to_env, get_converted_enum, get_parsed_arg_value, get_valid_dict, get_preferred_datetime, get_now, parse_milestone_dueon
+from ...utils import export_to_env, get_converted_enum, get_parsed_arg_value, get_valid_dict, get_preferred_datetime, get_now, convert_to_human_readable
 
 
 class RequestType(Enum):
@@ -13,35 +13,7 @@ class RequestType(Enum):
     Deprovision = "deprovision"
 
 
-def validate_test_plan_issue_link(testplan_section_list: List, request_form_issue_details: dict, testplan_type: str):
-    testplantype = testplan_type.lower()
-    request_title = str(request_form_issue_details["title"])
-    if testplantype not in request_title.lower():
-        raise ValueError("Test Plan type is not included in request form title")
-
-    testplan_link_match = None
-    section_list = get_list_items(testplan_section_list)
-    for listitem in section_list:
-        if isinstance(listitem, MdListItemTitleContent) and listitem.content is not None:
-            item_title = str(listitem.title).lower()
-            if testplantype in item_title and "test plan" in item_title:
-                testplan_link_match = re.match(r".*https://github.com.+/issues/(\d+)", listitem.content)
-            else:
-                testplan_link_match = re.match(r".*#(\d+)", listitem.content)
-
-    if not testplan_link_match:
-        raise ValueError("Test Plan issue link is not in correct format")
-
-
-def validate_deployment_schedule(deployment_schedule_list: List, request_form_issue_details: dict, branch_details: Dict[str, str], request_type: RequestType):
-    if request_type == RequestType.Provision:
-        if not branch_details["name"].startswith("milestone") and branch_details["name"] != "master":
-            raise ValueError("Deployment is only supported for master branch or milestone branch.")
-        if branch_details["name"] == "master" and request_form_issue_details["milestone"]["state"] == "open":
-            raise ValueError("Deployment on the master branch is prohibited while the milestone is open.")
-        if branch_details["name"].startswith("milestone") and request_form_issue_details["milestone"]["state"] == "closed":
-            raise ValueError("Deployment on the milestone branch is prohibited while the milestone is closed.")
-
+def validate_deployment_schedule(deployment_schedule_list: List, request_type: RequestType):
     preferred_date_obj = None
     deploy_scope = None
     delete_schedule_date_obj = None
@@ -65,13 +37,6 @@ def validate_deployment_schedule(deployment_schedule_list: List, request_form_is
     if (preferred_date_obj-delta) > now:
         raise ValueError("Preferred Date and Time is in future")
 
-    if request_form_issue_details["milestone"]["state"] == "open":
-        milestone_due_date_obj = parse_milestone_dueon(request_form_issue_details["milestone"]["due_on"])
-        if not milestone_due_date_obj:
-            raise ValueError("cannot convert milestone due date")
-        if preferred_date_obj > milestone_due_date_obj:
-            raise ValueError("Preferred Date and Time is after milestone due date")
-
     if deploy_scope not in ["API only", "UI and API"]:
         raise ValueError("Deployment Sope is not in correct format")
 
@@ -91,14 +56,14 @@ def validate_deployment_schedule(deployment_schedule_list: List, request_form_is
 
 
 def validate_env_details(env_details_contents: List):
-    has_testplan_env = False
+    has_development_env = False
     mdlist = get_list_items(env_details_contents)
     for listitem in mdlist:
         if isinstance(listitem, MdListItemTodo):
-            if listitem.is_checked and listitem.label is not None and "Test Plan Environment" in listitem.label:
-                has_testplan_env = True
+            if listitem.label is not None and "Development Environment" in listitem.label:
+                has_development_env = listitem.is_checked
 
-    if not has_testplan_env:
+    if not has_development_env:
         raise ValueError("Environment is incorrect")
 
 
@@ -127,19 +92,17 @@ def validate_release_details(release_detail_contents: List, request_form_issue_d
 
 
 class ValidityHeader(Enum):
-    TestplanDetails = "Test Plan"
     ReleaseDetails = "Release Deployment"
     EnvironmentDetails = "Environment Details"
     DeploymentSchedule = "Deployment Schedule"
 
 
-def validate_request_form(request_form_issue_details: Dict, testplan_type: str, branch_details: Dict, request_type: RequestType):
+def validate_request_form(request_form_issue_details: Dict, request_type: RequestType):
     request_form_contents = parsed_body(request_form_issue_details["body"])
     if len(request_form_contents) <= 1:
         raise ValueError("Request form didnot follow the template properly")
 
     has_validity = {}
-    has_validity[ValidityHeader.TestplanDetails] = False
     has_validity[ValidityHeader.ReleaseDetails] = False
     has_validity[ValidityHeader.EnvironmentDetails] = False
     has_validity[ValidityHeader.DeploymentSchedule] = False
@@ -158,16 +121,8 @@ def validate_request_form(request_form_issue_details: Dict, testplan_type: str, 
                 validate_env_details(form_header.contents)
                 has_validity[ValidityHeader.EnvironmentDetails] = True
             elif ValidityHeader.DeploymentSchedule.value in form_header.title:
-                deploy_scope = validate_deployment_schedule(form_header.contents,
-                                                            request_form_issue_details=request_form_issue_details,
-                                                            branch_details=branch_details,
-                                                            request_type=request_type)
+                deploy_scope = validate_deployment_schedule(form_header.contents, request_type=request_type)
                 has_validity[ValidityHeader.DeploymentSchedule] = True
-            elif ValidityHeader.TestplanDetails.value in form_header.title:
-                validate_test_plan_issue_link(form_header.contents,
-                                              request_form_issue_details=request_form_issue_details,
-                                              testplan_type=testplan_type)
-                has_validity[ValidityHeader.TestplanDetails] = True
 
     # verify version details
     if "UI" in deploy_scope and not version_details["ui_version"]:
@@ -183,23 +138,15 @@ def validate_request_form(request_form_issue_details: Dict, testplan_type: str, 
 
 if __name__ == "__main__":
     """
-    python -m scripts.request.deploy.testplan --validate --request-form-issue-details ..\dist\request_form_issue_details\testplan_deploy.json --request-type provision --branch-details "{\"name\":\"mileston/v0\"}" --testplan-type regression
-    python -m scripts.request.deploy.testplan --validate --request-form-issue-details ..\dist\request_form_issue_details\testplan_deploy.json --request-type deprovision --branch-details "{\"name\":\"mileston/v0\"}" --testplan-type regression
-
-    python -m scripts.request.deploy.testplan --validate --request-form-issue-details ..\dist\request_form_issue_details\testplan_deploy.json --request-type provision --branch-details "{\"name\":\"master\"}" --testplan-type regression
-    python -m scripts.request.deploy.testplan --validate --request-form-issue-details ..\dist\request_form_issue_details\testplan_deploy.json --request-type provision --branch-details "{\"name\":\"feature\"}" --testplan-type regression
-    python -m scripts.request.deploy.testplan --validate --request-form-issue-details ..\dist\request_form_issue_details\testplan_deploy.json --request-type provision --branch-details "{\"name\":\"mileston/v0\"}" --testplan-type feature
+    python -m scripts.request.deploy.development --validate --request-form-issue-details ..\dist\request_form_issue_details\dev_deploy.json --request-type provision
+    python -m scripts.request.deploy.development --validate --request-form-issue-details ..\dist\request_form_issue_details\dev_deploy.json --request-type deprovision
     """
     parser = ArgumentParser(
-        description="validates Deployment Request form for Testplan environment")
+        description="validates Deployment Request form for Development environment")
     parser.add_argument("--validate", action="store_true",
                         help="[Required] Validation Request")
     parser.add_argument("--request-form-issue-details",
                         help="[Required] Provide request form issue details as json")
-    parser.add_argument("--testplan-type",
-                        help="[Required] Provide Testplan type from label")
-    parser.add_argument("--branch-details",
-                        help="[Required] Provide branch details as json")
     parser.add_argument("--request-type", choices=["provision", "deprovision"],
                         help="[Required] Provide Request Type")
     args = parser.parse_args()
@@ -207,8 +154,6 @@ if __name__ == "__main__":
     try:
         get_parsed_arg_value(args, key="validate", arg_type_converter=bool)
         request_form_issue_details = get_parsed_arg_value(args, key="request_form_issue_details", arg_type_converter=get_valid_dict)
-        testplan_type = get_parsed_arg_value(args, key="testplan_type", arg_type_converter=lambda x: x if isinstance(x, str) else None)
-        branch_details = get_parsed_arg_value(args, key="branch_details", arg_type_converter=get_valid_dict)
         request_type = get_parsed_arg_value(args, key="request_type", arg_type_converter=lambda x: get_converted_enum(RequestType, str(x)))
 
     except Exception as e:
@@ -217,6 +162,4 @@ if __name__ == "__main__":
         exit(1)
 
     validate_request_form(request_form_issue_details=request_form_issue_details,
-                          testplan_type=testplan_type,
-                          branch_details=branch_details,
                           request_type=RequestType(request_type))

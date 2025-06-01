@@ -7,6 +7,7 @@ import { ApiConstruct } from "./api-gateway";
 import { ConfigS3Construct } from "./config-s3";
 import { ReceiptS3Construct } from "./receipts-s3";
 import { MyCfDistributionConstruct } from "./cf-distribution";
+import { DeleteStackScheduleConstruct } from "./delete-schedule-eventbridge";
 
 /*
  * https://awscli.amazonaws.com/v2/documentation/api/latest/reference/kms/list-aliases.html#examples
@@ -62,6 +63,11 @@ export class MyFinanceAppStack extends Stack {
       contextInfo: contextInfo,
       stageName: allApis.stageName
       // webAclId: props.webAclId,
+    });
+
+    const deleteStackScheduler = new DeleteStackScheduleConstruct(this, "DeleteStackScheduleConstruct", {
+      appId: props.appId,
+      environment: props.environment
     });
 
     this.uiBucketArn = cloudfrontDistribution.uiBucketArn;
