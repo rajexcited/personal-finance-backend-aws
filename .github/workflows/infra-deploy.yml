@@ -277,7 +277,7 @@ jobs:
       use-existing-tag: ${{ steps.request-form-prod.outputs.use_existing_tag }}
       pr-number: ${{ steps.branch-pr.outputs.prNumber }}
       pr-url: ${{ steps.branch-pr.outputs.prUrl }}
-      delete_schedule_time: ${{ steps.request-form-development.outputs.delete_schedule || steps.request-form-testplan.outputs.delete_schedule }}
+      delete-schedule-time: ${{ steps.request-form-development.outputs.delete_schedule || steps.request-form-testplan.outputs.delete_schedule }}
     steps:
       - name: Display Needs
         env:
@@ -1384,7 +1384,7 @@ jobs:
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
           TAGS: ${{ join(steps.prepare-tags.outputs.stackTags) }}
-          DELETE_SCHEDULE_TIME: ${{ needs.validate_request.outputs.delete_schedule_time }}
+          DELETE_SCHEDULE_TIME: ${{ needs.validate_request.outputs.delete-schedule-time }}
 
   deployment:
     name: Deploy Infra Stack
@@ -1570,7 +1570,7 @@ jobs:
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
           TAGS: ${{ needs.diff.outputs.stack-tags }}
-          DELETE_SCHEDULE_TIME: ${{ needs.validate_request.outputs.delete_schedule_time }}
+          DELETE_SCHEDULE_TIME: ${{ needs.validate_request.outputs.delete-schedule-time }}
         continue-on-error: true
       - id: describe-stack
         name: Describe stack
