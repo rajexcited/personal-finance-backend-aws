@@ -12,10 +12,24 @@ export class DeleteStackScheduleConstruct extends Construct {
   constructor(scope: Construct, id: string, props: DeleteStackScheduleProps) {
     super(scope, id);
 
-    const scheduleTime = new Date(process.env.DELETE_SCHEDULE_TIME || "");
+    const deleteScheduleTime = process.env.DELETE_SCHEDULE_TIME;
+    const scheduleTime = new Date(deleteScheduleTime || "");
 
-    if (!isNaN(scheduleTime.getTime())) {
-      console.error("delete schedule time is not provided.");
+    if (isNaN(scheduleTime.getTime())) {
+      console.error("delete schedule time is not provided.", "deleteScheduleTime=", deleteScheduleTime);
+      return;
+    }
+
+    const beforeDate = new Date();
+    beforeDate.setMinutes(beforeDate.getMinutes() + 15);
+    if (scheduleTime <= beforeDate) {
+      console.error(
+        "scheduled deletion is in past. skipping schedule deletion event rule configuration.",
+        "deleteScheduleTime=",
+        scheduleTime.toString(),
+        "beforeDate=",
+        beforeDate.toString()
+      );
       return;
     }
 

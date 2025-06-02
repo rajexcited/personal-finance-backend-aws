@@ -2,7 +2,7 @@
 name: Request Regression - Provision/Deprovision Non-Prod Environment
 about: Request form to provision or deprovision a non-prod environment
 title: "[Request] Provision / Deprovision Development / Test Plan Environment for Regression"
-labels: [deployment, regression, "env: testplan", "env: development"]
+labels: [deployment, regression, "env: testplan", "env: development", request]
 ---
 
 # Request Form to Provision

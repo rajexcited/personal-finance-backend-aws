@@ -94,8 +94,8 @@ def validate_env_details(env_details_contents: List):
     has_testplan_env = False
     mdlist = get_list_items(env_details_contents)
     for listitem in mdlist:
-        if isinstance(listitem, MdListItemTodo):
-            if listitem.is_checked and listitem.label is not None and "Test Plan Environment" in listitem.label:
+        if isinstance(listitem, MdListItemTodo) and listitem.label is not None:
+            if listitem.is_checked and "Test Plan Environment" in listitem.label:
                 has_testplan_env = True
 
     if not has_testplan_env:

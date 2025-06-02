@@ -2,7 +2,7 @@
 name: Request - Deploy or Rollback Production Environment
 about: Submit a request for release deployment or rollback to a previous version in the production environment.
 title: "[Request] [Rollback] Provision Production Environment"
-labels: [deployment, "env: production", rollback]
+labels: [deployment, "env: production", rollback, request]
 ---
 
 # Production Environment Deployment Form
@@ -18,7 +18,7 @@ labels: [deployment, "env: production", rollback]
 
 ### Release Deployment / Rollback Details:
 
-> **Note:** _Provide deployment versions. select the existing tag use if tag is created_
+> **Note:** _Provide deployment versions. select the existing tag use if tag is created._
 
 - **Version to Deploy (Release/Rollback):** v0.2.0 <!-- Specify the version for release or rollback deployment. -->
 - **Existing Deployed Version:** v0.1.0 <!-- Indicate the current production version. -->

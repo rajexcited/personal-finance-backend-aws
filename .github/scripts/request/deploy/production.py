@@ -18,8 +18,8 @@ def validate_env_details(env_details_contents: List):
     has_prod_env = False
     env_listitems = get_list_items(env_details_contents)
     for listitem in env_listitems:
-        if isinstance(listitem, MdListItemTodo):
-            if listitem.label is not None and "Production Environment" in listitem.label:
+        if isinstance(listitem, MdListItemTodo) and listitem.label is not None:
+            if "Production Environment" in listitem.label:
                 has_prod_env = listitem.is_checked
 
     if not has_prod_env:
@@ -33,8 +33,8 @@ def validate_release_details(release_detail_contents: List, request_form_issue_d
 
     version_listitems = get_list_items(release_detail_contents)
     for item in version_listitems:
-        if isinstance(item, MdListItemTodo):
-            if item.label is not None and "use existing tag if available" in item.label:
+        if isinstance(item, MdListItemTodo) and item.label is not None:
+            if "use existing tag for release if available" in item.label:
                 export_to_env({
                     "use_existing_tag": "true" if item.is_checked else "false"
                 })
@@ -142,10 +142,10 @@ def validate_deployment_reason(deployment_reason_list: List, deployment_type: De
         if isinstance(depl_rsn, MdHeader) and depl_rsn.title is not None and "Risk Assessment" in depl_rsn.title:
             mdlist = get_list_items(depl_rsn.contents)
             for mditem in mdlist:
-                if isinstance(mditem, MdListItemTitleContent) and mditem.title is not None:
-                    if "Risk Level" in mditem.title and mditem.content is not None:
+                if isinstance(mditem, MdListItemTitleContent) and mditem.title is not None and mditem.content is not None:
+                    if "Risk Level" in mditem.title:
                         risk_level = mditem.content.strip()
-                    if "Justification for Risk level" in mditem.title and mditem.content is not None:
+                    if "Justification for Risk level" in mditem.title:
                         item_content = mditem.content.strip()
                         if item_content != "NA" and len(item_content) > 0:
                             has_justification = True
@@ -236,9 +236,7 @@ def validate_request_form(request_form_issue_details: Dict):
     has_validity[ValidityHeader.PostDeploymentTasks] = False
 
     for form_header in request_form_contents:
-        if isinstance(form_header, MdHeader):
-            if form_header.title is None:
-                continue
+        if isinstance(form_header, MdHeader) and form_header.title is not None:
             if ValidityHeader.ReleaseRollbackDetails.value in form_header.title:
                 validate_release_details(form_header.contents, request_form_issue_details=request_form_issue_details, deployment_type=deployment_type)
                 has_validity[ValidityHeader.ReleaseRollbackDetails] = True
