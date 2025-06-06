@@ -1558,6 +1558,15 @@ jobs:
           # setup cicd role through instructions from aws-manual branch.
           role-to-assume: ${{ secrets.AWS_CICD_ROLE_ARN }}
           role-session-name: cdkSession
+      - id: delete-schedule
+        env:
+          DELETE_SCHEDULE_TIME: ${{ needs.validate_request.outputs.delete-schedule-time }}
+          INFRA_ENV: ${{ vars.INFRA_ENV }}
+        run: |
+          if [ "$DELETE_SCHEDULE_TIME" == "PreservePreviousSchedule" ]; then
+            DELETE_SCHEDULE_TIME=$(aws events describe-rule --name prsfin-$INFRA_ENV-delete-stack-schedule-ebrule --query ScheduleExpression --output text)
+          fi
+          echo "delete-schedule-time=$DELETE_SCHEDULE_TIME" >> $GITHUB_OUTPUT
       - id: cdk-deploy
         name: cdk deploy
         uses: youyo/aws-cdk-github-actions@v2
@@ -1570,7 +1579,7 @@ jobs:
         env:
           INFRA_ENV: ${{ vars.INFRA_ENV }}
           TAGS: ${{ needs.diff.outputs.stack-tags }}
-          DELETE_SCHEDULE_TIME: ${{ needs.validate_request.outputs.delete-schedule-time }}
+          DELETE_SCHEDULE_TIME: ${{ steps.delete-schedule.outputs.delete-schedule-time }}
         continue-on-error: true
       - id: describe-stack
         name: Describe stack

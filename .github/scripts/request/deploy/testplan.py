@@ -53,7 +53,10 @@ def validate_deployment_schedule(deployment_schedule_list: List, request_form_is
             if "Deployment Scope" in listitem.title and listitem.content is not None:
                 deploy_scope = listitem.content.strip()
             if "Schedule to delete after" in listitem.title and listitem.content is not None:
-                delete_schedule_date_obj = get_preferred_datetime(listitem.content)
+                if "Preserve previous schedule" in listitem.content:
+                    export_to_env({"delete_schedule": "PreservePreviousSchedule"})
+                else:
+                    delete_schedule_date_obj = get_preferred_datetime(listitem.content)
 
     if not preferred_date_obj:
         raise ValueError("Preferred Date and Time format is not correct.")
@@ -80,10 +83,10 @@ def validate_deployment_schedule(deployment_schedule_list: List, request_form_is
 
     if delete_schedule_date_obj is not None:
         time_diff = abs(delete_schedule_date_obj-preferred_date_obj)
-        if time_diff < timedelta(hours=1):
-            raise ValueError(f"Invalid schedule deletion request. The difference [{convert_to_human_readable(time_diff)}] is less than 1 hour")
-        if time_diff > timedelta(weeks=1):
-            raise ValueError(f"Invalid schedule deletion request. The difference [{convert_to_human_readable(time_diff)}] is greater than 1 week")
+        if time_diff < timedelta(minutes=15):
+            raise ValueError(f"Invalid schedule deletion request. The difference [{convert_to_human_readable(time_diff)}] is less than 15 minutes")
+        if time_diff > timedelta(days=30):
+            raise ValueError(f"Invalid schedule deletion request. The difference [{convert_to_human_readable(time_diff)}] is greater than 1 month")
         formatted_datetime = preferred_date_obj.strftime("%Y-%m-%d %H:%M:%S %Z")
         export_to_env({"delete_schedule": formatted_datetime})
 

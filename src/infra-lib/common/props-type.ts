@@ -22,4 +22,5 @@ export enum AwsResourceType {
   CloudFrontFunction = "cf-function",
   CftOutput = "cft-output",
   Stack = "stack",
+  EventBridgeRule = "ebrule"
 }

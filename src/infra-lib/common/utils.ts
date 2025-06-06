@@ -29,10 +29,11 @@ export const parsedDuration = (formatted: string) => {
   const parts = [0, 0, 0, 0, 0];
   let num: Nullable<string> = null;
 
+  const timeRegex =
+    /^(-?(?:\d+)?\.?\d+)* *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|months?|mnths?|years?|yrs?|y)?$/i;
   trimmed.split(" ").forEach((st) => {
     if (st) {
-      const match =
-        /^(-?(?:\d+)?\.?\d+)* *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|months?|mnths?|years?|yrs?|y)?$/i.exec(st);
+      const match = timeRegex.exec(st);
       let tm: Nullable<string> = null;
       if (match) {
         tm = match[2] ? match[2].trim() : null;
