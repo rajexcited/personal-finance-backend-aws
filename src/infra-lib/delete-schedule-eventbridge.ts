@@ -5,6 +5,7 @@ import * as events from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as iam from "aws-cdk-lib/aws-iam";
 import { AwsResourceType, buildResourceName, ConstructProps, InfraEnvironmentId } from "./common";
+import { RetentionDays } from "aws-cdk-lib/aws-logs";
 
 interface DeleteStackScheduleProps extends ConstructProps {}
 
@@ -72,6 +73,7 @@ export class DeleteStackScheduleConstruct extends Construct {
       handler: "delete_stack.lambda_handler",
       code: lambda.Code.fromAsset("src/lambda-py/power-schedule"),
       timeout: cdk.Duration.minutes(15),
+      logRetention: RetentionDays.ONE_MONTH,
       environment: {
         ...stackResources
       }
@@ -80,7 +82,7 @@ export class DeleteStackScheduleConstruct extends Construct {
     // Grant Lambda permission to delete CloudFormation stacks
     deleteStackLambda.addToRolePolicy(
       new iam.PolicyStatement({
-        actions: ["cloudformation:DeleteStack"],
+        actions: ["cloudformation:DeleteStack", "cloudformation:DescribeStacks"],
         resources: Object.values(stackResources).map(
           (stackName) => `arn:aws:cloudformation:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:stack/${stackName}/*`
         )
