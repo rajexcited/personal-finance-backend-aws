@@ -67,7 +67,8 @@ export class MyFinanceAppStack extends Stack {
 
     const deleteStackScheduler = new DeleteStackScheduleConstruct(this, "DeleteStackScheduleConstruct", {
       appId: props.appId,
-      environment: props.environment
+      environment: props.environment,
+      receiptS3: receiptS3.receiptBucket
     });
 
     this.uiBucketArn = cloudfrontDistribution.uiBucketArn;

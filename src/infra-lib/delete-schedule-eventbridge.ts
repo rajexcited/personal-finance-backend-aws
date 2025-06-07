@@ -4,10 +4,13 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as events from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import { AwsResourceType, buildResourceName, ConstructProps, InfraEnvironmentId } from "./common";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
 
-interface DeleteStackScheduleProps extends ConstructProps {}
+interface DeleteStackScheduleProps extends ConstructProps {
+  receiptS3: s3.IBucket;
+}
 
 export class DeleteStackScheduleConstruct extends Construct {
   constructor(scope: Construct, id: string, props: DeleteStackScheduleProps) {
@@ -75,7 +78,8 @@ export class DeleteStackScheduleConstruct extends Construct {
       timeout: cdk.Duration.minutes(15),
       logRetention: RetentionDays.ONE_MONTH,
       environment: {
-        ...stackResources
+        ...stackResources,
+        RECEIPT_S3_BUCKET_NAME: props.receiptS3.bucketName
       }
     });
 
@@ -88,6 +92,8 @@ export class DeleteStackScheduleConstruct extends Construct {
         )
       })
     );
+    props.receiptS3.grantRead(deleteStackLambda);
+    props.receiptS3.grantDelete(deleteStackLambda);
 
     // EventBridge rule to trigger Lambda after 2 days
     const eventRule = new events.Rule(this, "DeleteStackScheduleEventRule", {

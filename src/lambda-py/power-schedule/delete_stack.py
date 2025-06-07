@@ -36,6 +36,7 @@ def lambda_handler(event, context):
     # Wait for stack deletion to complete
     wait_for_stack_deletion(cloudformation, stack_name)
 
+    empty_receipt_bucket()
     stack_name = get_infra_stack_name()
     print(f"Initiating deletion of Infra stack: {stack_name}")
     cloudformation.delete_stack(StackName=stack_name)
@@ -55,3 +56,18 @@ def get_ui_stack_name():
     if stack_name is None:
         raise ValueError("ui stack is not found")
     return stack_name
+
+
+def empty_receipt_bucket():
+    receipt_bucket_name = os.getenv("RECEIPT_S3_BUCKET_NAME")
+    if not receipt_bucket_name:
+        return
+    s3 = boto3.client("s3")
+    s3_objects = s3.list_objects_v2(Bucket=receipt_bucket_name)
+    if "Contents" in s3_objects:
+        object_keys = [{"Key": obj["Key"]} for obj in s3_objects["Contents"]]
+        delete_obj_response = s3.delete_objects(Bucket=receipt_bucket_name, Delete={"Objects": object_keys})
+        print(f"Deleted {len(object_keys)} s3 objects from {receipt_bucket_name}")
+        print(delete_obj_response)
+    else:
+        print(f"The bucket {receipt_bucket_name} is already empty")
