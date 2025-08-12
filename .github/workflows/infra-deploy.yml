@@ -595,7 +595,7 @@ jobs:
         name: Validate Request form details
         env:
           TESTPLAN_TYPE: ${{ steps.testplan-issue.outputs.testplanType }}
-          TESTPLAN_REQUEST_TYPE: ${{ steps.get-request-type.outputs.request-type }}
+          TESTPLAN_REQUEST_TYPE: ${{ needs.run_eligible.outputs.request-type }}
           ISSUE_DETAILS: ${{ steps.request-issue.outputs.issueDetails }}
           BRANCH_DETAILS: ${{ steps.get-milestone-testplan.outputs.branch }}
         run: |
