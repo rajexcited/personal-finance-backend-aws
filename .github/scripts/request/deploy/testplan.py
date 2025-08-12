@@ -186,12 +186,12 @@ def validate_request_form(request_form_issue_details: Dict, testplan_type: str, 
 
 if __name__ == "__main__":
     """
-    python -m scripts.request.deploy.testplan --validate --request-form-issue-details ..\dist\request_form_issue_details\testplan_deploy.json --request-type provision --branch-details "{\"name\":\"mileston/v0\"}" --testplan-type regression
-    python -m scripts.request.deploy.testplan --validate --request-form-issue-details ..\dist\request_form_issue_details\testplan_deploy.json --request-type deprovision --branch-details "{\"name\":\"mileston/v0\"}" --testplan-type regression
+    python -m scripts.request.deploy.testplan --validate --request-form-issue-details ../dist/request_form_issue_details/testplan_deploy.json --request-type provision --branch-details "{\"name\":\"mileston/v0\"}" --testplan-type regression
+    python -m scripts.request.deploy.testplan --validate --request-form-issue-details ../dist/request_form_issue_details/testplan_deploy.json --request-type deprovision --branch-details "{\"name\":\"mileston/v0\"}" --testplan-type regression
 
-    python -m scripts.request.deploy.testplan --validate --request-form-issue-details ..\dist\request_form_issue_details\testplan_deploy.json --request-type provision --branch-details "{\"name\":\"master\"}" --testplan-type regression
-    python -m scripts.request.deploy.testplan --validate --request-form-issue-details ..\dist\request_form_issue_details\testplan_deploy.json --request-type provision --branch-details "{\"name\":\"feature\"}" --testplan-type regression
-    python -m scripts.request.deploy.testplan --validate --request-form-issue-details ..\dist\request_form_issue_details\testplan_deploy.json --request-type provision --branch-details "{\"name\":\"mileston/v0\"}" --testplan-type feature
+    python -m scripts.request.deploy.testplan --validate --request-form-issue-details ../dist/request_form_issue_details/testplan_deploy.json --request-type provision --branch-details "{\"name\":\"master\"}" --testplan-type regression
+    python -m scripts.request.deploy.testplan --validate --request-form-issue-details ../dist/request_form_issue_details/testplan_deploy.json --request-type provision --branch-details "{\"name\":\"feature\"}" --testplan-type regression
+    python -m scripts.request.deploy.testplan --validate --request-form-issue-details ../dist/request_form_issue_details/testplan_deploy.json --request-type provision --branch-details "{\"name\":\"mileston/v0\"}" --testplan-type feature
     """
     parser = ArgumentParser(
         description="validates Deployment Request form for Testplan environment")
