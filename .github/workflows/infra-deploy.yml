@@ -269,7 +269,7 @@ jobs:
     outputs:
       branch-name: ${{ steps.get-milestone-testplan.outputs.branch-name || steps.get-milestone-development.outputs.branch-name || steps.get-milestone-prod.outputs.tagRefName }}
       branch-url: ${{ steps.get-milestone-testplan.outputs.branch-url || steps.get-milestone-development.outputs.branch-url || steps.get-milestone-prod.outputs.tagRefUrl }}
-      failed-reason: ${{ steps.get-milestone-testplan.outputs.failedReason || steps.testplan-issue.outputs.failedReason || steps.testplan-issue2.outputs.failedReason || steps.request-form-testplan.outputs.failedReason || steps.testplan-request-eligible.outputs.failedReason || steps.prod-request-eligible.outputs.failedReason || steps.request-form-prod.outputs.failedReason || steps.get-milestone-prod.outputs.failedReason || steps.build-workflow-status.outputs.failedReason || steps.get-milestone-development.outputs.failedReason || steps.request-form-development.outputs.failedReason || steps.verify-deploy-version.outputs.failedReason || steps.validate-rollback.outputs.failedReason }}
+      failed-reason: ${{ steps.get-milestone-testplan.outputs.failedReason || steps.testplan-issue.outputs.failedReason || steps.testplan-issue2.outputs.failedReason || steps.request-form-testplan.outputs.failedReason || steps.prod-request-eligible.outputs.failedReason || steps.request-form-prod.outputs.failedReason || steps.get-milestone-prod.outputs.failedReason || steps.build-workflow-status.outputs.failedReason || steps.get-milestone-development.outputs.failedReason || steps.request-form-development.outputs.failedReason || steps.verify-deploy-version.outputs.failedReason || steps.validate-rollback.outputs.failedReason }}
       testplan-type: ${{ steps.testplan-issue.outputs.testplanType }}
       testplan-issue-number: ${{ steps.testplan-issue.outputs.testplanIssue-number }}
       testplan-issue-repo: ${{ steps.testplan-issue.outputs.testplanIssue-repo }}
@@ -286,27 +286,6 @@ jobs:
         run: |
           echo "Needs of Validate Request: $RUN_ELIGIBLE_JSON"
           echo "Needs of Update Request: $UPDATE_REQ_JSON"
-      - id: testplan-request-eligible
-        if: needs.run_eligible.outputs.is-testplan == 'true'
-        env:
-          IS_TESTPLAN_PROVISION: ${{ needs.run_eligible.outputs.is-testplan-provision }}
-          IS_TESTPLAN_DEPROVISION: ${{ needs.run_eligible.outputs.is-testplan-deprovision }}
-          IS_MILESTONE_OPEN: ${{ github.event.issue.milestone.state == 'open' }}
-        run: |
-          ELIGIBLE="false"
-          # validation relaxed for milestone if deprovision
-          if [[ "$IS_TESTPLAN_DEPROVISION" == "true" ]]; then
-            ELIGIBLE="true"
-          elif [[ "$IS_TESTPLAN_PROVISION" == "true" && "$IS_MILESTONE_OPEN" == "true" ]]; then
-            ELIGIBLE="true"
-          fi
-          if [[ "$ELIGIBLE" == "false" ]]; then
-            echo "failed request form criteria"
-            echo "Criteria-1, allow testplan deprovision request. found values, testplan deprovision? $IS_TESTPLAN_DEPROVISION"
-            echo "Criteria-2, allow testplan provision only for open milestone. found values, milestone open? $IS_MILESTONE_OPEN, testplan provision? $IS_TESTPLAN_PROVISION"
-            echo "failedReason=for testplan request form, milestone or label assignments are incorrect" >> $GITHUB_OUTPUT
-            exit 1
-          fi
       - id: prod-request-eligible
         if: needs.run_eligible.outputs.is-production == 'true'
         env:
