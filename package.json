@@ -37,7 +37,7 @@
     "@types/ms": "^0.7.34",
     "@types/node": "20.11.14",
     "aws-cdk": "^2.1003.0",
-    "aws-cdk-lib": "~2.187.0",
+    "aws-cdk-lib": "~2.189.1",
     "commander": "^12.1.0",
     "constructs": "^10.0.0",
     "eslint": "^9.25.1",
