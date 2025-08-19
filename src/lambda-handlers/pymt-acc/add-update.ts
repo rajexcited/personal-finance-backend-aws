@@ -69,7 +69,10 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   };
   const duplicateResult = await dbutil.queryOnce(queryCmdInput, logger, dbutil.CacheAction.NOT_FROM_CACHE);
   if (duplicateResult?.Items?.length) {
-    throw new ValidationError([{ path: PymtAccResourcePath.SHORTNAME, message: ErrorMessage.DUPLICATE_VALUE }]);
+    const duplicateDbPaymentAccount = duplicateResult.Items[0] as DbItemPymtAcc;
+    if (req.id && duplicateDbPaymentAccount.PK !== getDetailsTablePk(req.id)) {
+      throw new ValidationError([{ path: PymtAccResourcePath.SHORTNAME, message: ErrorMessage.DUPLICATE_VALUE }]);
+    }
   }
 
   const pymtAccId = existingDbItem?.details.id || uuidv4();
