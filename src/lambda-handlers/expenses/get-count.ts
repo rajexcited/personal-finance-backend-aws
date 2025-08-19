@@ -45,7 +45,7 @@ export const getExpenseCount = apiGatewayHandlerWrapper(async (event: APIGateway
       Select: Select.COUNT
     },
     logger,
-    dbutil.CacheAction.FROM_CACHE
+    dbutil.CacheAction.CLEAR_CACHE_AFTER_RESULT
   );
 
   return result?.Count || 0;

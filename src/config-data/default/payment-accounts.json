@@ -3,7 +3,7 @@
     "shortName": "cash",
     "accountIdNum": "cash",
     "typeName": "savings",
-    "tags": [],
+    "tags": ["cash"],
     "description": "my cash, notes or coins stored",
     "institutionName": "",
     "status": "immutable"

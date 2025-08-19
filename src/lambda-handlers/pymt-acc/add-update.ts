@@ -1,5 +1,13 @@
 import { APIGatewayProxyEvent } from "aws-lambda";
-import { InvalidField, JSONObject, RequestBodyContentType, UnAuthorizedError, ValidationError, apiGatewayHandlerWrapper, convertToCreatedResponse } from "../apigateway";
+import {
+  InvalidField,
+  JSONObject,
+  RequestBodyContentType,
+  UnAuthorizedError,
+  ValidationError,
+  apiGatewayHandlerWrapper,
+  convertToCreatedResponse
+} from "../apigateway";
 import {
   ErrorMessage,
   NAME_MIN_LENGTH,
@@ -48,20 +56,20 @@ const addUpdateDetailsHandler = async (event: APIGatewayProxyEvent) => {
         throw new UnAuthorizedError("not authorized to update payment type details");
       }
     } else {
-      const queryCmdInput: QueryCommandInput = {
-        TableName: _pymtAccTableName,
-        IndexName: _userIdStatusShortnameIndex,
-        KeyConditionExpression: "UP_GSI_PK = :pkv and UP_GSI_SK = :skv",
-        ExpressionAttributeValues: {
-          ":pkv": getUserIdStatusShortnameGsiPk(authUser.userId, PymtAccStatus.ENABLE, currencyProfile),
-          ":skv": getUserIdStatusShortnameGsiSk(req.shortName)
-        }
-      };
-      const result = await dbutil.queryOnce(queryCmdInput, logger, dbutil.CacheAction.NOT_FROM_CACHE);
-      if (result?.Items?.length) {
-        throw new ValidationError([{ path: PymtAccResourcePath.SHORTNAME, message: ErrorMessage.DUPLICATE_VALUE }]);
-      }
     }
+  }
+  const queryCmdInput: QueryCommandInput = {
+    TableName: _pymtAccTableName,
+    IndexName: _userIdStatusShortnameIndex,
+    KeyConditionExpression: "UP_GSI_PK = :pkv and UP_GSI_SK = :skv",
+    ExpressionAttributeValues: {
+      ":pkv": getUserIdStatusShortnameGsiPk(authUser.userId, PymtAccStatus.ENABLE, currencyProfile),
+      ":skv": getUserIdStatusShortnameGsiSk(req.shortName)
+    }
+  };
+  const duplicateResult = await dbutil.queryOnce(queryCmdInput, logger, dbutil.CacheAction.NOT_FROM_CACHE);
+  if (duplicateResult?.Items?.length) {
+    throw new ValidationError([{ path: PymtAccResourcePath.SHORTNAME, message: ErrorMessage.DUPLICATE_VALUE }]);
   }
 
   const pymtAccId = existingDbItem?.details.id || uuidv4();
