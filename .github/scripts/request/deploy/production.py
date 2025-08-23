@@ -194,9 +194,12 @@ def validate_deployment_schedule(deployment_schedule_list: List, deployment_type
 
     if deployment_type == DeploymentType.Release:
         if preferred_date_obj > milestone_due_date_obj:
-            raise ValueError("Preferred Date and Time is after milestone due date")
-        if preferred_date_obj.strftime("%Y%m%d") != milestone_due_date_obj.strftime("%Y%m%d"):
-            raise ValueError("Release date is not same as milestone dueon date")
+            raise ValueError(f"Preferred Date and Time [{preferred_date_obj}] is after milestone due date[{milestone_due_date_obj}]")
+        if preferred_date_obj < milestone_due_date_obj-timedelta(days=1) or preferred_date_obj > milestone_due_date_obj:
+            # not within a day
+            preferred_date_str = preferred_date_obj.strftime("%Y%m%d")
+            milestone_dueon_str = milestone_due_date_obj.strftime("%Y%m%d")
+            raise ValueError(f"Release date [{preferred_date_str}] is not same as milestone dueon date [{milestone_dueon_str}]")
 
 
 def get_deployment_type(form_contents: List):
@@ -273,8 +276,8 @@ def validate_request_form(request_form_issue_details: Dict):
 
 if __name__ == "__main__":
     """
-    python -m scripts.request.deploy.production --validate --request-form-issue-details ..\dist\request_form_issue_details\prod_release.json
-    python -m scripts.request.deploy.production --validate --request-form-issue-details ..\dist\request_form_issue_details\prod_rollback.json
+    python -m scripts.request.deploy.production --validate --request-form-issue-details ..\\dist\\request_form_issue_details\\prod_release.json
+    python -m scripts.request.deploy.production --validate --request-form-issue-details ..\\dist\\request_form_issue_details\\prod_rollback.json
     """
     parser = ArgumentParser(
         description="validates Deployment Request form for Prod environment")
@@ -282,12 +285,12 @@ if __name__ == "__main__":
                         help="[Required] Validation Request")
     parser.add_argument("--request-form-issue-details",
                         help="[Required] Provide request form issue details as json")
+
     args = parser.parse_args()
 
     try:
         get_parsed_arg_value(args, key="validate", arg_type_converter=bool)
-        request_form_issue_details = get_parsed_arg_value(args, key="request_form_issue_details",
-                                                          arg_type_converter=lambda x: get_valid_dict(x) or {})
+        request_form_issue_details = get_parsed_arg_value(args, key="request_form_issue_details", arg_type_converter=get_valid_dict)
 
     except Exception as e:
         print("error: ", e)
