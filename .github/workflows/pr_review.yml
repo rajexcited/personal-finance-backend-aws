@@ -297,7 +297,8 @@ jobs:
               if(issueLables.length !== allowedLabels.length) {
                 throw new Error("provided issue link in comment is not regression testplan");
               }
-              const foundCompleteComment=!!testplanIssueComments.find(comment=> comment.body.includes("There are no critical issues") && comment.body.includes("Status-All%20Good"));
+              const isCommentStatusAllGood = comment => (comment.body.includes("There are no critical issues") || comment.body.includes("There are no issues")) && comment.body.includes("Status-All%20Good");
+              const foundCompleteComment=!!testplanIssueComments.find(isCommentStatusAllGood);
               if (!foundCompleteComment) {
                   throw new Error("Regression issue is closed but all critical issues are not resolved.");
               }
