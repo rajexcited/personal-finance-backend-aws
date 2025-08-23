@@ -1,4 +1,4 @@
-name: Release Drafter
+name: Generate Release Draft
 
 on:
   workflow_dispatch:
@@ -7,54 +7,110 @@ on:
         description: Enter milestone title
         required: true
         type: string
-      publish:
-        description: Publish the release
-        default: "No"
-        options:
-          - "Yes"
-          - "No"
-        required: false
-        type: choice
 
 jobs:
-  generate_release_draft:
+  summarize_create:
+    name: Summarize and Draft Release Notes
     permissions:
       contents: write
     runs-on: ubuntu-latest
-    if: github.event_name == 'neel'
+    environment: aws-infra-production
     steps:
-      - name: Experiment release draft with cli
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.13"
+
+      - name: Authenticate Google Cloud with Service Account
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Pip Install
+        run: |
+          cd .github
+          echo "Python Version: " $(python --version)
+          echo "Pip Version: " $(pip --version)
+          pip install -r scripts/requirements.txt
+          cd ..
+          pip list
+
+      - name: Experiment
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MILESTONE_TITLE: ${{ github.event.inputs.milestone_version }}
+          GCP_LOCATION: ${{ vars.GCP_LOCATION }}
+          GCP_MODEL_NAME: ${{ vars.GCP_MODEL_NAME }}
+          GRPC_VERBOSITY: "DEBUG"
+          GRPC_TRACE: "all"
+        if: github.event_name == 'experiment'
         run: |
-          gh release create "${{ github.ref_name }}" \
-              --draft --latest \
-              --repo="${{ github.repository }}" \
-              --title="v0.2.0" \
-              --generate-notes
+          cd .github
+          # capture error code +-e
+          set +e
+          python -m scripts.request.release.draft --example > example_output.log 2>&1
+          RETURN_CODE=$?
+          set -e
+          cat example_output.log
+          if [ $RETURN_CODE -ne 0 ]; then
+            echo "failedReason<<EOF" >> $GITHUB_OUTPUT
+            cat example_output.log >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+          exit $RETURN_CODE
 
-  update_release_draft:
-    permissions:
-      # write permission is required to create a github release
-      contents: write
-      # write permission is required for autolabeler
-      # otherwise, read permission is required at least
-      pull-requests: write
-    runs-on: ubuntu-latest
-    steps:
-      # (Optional) GitHub Enterprise requires GHE_HOST variable set
-      #- name: Set GHE_HOST
-      #  run: |
-      #    echo "GHE_HOST=${GITHUB_SERVER_URL##https:\/\/}" >> $GITHUB_ENV
-
-      # Drafts your next Release notes as Pull Requests are merged into "master"
-      - uses: release-drafter/release-drafter@v6
-        # (Optional) specify config name to use, relative to .github/. Default: release-drafter.yml
-        with:
-          publish: ${{ github.event.inputs.publish == 'Yes' }}
-          latest: true
-          version: ${{ github.event.inputs.milestone_version || github.event.pull_request.milestone.title }}
-        #   disable-autolabeler: true
+      - name: generate release change
+        id: generate-change
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MILESTONE_TITLE: ${{ github.event.inputs.milestone_version || github.event.pull_request.milestone.title }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MILESTONE_TITLE: ${{ github.event.inputs.milestone_version }}
+          GCP_LOCATION: ${{ vars.GCP_LOCATION }}
+          GCP_MODEL_NAME: ${{ vars.GCP_MODEL_NAME }}
+          # GRPC_VERBOSITY: "DEBUG"
+          # GRPC_TRACE: "all"
+        run: |
+          cd .github
+          python --version
+          pip install -r scripts/requirements.txt
+          # capture error code +-e
+          set +e
+          python -m scripts.request.release.draft --generate --template-path .github/release-notes.template.yml > generate_change_output.log 2>&1
+          RETURN_CODE=$?
+          set -e
+          if [ $RETURN_CODE -ne 0 ]; then
+            echo "failedReason<<EOF" >> $GITHUB_OUTPUT
+            cat generate_change_output.log >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+          cat generate_change_output.log
+          exit $RETURN_CODE
+
+      - name: Create Release draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_FULLNAME: ${{ github.repository }}
+          MILESTONE_TITLE: ${{ github.event.inputs.milestone_version }}
+          RELEASE_NOTES: ${{ steps.generate-change.outputs.release_change }}
+          TARGET_REF: ${{ github.ref_name }}
+        run: |
+          # Check if the release already exists
+          if gh release view "$MILESTONE_TITLE" --repo="$REPO_FULLNAME" > /dev/null 2>&1; then
+            echo "Updating existing release with Tag $MILESTONE_TITLE"
+            gh release edit "$MILESTONE_TITLE" \
+                --draft --latest \
+                --repo="$REPO_FULLNAME" \
+                --title="$MILESTONE_TITLE" \
+                --notes "$RELEASE_NOTES" \
+                --target "$TARGET_REF"
+          else
+            echo "Creating release with Tag $MILESTONE_TITLE"
+            gh release create "$MILESTONE_TITLE" \
+                --draft --latest \
+                --repo="$REPO_FULLNAME" \
+                --title="$MILESTONE_TITLE" \
+                --notes "$RELEASE_NOTES" \
+                --target "$TARGET_REF"
+          fi
