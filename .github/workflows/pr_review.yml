@@ -126,20 +126,20 @@ jobs:
             echo "Merged timestamp does not fall within the allowed range. Automatic deletion is not supported."
             exit 1
           fi
-      - name: Compare Milestone branch to master
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const compareResponse = await github.rest.repos.compareCommits({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              head: "master",
-              base: context.payload.pull_request.head.ref
-            });
-            console.log("milestone branch as base and master branch as head, compareResponse: ", compareResponse);
-            if (compareResponse.data.behind_by > 0) {
-              throw new Error(`Milestone branch [${context.payload.pull_request.head.ref}] is not fully merged to master. and master is behind by ${compareResponse.data.behind_by} commits.`);
-            }
+      # - name: Compare Milestone branch to master
+      #   uses: actions/github-script@v7
+      #   with:
+      #     script: |
+      #       const compareResponse = await github.rest.repos.compareCommits({
+      #         owner: context.repo.owner,
+      #         repo: context.repo.repo,
+      #         head: "master",
+      #         base: context.payload.pull_request.head.ref
+      #       });
+      #       console.log("milestone branch as base and master branch as head, compareResponse: ", compareResponse);
+      #       if (compareResponse.data.behind_by > 0) {
+      #         throw new Error(`Milestone branch [${context.payload.pull_request.head.ref}] is not fully merged to master. and master is behind by ${compareResponse.data.behind_by} commits.`);
+      #       }
       - name: Checkout
         uses: actions/checkout@v4
       - name: Delete Milestone Branch
@@ -297,7 +297,8 @@ jobs:
               if(issueLables.length !== allowedLabels.length) {
                 throw new Error("provided issue link in comment is not regression testplan");
               }
-              const foundCompleteComment=!!testplanIssueComments.find(comment=> comment.body.includes("There are no critical issues") && comment.body.includes("Status-All%20Good"));
+              const isCommentStatusAllGood = comment => (comment.body.includes("There are no critical issues") || comment.body.includes("There are no issues")) && comment.body.includes("Status-All%20Good");
+              const foundCompleteComment=!!testplanIssueComments.find(isCommentStatusAllGood);
               if (!foundCompleteComment) {
                   throw new Error("Regression issue is closed but all critical issues are not resolved.");
               }

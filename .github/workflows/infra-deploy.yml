@@ -366,31 +366,31 @@ jobs:
         with:
           script: |
             try {
+              // Convert UTC to Central Time (America/Chicago) using timeZone offset
+              const centralTimeFormat = new Intl.DateTimeFormat("en-US", {
+                timeZone: "America/Chicago",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                timeZoneName: "short"
+              });
+
               const getEndOfDayCentral = (datetime) => {
                 const date = new Date(datetime);
                 if (isNaN(date.getTime())) {
                   return null; // Invalid Date
                 }
-                date.setHours(23);
-
-                // Convert UTC to Central Time (America/Chicago) using timeZone offset
-                const centralTimeFormat = new Intl.DateTimeFormat("en-US", {
-                  timeZone: "America/Chicago",
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                  timeZoneName: "short"
-                });
 
                 // Format and extract adjusted time
                 const centralTimeString = centralTimeFormat.format(date);
-                const centralDate = new Date(centralTimeString);
-
                 // Ensure time is set to 23:59:59 (end of the day)
-                centralDate.setHours(23, 59, 59, 999);
+                const dateTimeParts = centralTimeString.split(" ");
+                dateTimeParts[1] = "11:59:59.999"
+                dateTimeParts[2] = "PM"
+                const centralDate = new Date(dateTimeParts.join(" "));
 
                 return centralDate;
               };
@@ -404,7 +404,7 @@ jobs:
                 }
                 const milestoneDueOn = getEndOfDayCentral(context.payload.issue.milestone.due_on);
                 const endOfToday = getEndOfDayCentral(new Date());
-                const toDateString = (dateInstance) => dateInstance.toJSON().substring(0,10);
+                const toDateString = (dateInstance) => centralTimeFormat.format(dateInstance).substring(0,10);
                 if(milestoneDueOn < endOfToday) {
                   throw new Error(`Milestone due date[${toDateString(milestoneDueOn)}] is already passed ${toDateString(endOfToday)}`);
                 }
@@ -652,31 +652,31 @@ jobs:
         with:
           script: |
             try {
+              // Convert UTC to Central Time (America/Chicago) using timeZone offset
+              const centralTimeFormat = new Intl.DateTimeFormat("en-US", {
+                timeZone: "America/Chicago",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                timeZoneName: "short"
+              });
+
               const getEndOfDayCentral = (datetime) => {
                 const date = new Date(datetime);
                 if (isNaN(date.getTime())) {
                   return null; // Invalid Date
                 }
-                date.setHours(23);
-
-                // Convert UTC to Central Time (America/Chicago) using timeZone offset
-                const centralTimeFormat = new Intl.DateTimeFormat("en-US", {
-                  timeZone: "America/Chicago",
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                  timeZoneName: "short"
-                });
 
                 // Format and extract adjusted time
                 const centralTimeString = centralTimeFormat.format(date);
-                const centralDate = new Date(centralTimeString);
-
                 // Ensure time is set to 23:59:59 (end of the day)
-                centralDate.setHours(23, 59, 59, 999);
+                const dateTimeParts = centralTimeString.split(" ");
+                dateTimeParts[1] = "11:59:59.999"
+                dateTimeParts[2] = "PM"
+                const centralDate = new Date(dateTimeParts.join(" "));
 
                 return centralDate;
               };
@@ -712,10 +712,11 @@ jobs:
               }
               if(process.env.IS_ROLLBACK != "true") {
                 // for prod deployment, date has to be today
-                const milestoneDueOnDate = getEndOfDayCentral(context.payload.issue.milestone.due_on).toDateString();
+                const milestoneDueOnDate = getEndOfDayCentral(context.payload.issue.milestone.due_on);
                 const endOfToday = getEndOfDayCentral(new Date());
-                if(milestoneDueOnDate !== endOfToday.toDateString()) {
-                  throw new Error("Milestone due date is not today");
+                if(milestoneDueOnDate.getTime() !== endOfToday.getTime()) {
+                  const milestoneDueDate = centralTimeFormat.format(milestoneDueOnDate).substring(0,10);
+                  throw new Error(`Milestone due date[${milestoneDueDate}] is not today`);
                 }
               }
               // verify milestone branch not exists
@@ -1615,8 +1616,18 @@ jobs:
               issueBody += `- Parent Request [Issue-${context.payload.issue.number}](${context.payload.issue.html_url})\n\n`;
               issueBody += process.env.POST_DEPLOY_REQ_SECTION;
               issueBody += "\n\n  ";
-              issueBody += "> [!IMPORTANT]  \n";
-              issueBody += "> Please checked tasks if verified successfully. When post deployment verification is completed, close the issue regardless the status to mark the deployment attempt complete.  ";
+              issueBody += "\n> [!IMPORTANT]  ";
+              issueBody += "\n> Please checked tasks if verified successfully.  ";
+              issueBody += "\n> When post deployment verification is completed, close the issue regardless the status to mark the deployment attempt complete.  ";
+              issueBody += "\n\n  "
+              issueBody += "\n### Complete Post Deployment Activities\n"
+              issueBody += "\n  "
+              issueBody += "\n- [ ] Run Smoke Test  "
+              issueBody += "\n- [ ] Verify Tag created  "
+              issueBody += "\n- [ ] Close Milestone and ensure no issues are open  "
+              issueBody += "\n- [ ] Verify Release Notes and publish  "
+              issueBody += "\n"
+
               const createIssueResponse = await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,

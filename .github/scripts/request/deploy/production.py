@@ -89,14 +89,20 @@ def validate_rollback_plan(rollback_list: List):
 
 def validate_pre_deployment_tasks(pre_deploy_task_list: List):
     verification_task_count = 0
+    unverified_task_count = 0
 
     vrfy_task_list = get_list_items(pre_deploy_task_list)
     for vrfy_task in vrfy_task_list:
         if isinstance(vrfy_task, MdListItemTodo):
-            verification_task_count += 1
+            if vrfy_task.is_checked:
+                verification_task_count += 1
+            else:
+                unverified_task_count += 1
 
+    if unverified_task_count > 0:
+        raise ValueError("Pre Deployment Tasks section does not have all tasks checked. Please make to verify all tasks before deployment.")
     if verification_task_count == 0:
-        raise ValueError("Pre Deployment Tasks section is missing verification tasks")
+        raise ValueError("Pre Deployment Tasks section is missing verification tasks. and all tasks should be checked.")
 
 
 def validate_post_deployment_tasks(post_deploy_task_list: List):
