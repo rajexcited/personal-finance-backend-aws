@@ -10,7 +10,6 @@ export interface DomainCfProps extends ConstructProps {
   uiBucket: s3.IBucket;
   restApi: apigateway.RestApi;
   apiStageName: string;
-  // webAclId: string | undefined;
   cfContext: CloudFrontContextInfo;
 }
 
@@ -43,16 +42,13 @@ export class DomainCfConstruct extends Construct {
     };
 
     const distribution = new cf.Distribution(this, "DistributionConstruct", {
-      // defaultRootObject: props.cfContext.homePageUrl,
-      // defaultRootObject: relativeUiPath + "/index.html",
       defaultBehavior: {
         origin: defaultBucketOrigin,
         viewerProtocolPolicy: cf.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         functionAssociations: [redirectHomepageCfFunction]
       },
       priceClass: cf.PriceClass.PRICE_CLASS_100,
-      // webAclId: props.cfContext.enableWebAcl ? props.webAclId : undefined,
-      geoRestriction: geoRestriction,
+            geoRestriction: geoRestriction,
       errorResponses: this.getErrorResponses(props)
     });
     this.cfDistribution = distribution;
@@ -162,40 +158,12 @@ function getLoadHomepageHandlerFunctionString(props: DomainCfProps) {
   function handler(event: CfEvent) {
     const request = event.request;
 
-    // if (true) {
-    //   const resp: CfResponse = {
-    //     statusCode: 200,
-    //     statusDescription: "OK",
-    //     headers: {},
-    //     body: event,
-    //   };
-    //   return resp;
-    // }
-    // Check whether the URI is missing a file name.
-    // if (uri.endsWith("/")) {
-    //   request.uri += "index.html";
-    // }
-    // Check whether the URI is missing a file extension.
-    // else
-    //  if (!uri.includes("index.html")) {
     const rootPath = request.uri.split("/").find((a) => a);
     request.uri = "/" + rootPath + "/index.html";
-    // }
+    
 
     return request;
   }
 
-  // async function handler(event: CfEvent) {
-  //   console.log("event", JSON.stringify(event));
-  //   const homepageUrl = "${props.cfContext.homepageUrl}";
-  //   const request = event.request;
-  //   // request.uri = `/${homepageUrl}/index.html`;
-  //   if (!request.uri.includes("index.html")) {
-  //     request.uri += request.uri.endsWith("/") ? "" : "/" + "index.html";
-  //   }
-  //   return request;
-  // }
-
-  // return handler.toString().replace("${props.cfContext.homepageUrl}", props.cfContext.homepageUrl);
   return handler.toString();
 }

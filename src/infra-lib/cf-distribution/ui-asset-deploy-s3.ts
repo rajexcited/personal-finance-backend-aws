@@ -18,8 +18,8 @@ export class UiAssetDeployS3Construct extends Construct {
 
     const uiBucket = s3.Bucket.fromBucketArn(this, "UiBucketFromArn", props.uiBucketArn);
 
-    const uiStaticBucketDeploymentConstructId = buildResourceName(["ui", "static"], AwsResourceType.BucketDeployment, props);
-    const uiDeployment = new s3Deploy.BucketDeployment(this, uiStaticBucketDeploymentConstructId, {
+    const uiAssetsBucketDeploymentConstructId = buildResourceName(["ui", "assets"], AwsResourceType.BucketDeployment, props);
+    const uiDeployment = new s3Deploy.BucketDeployment(this, uiAssetsBucketDeploymentConstructId, {
       destinationBucket: uiBucket,
       sources: [
         s3Deploy.Source.asset("dist/ui", {
@@ -37,7 +37,7 @@ export class UiAssetDeployS3Construct extends Construct {
       destinationBucket: uiBucket,
       sources: [
         s3Deploy.Source.asset("dist/ui", {
-          exclude: ["**/static/**", "*.jpeg", "*.png", "*.json", "*.ico", "*.txt", "*.css", "*.js"]
+          exclude: ["**/assets/**", "*.jpeg", "*.png", "*.json", "*.ico", "*.txt", "*.css", "*.js"]
         })
       ],
       retainOnDelete: false,

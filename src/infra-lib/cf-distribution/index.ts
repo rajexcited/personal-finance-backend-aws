@@ -11,14 +11,13 @@ export { UiAssetDeployS3Construct } from "./ui-asset-deploy-s3";
 interface MyCfDistributionProps extends ConstructProps {
   restApi: apigateway.RestApi;
   contextInfo: ContextInfo;
-  stageName: string;
-  // webAclId: string;
+  stageName: string;  
 }
 
 export class MyCfDistributionConstruct extends Construct {
   public readonly uiBucketArn: string;
   public readonly cfDistribution: cf.IDistribution;
-
+  
   constructor(scope: Construct, id: string, props: MyCfDistributionProps) {
     super(scope, id);
 
@@ -35,7 +34,6 @@ export class MyCfDistributionConstruct extends Construct {
       environment: props.environment,
       appId: props.appId,
       restApi: props.restApi,
-      // webAclId: props.webAclId,
       uiBucket: uiS3.uiBucket,
       apiStageName: props.stageName,
       cfContext: props.contextInfo.cloudfront
