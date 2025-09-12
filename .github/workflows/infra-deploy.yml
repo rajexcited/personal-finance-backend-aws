@@ -1797,7 +1797,7 @@ jobs:
       - run_eligible
       - validate_request
       - validate_request_stack
-    if: needs.run_eligible.outputs.is-testplan-deprovision == 'true'
+    if: needs.run_eligible.outputs.is-testplan-deprovision == 'true' || needs.run_eligible.outputs.is-development-deprovision == 'true'
     environment:
       name: aws-infra-${{ needs.run_eligible.outputs.env-ref-name }}
     outputs:
