@@ -299,14 +299,8 @@ jobs:
           ls -lrt dist/ui/logo.jpeg
           ls -lrt dist/ui/logo192.png
           ls -lrt dist/ui/favicon.ico
-          echo ls -lrt dist/ui/static
-          ls -lrt dist/ui/static
-          echo ls -lrt dist/ui/static/css
-          ls -lrt dist/ui/static/css
-          echo ls -lrt dist/ui/static/js
-          ls -lrt dist/ui/static/js
-          echo ls -lrt dist/ui/static/media
-          ls -lrt dist/ui/static/media
+          echo ls -lrt dist/ui/assets
+          ls -lrt dist/ui/assets
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
