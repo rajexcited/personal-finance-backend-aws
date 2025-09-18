@@ -1,12 +1,4 @@
-import {
-  Delete,
-  DynamoDBClient,
-  KeysAndAttributes,
-  ProvisionedThroughputExceededException,
-  Put,
-  ReturnValue,
-  Update
-} from "@aws-sdk/client-dynamodb";
+import { Delete, DynamoDBClient, KeysAndAttributes, ProvisionedThroughputExceededException, Put, ReturnValue, Update } from "@aws-sdk/client-dynamodb";
 import {
   BatchWriteCommandInput,
   DynamoDBDocument,
@@ -17,7 +9,9 @@ import {
   GetCommandInput,
   PutCommandInput,
   DeleteCommandInput,
-  UpdateCommandInput
+  UpdateCommandInput,
+  ScanCommandInput,
+  ScanCommandOutput
 } from "@aws-sdk/lib-dynamodb";
 import { NativeAttributeValue } from "@aws-sdk/util-dynamodb";
 import { LoggerBase, getLogger } from "../utils";
@@ -104,6 +98,7 @@ const MAX_TRANSACTION_ITEMS = 100; // AWS DynamoDB limit for transaction operati
 const MAX_ITEM_SIZE_BYTES = 400 * 1024; // AWS DynamoDB limit - 400KB per item
 const MAX_REQUEST_SIZE_BYTES = 16 * 1024 * 1024; // AWS DynamoDB limit - 16MB per request
 const MAX_QUERY_ITERATIONS = 10; // Safety limit to prevent infinite loops in queryAll
+const MAX_SCAN_ITERATIONS = 10; // Safety limit to prevent infinite loops in scan
 
 /**
  * Calculate exponential backoff delay with jitter
@@ -940,6 +935,140 @@ export const queryAll = async <T>(baseLogger: LoggerBase, input: QueryCommandInp
     stopwatch.stop();
     logger.info("queryloop summary");
     qsw.prettyPrint();
+    logger.info("stopwatch summary", stopwatch.shortSummary());
+  }
+};
+
+export const scan = async <T>(baseLogger: LoggerBase, input: ScanCommandInput): Promise<{ Items: T[]; LastEvaluatedKey: Record<string, any> | undefined }> => {
+  const stopwatch = new StopWatch("scan");
+  const logger = getLogger("scan", baseLogger);
+  const ssw = new StopWatch("scanloop");
+
+  try {
+    stopwatch.start();
+    if (!input.TableName) {
+      throw new MissingError("missing tableName");
+    }
+
+    // Check circuit breaker
+    if (!dynamoDBCircuitBreaker.canExecute()) {
+      throw new Error(`DynamoDB circuit breaker is ${dynamoDBCircuitBreaker.getState()} - operations temporarily disabled`);
+    }
+
+    let output: ScanCommandOutput | undefined;
+    let lastEvaluatedKey = input.ExclusiveStartKey;
+    const items = [];
+    let count = 1;
+    let totalConsumedCapacity = 0;
+
+    logger.info("starting to scan DB in loop until all items are retrieved satisfying input command");
+
+    do {
+      try {
+        ssw.start("iteration" + count);
+        const cmdInput: ScanCommandInput = {
+          ...input,
+          ExclusiveStartKey: lastEvaluatedKey,
+          // Add consumed capacity monitoring
+          ReturnConsumedCapacity: "TOTAL"
+        };
+        logger.debug("cmdInput =", cmdInput);
+
+        let scanAttempt = 0;
+        while (scanAttempt < MAX_RETRY_ATTEMPTS) {
+          // Check circuit breaker on each attempt
+          if (!dynamoDBCircuitBreaker.canExecute()) {
+            throw new Error(`DynamoDB circuit breaker is ${dynamoDBCircuitBreaker.getState()} - operations temporarily disabled`);
+          }
+
+          try {
+            output = await getDdbClient().scan(cmdInput);
+            dynamoDBCircuitBreaker.onSuccess(); // Mark success for circuit breaker
+            break; // Success, exit retry loop
+          } catch (err: any) {
+            scanAttempt++;
+            // Only mark circuit breaker failure for service/infrastructure errors
+            if (isServiceFailure(err) && scanAttempt === 1) {
+              dynamoDBCircuitBreaker.onFailure();
+            }
+            logger.error(`scan iteration failed (attempt ${scanAttempt}/${MAX_RETRY_ATTEMPTS})`, err);
+
+            // Handle specific DynamoDB errors
+            if (err.name === "ValidationException") {
+              logger.error("Validation error in scan - check scan parameters and expressions", err.message);
+              throw err;
+            } else if (err.name === "ResourceNotFoundException") {
+              logger.error("Table or index not found in scan", err.message);
+              throw err;
+            }
+
+            // Retry for retryable errors
+            if (isRetryableError(err) && scanAttempt < MAX_RETRY_ATTEMPTS) {
+              const delay = calculateRetryDelay(scanAttempt);
+              logger.info(`Retrying scan after ${delay}ms delay`);
+              await scheduler.wait(delay);
+              continue;
+            }
+
+            throw err;
+          }
+        }
+
+        // Ensure output is defined before proceeding
+        if (!output) {
+          throw new Error("Failed to get scan output after all retry attempts");
+        }
+
+        lastEvaluatedKey = output.LastEvaluatedKey;
+        items.push(...(output.Items || []));
+
+        // Track consumed capacity
+        if (output.ConsumedCapacity) {
+          totalConsumedCapacity += output.ConsumedCapacity.CapacityUnits || 0;
+        }
+
+        logger.info(
+          "retrieved db result count =",
+          output.Count,
+          ", total item count = ",
+          items.length,
+          ", consumed capacity =",
+          output.ConsumedCapacity?.CapacityUnits || 0,
+          ", total consumed =",
+          totalConsumedCapacity,
+          ", output =",
+          { ...output, Items: null },
+          ", lastEvaluatedKey =",
+          lastEvaluatedKey
+        );
+
+        // Add adaptive delay based on consumed capacity to prevent throttling
+        if (output.ConsumedCapacity?.CapacityUnits && output.ConsumedCapacity.CapacityUnits > 10) {
+          const delay = Math.min(output.ConsumedCapacity.CapacityUnits * 10, 1000); // Max 1 second
+          logger.info(`High capacity consumption detected, adding ${delay}ms delay to prevent throttling`);
+          await scheduler.wait(delay);
+        }
+
+        count++;
+
+        // Safety limit to prevent runaway scans
+        if (count > MAX_SCAN_ITERATIONS) {
+          logger.warn(`Scan iteration limit exceeded (${count}). Possible infinite loop detected.`);
+          // throw new Error("Scan iteration limit exceeded - possible infinite loop");
+          break; // Exit the loop gracefully
+        }
+      } finally {
+        ssw.stop();
+        logger.info("stopwatch iteration summary", ssw.shortSummary());
+      }
+    } while (lastEvaluatedKey);
+
+    logger.info(`Scan completed: ${items.length} total items, ${totalConsumedCapacity} total capacity units consumed`);
+    return { Items: items as T[], LastEvaluatedKey: lastEvaluatedKey };
+  } finally {
+    stopwatch.stop();
+    logger.info("scanloop summary");
+    ssw.prettyPrint();
     logger.info("stopwatch summary", stopwatch.shortSummary());
   }
 };
