@@ -86,7 +86,14 @@ const DdbTranslateConfig: TranslateConfig = {
   }
 };
 
-const ddbClient = DynamoDBDocument.from(new DynamoDBClient(), DdbTranslateConfig);
+let _ddbClient: DynamoDBDocument;
+
+const getDdbClient = () => {
+  if (!_ddbClient) {
+    _ddbClient = DynamoDBDocument.from(new DynamoDBClient(), DdbTranslateConfig);
+  }
+  return _ddbClient;
+};
 
 const MAX_RETRY_ATTEMPTS = 3; // Up to 3 retries for transient errors
 const BASE_RETRY_DELAY_MS = 250; // Start with 250ms to reach ~500ms with jitter on first attempt
@@ -96,6 +103,7 @@ const MAX_BATCH_WRITE_ITEMS = 25; // AWS DynamoDB limit for batchWrite operation
 const MAX_TRANSACTION_ITEMS = 100; // AWS DynamoDB limit for transaction operations
 const MAX_ITEM_SIZE_BYTES = 400 * 1024; // AWS DynamoDB limit - 400KB per item
 const MAX_REQUEST_SIZE_BYTES = 16 * 1024 * 1024; // AWS DynamoDB limit - 16MB per request
+const MAX_QUERY_ITERATIONS = 10; // Safety limit to prevent infinite loops in queryAll
 
 /**
  * Calculate exponential backoff delay with jitter
@@ -229,7 +237,7 @@ export const getItem = async (input: GetCommandInput, _logger: LoggerBase, cache
           }
 
           try {
-            const dbOutput = await ddbClient.get(input);
+            const dbOutput = await getDdbClient().get(input);
             dynamoDBCircuitBreaker.onSuccess(); // Mark success for circuit breaker
             return dbOutput;
           } catch (err: any) {
@@ -301,7 +309,7 @@ export const putItem = async (input: PutCommandInput, _logger: LoggerBase) => {
       }
 
       try {
-        const output = await ddbClient.put(input);
+        const output = await getDdbClient().put(input);
         dynamoDBCircuitBreaker.onSuccess(); // Mark success for circuit breaker
         logger.info("output =", output);
         return output;
@@ -362,7 +370,7 @@ export const updateAttribute = async (input: UpdateCommandInput, _logger: Logger
       }
 
       try {
-        const output = await ddbClient.update(modifiedInput);
+        const output = await getDdbClient().update(modifiedInput);
         dynamoDBCircuitBreaker.onSuccess(); // Mark success for circuit breaker
         logger.info("output =", output);
         return output;
@@ -421,7 +429,7 @@ export const deleteItem = async (input: DeleteCommandInput, _logger: LoggerBase)
       }
 
       try {
-        const output = await ddbClient.delete(input);
+        const output = await getDdbClient().delete(input);
         dynamoDBCircuitBreaker.onSuccess(); // Mark success for circuit breaker
         logger.info("output =", output);
         return output;
@@ -488,7 +496,7 @@ export const queryOnce = async (input: QueryCommandInput, _logger: LoggerBase, c
           }
 
           try {
-            const dbOutput = await ddbClient.query(input);
+            const dbOutput = await getDdbClient().query(input);
             dynamoDBCircuitBreaker.onSuccess(); // Mark success for circuit breaker
             return dbOutput;
           } catch (err: any) {
@@ -584,7 +592,7 @@ export const batchGet = async <T>(
         }
 
         try {
-          const output = await ddbClient.batchGet({ RequestItems: requestItems });
+          const output = await getDdbClient().batchGet({ RequestItems: requestItems });
           dynamoDBCircuitBreaker.onSuccess(); // Mark success for circuit breaker
           const items = (output.Responses && output.Responses[tableName]) || [];
           logger.info("retrieved items, output =", output, ", size of list=", items.length);
@@ -734,7 +742,7 @@ const batchWriteWithRetry = async (batchWriteItemsInput: BatchWriteCommandInput,
       }
 
       try {
-        results = await ddbClient.batchWrite(batchWriteItemsInput);
+        results = await getDdbClient().batchWrite(batchWriteItemsInput);
         dynamoDBCircuitBreaker.onSuccess(); // Mark success for circuit breaker
         logger.debug("after batchwrite, results=", results);
 
@@ -811,7 +819,7 @@ export const queryAll = async <T>(baseLogger: LoggerBase, input: QueryCommandInp
   try {
     stopwatch.start();
     if (!input.TableName) {
-      throw new MissingError(`missing tableName [${input.TableName}]`);
+      throw new MissingError("missing tableName");
     }
 
     // Check circuit breaker
@@ -846,7 +854,7 @@ export const queryAll = async <T>(baseLogger: LoggerBase, input: QueryCommandInp
           }
 
           try {
-            output = await ddbClient.query(cmdInput);
+            output = await getDdbClient().query(cmdInput);
             dynamoDBCircuitBreaker.onSuccess(); // Mark success for circuit breaker
             break; // Success, exit retry loop
           } catch (err: any) {
@@ -916,7 +924,7 @@ export const queryAll = async <T>(baseLogger: LoggerBase, input: QueryCommandInp
         count++;
 
         // Safety limit to prevent runaway queries
-        if (count > 1000) {
+        if (count > MAX_QUERY_ITERATIONS) {
           logger.error(`Query iteration limit exceeded (${count}). Possible infinite loop detected.`);
           throw new Error("Query iteration limit exceeded - possible infinite loop");
         }
@@ -1093,7 +1101,7 @@ export class TransactionWriter {
         }
 
         try {
-          const transactWriteResult = await ddbClient.transactWrite({
+          const transactWriteResult = await getDdbClient().transactWrite({
             TransactItems: this.items
           });
           dynamoDBCircuitBreaker.onSuccess(); // Mark success for circuit breaker
