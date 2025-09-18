@@ -439,10 +439,11 @@ describe("dbutil", () => {
 
       mockDdbClient.query.mockResolvedValue(mockOutput);
 
+      const MAX_QUERY_ITERATIONS = 10; // Should match the limit set in dbutil.ts
       await expect(queryAll(logger, mockInput)).rejects.toThrow("Query iteration limit exceeded - possible infinite loop");
-      expect(mockDdbClient.query).toHaveBeenCalledTimes(10);
+      expect(mockDdbClient.query).toHaveBeenCalledTimes(MAX_QUERY_ITERATIONS);
       expect(mockDdbClient.query).toHaveBeenNthCalledWith(1, { ...mockInput, ReturnConsumedCapacity: "TOTAL" });
-      for (let i = 2; i <= 99; i++) {
+      for (let i = 2; i <= MAX_QUERY_ITERATIONS; i++) {
         expect(mockDdbClient.query).toHaveBeenNthCalledWith(i, { ...mockInput, ExclusiveStartKey: { id: "1" }, ReturnConsumedCapacity: "TOTAL" });
       }
     });
