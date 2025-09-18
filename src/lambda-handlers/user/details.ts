@@ -29,6 +29,7 @@ export const getDetails = apiGatewayHandlerWrapper(async (event: APIGatewayProxy
   }
   const dbDetails: DbUserDetails = output.Item.details;
   const result: ApiUserResource = {
+    id: dbDetails.publicId,
     firstName: dbDetails.firstName,
     lastName: dbDetails.lastName,
     emailId: dbDetails.emailId,
@@ -61,6 +62,7 @@ const updateDetailsHandler = async (event: APIGatewayProxyEvent) => {
     }
     apiToDbDetails = {
       id: dbDetails.id,
+      publicId: dbDetails.publicId,
       firstName: dbDetails.firstName,
       lastName: dbDetails.lastName,
       emailId: dbDetails.emailId,
@@ -71,6 +73,7 @@ const updateDetailsHandler = async (event: APIGatewayProxyEvent) => {
   } else {
     apiToDbDetails = {
       id: dbDetails.id,
+      publicId: dbDetails.publicId,
       firstName: req.firstName as string,
       lastName: req.lastName as string,
       emailId: dbDetails.emailId,
@@ -133,6 +136,7 @@ export const deleteDetails = apiGatewayHandlerWrapper(async (event: APIGatewayPr
   logger.debug("user is marked for deletion");
 
   const deleteResponse: ApiUserResource = {
+    id: deletingDbItem.details.publicId,
     emailId: deletingDbItem.details.emailId,
     firstName: deletingDbItem.details.firstName,
     lastName: deletingDbItem.details.lastName,

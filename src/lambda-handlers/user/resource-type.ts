@@ -44,6 +44,7 @@ export enum DbUserStatus {
 
 export interface DbUserDetails {
   id: string;
+  publicId: string; // External-facing UUID for client responses
   firstName: string;
   lastName: string;
   emailId: string;
@@ -59,6 +60,7 @@ export enum ApiUserAccountStatus {
 }
 
 export interface ApiUserResource {
+  id: string;
   firstName?: string;
   lastName?: string;
   emailId?: string;
