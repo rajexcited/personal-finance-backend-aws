@@ -217,6 +217,7 @@ export const getUserDetailsById = async (userId: string) => {
     const dbDetails: DbUserDetails = output.Item.details;
     return {
       id: dbDetails.id,
+      publicId: dbDetails.publicId,
       firstName: dbDetails.firstName,
       lastName: dbDetails.lastName,
       emailId: dbDetails.emailId,
