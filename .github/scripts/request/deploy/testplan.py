@@ -87,7 +87,7 @@ def validate_deployment_schedule(deployment_schedule_list: List, request_form_is
             raise ValueError(f"Invalid schedule deletion request. The difference [{convert_to_human_readable(time_diff)}] is less than 15 minutes")
         if time_diff > timedelta(days=30):
             raise ValueError(f"Invalid schedule deletion request. The difference [{convert_to_human_readable(time_diff)}] is greater than 1 month")
-        formatted_datetime = preferred_date_obj.strftime("%Y-%m-%d %H:%M:%S %Z")
+        formatted_datetime = delete_schedule_date_obj.strftime("%Y-%m-%d %H:%M:%S %Z")
         export_to_env({"delete_schedule": formatted_datetime})
 
     return deploy_scope

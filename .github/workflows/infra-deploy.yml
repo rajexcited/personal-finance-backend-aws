@@ -1612,17 +1612,23 @@ jobs:
               if(process.env.IS_RELEASE != "true") {
                 deploymentType = "Rollback";
               }
-              let issueBody = `\n## ${deploymentType} Deployment Completed\n\n`;
-              issueBody += `- Parent Request [Issue-${context.payload.issue.number}](${context.payload.issue.html_url})\n\n`;
+              let issueBody = `\n## ${deploymentType} Deployment Completed\n`;
+              issueBody += `\n- Parent Request [Issue-${context.payload.issue.number}](${context.payload.issue.html_url})  `;
+              issueBody += "\n\n> [!TIP]  "
+              issueBody += `\n> Add Issue-${context.payload.issue.number} as parent in relationship section of this issue manually.  `
+              issueBody += "\n\n  "
               issueBody += process.env.POST_DEPLOY_REQ_SECTION;
               issueBody += "\n\n  ";
               issueBody += "\n> [!IMPORTANT]  ";
               issueBody += "\n> Please checked tasks if verified successfully.  ";
               issueBody += "\n> When post deployment verification is completed, close the issue regardless the status to mark the deployment attempt complete.  ";
+              issueBody += "\n> Add Comment with screenshots of spec executions and Smoke Test Report.  ";
+              issueBody += "\n> When all activities are completed Add comment with status badge pass/failed.  ";
               issueBody += "\n\n  "
               issueBody += "\n### Complete Post Deployment Activities\n"
               issueBody += "\n  "
-              issueBody += "\n- [ ] Run Smoke Test  "
+              issueBody += "\n- [ ] Run Smoke Test Automation  "
+              issueBody += "\n- [ ] Verify Smoke Test Video Report  "
               issueBody += "\n- [ ] Verify Tag created  "
               issueBody += "\n- [ ] Close Milestone and ensure no issues are open  "
               issueBody += "\n- [ ] Verify Release Notes and publish  "
@@ -1791,7 +1797,7 @@ jobs:
       - run_eligible
       - validate_request
       - validate_request_stack
-    if: needs.run_eligible.outputs.is-testplan-deprovision == 'true'
+    if: needs.run_eligible.outputs.is-testplan-deprovision == 'true' || needs.run_eligible.outputs.is-development-deprovision == 'true'
     environment:
       name: aws-infra-${{ needs.run_eligible.outputs.env-ref-name }}
     outputs:

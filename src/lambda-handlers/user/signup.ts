@@ -2,7 +2,15 @@ import { APIGatewayProxyEvent } from "aws-lambda";
 import { v4 as uuidv4 } from "uuid";
 import { AuthRole } from "../common";
 import { getSignedToken } from "../auth";
-import { apiGatewayHandlerWrapper, RequestBodyContentType, ValidationError, InvalidField, NotFoundError, convertToCreatedResponse, MissingError } from "../apigateway";
+import {
+  apiGatewayHandlerWrapper,
+  RequestBodyContentType,
+  ValidationError,
+  InvalidField,
+  NotFoundError,
+  convertToCreatedResponse,
+  MissingError
+} from "../apigateway";
 import { getLogger, utils, LoggerBase, validations, dbutil, s3utils } from "../utils";
 import {
   _logger as userLogger,
@@ -55,6 +63,7 @@ const signupHandler = async (event: APIGatewayProxyEvent) => {
     const auditDetails = utils.updateAuditDetailsFailIfNotExists(null, primaryUser);
     const apiToDbDetails: DbUserDetails = {
       id: userId,
+      publicId: uuidv4(),
       emailId: req.emailId as string,
       firstName: req.firstName as string,
       lastName: req.lastName as string,

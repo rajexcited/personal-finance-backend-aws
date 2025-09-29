@@ -97,6 +97,35 @@ jobs:
         with:
           script: |
             try {
+              // Convert UTC to Central Time (America/Chicago) using timeZone offset
+              const centralTimeFormat = new Intl.DateTimeFormat("en-US", {
+                timeZone: "America/Chicago",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                timeZoneName: "short"
+              });
+
+              const getEndOfDayCentral = (datetime) => {
+                const date = new Date(datetime);
+                if (isNaN(date.getTime())) {
+                  return null; // Invalid Date
+                }
+
+                // Format and extract adjusted time
+                const centralTimeString = centralTimeFormat.format(date);
+                // Ensure time is set to 23:59:59 (end of the day)
+                const dateTimeParts = centralTimeString.split(" ");
+                dateTimeParts[1] = "11:59:59.999"
+                dateTimeParts[2] = "PM"
+                const centralDate = new Date(dateTimeParts.join(" "));
+
+                return centralDate;
+              };
+              
               var branchName = "master";
               if(context.payload.client_payload.apiVersion) {
                 // get milestone
@@ -115,9 +144,11 @@ jobs:
                   if(!matchedMilestone.due_on) {
                     throw new Error("Milestone due date is not set");
                   }
-                  const milestoneDueOn = new Date(matchedMilestone.due_on);
-                  if(milestoneDueOn < new Date()) {
-                    throw new Error("Milestone due date is already passed");
+                  const milestoneDueOn = getEndOfDayCentral(matchedMilestone.due_on);
+                  const endOfToday = getEndOfDayCentral(new Date());
+                  const toDateString = (dateInstance) => centralTimeFormat.format(dateInstance).substring(0,10);
+                  if(milestoneDueOn < endOfToday) {
+                    throw new Error(`Milestone due date[${toDateString(milestoneDueOn)}] is already passed ${toDateString(endOfToday)}`);
                   }
                   branchName = `milestone/${matchedMilestone.title}`;
                 }

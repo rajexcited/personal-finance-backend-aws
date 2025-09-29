@@ -14,9 +14,10 @@ enum LogLevel {
   DEBUG = 1,
   INFO = 2,
   ERROR = 3,
+  OFF = 4
 }
 
-type LogLevelType = "INFO" | "DEBUG" | "ERROR";
+type LogLevelType = "INFO" | "DEBUG" | "ERROR" | "OFF";
 let defaultLogLevel: LogLevelType = "INFO";
 
 const setDefaultLogLevel = (logLevel?: string) => {
@@ -24,6 +25,7 @@ const setDefaultLogLevel = (logLevel?: string) => {
     case "INFO":
     case "DEBUG":
     case "ERROR":
+    case "OFF":
       defaultLogLevel = logLevel as LogLevelType;
     default:
     // do nothing
@@ -71,6 +73,9 @@ export class LoggerBase {
       case LogLevel.ERROR:
         level = "ERROR";
         break;
+      case LogLevel.OFF:
+        level = "OFF";
+        break;
       case LogLevel.INFO:
       default:
         level = "INFO";
@@ -88,6 +93,9 @@ export class LoggerBase {
         break;
       case "error":
         this.logLevel = LogLevel.ERROR;
+        break;
+      case "off":
+        this.logLevel = LogLevel.OFF;
         break;
       default:
     }
