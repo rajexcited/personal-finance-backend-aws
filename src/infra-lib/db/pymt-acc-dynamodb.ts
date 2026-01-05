@@ -8,7 +8,7 @@ import { PymtAccDbProps } from "./db-prop-type";
  * Dynamodb to manage user's Payment account
  *
  * wiki design:
- *    https://github.com/rajexcited/personal-finance-backend-aws/wiki/Payment-Account-Table
+ *    https://github.com/rajexcited/arthasight-backend/wiki/Payment-Account-Table
  *
  */
 export class PymtAccDBConstruct extends Construct {

@@ -8,7 +8,7 @@ import { UserDbProps } from "./db-prop-type";
  * Dynamodb to manage user details
  *
  * wiki design:
- *    https://github.com/rajexcited/personal-finance-backend-aws/wiki/User-Table
+ *    https://github.com/rajexcited/arthasight-backend/wiki/User-Table
  */
 export class UserDBConstruct extends Construct {
   public readonly userTable: UserDbProps;

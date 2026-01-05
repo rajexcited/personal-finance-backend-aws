@@ -1,6 +1,19 @@
 {
-  "name": "personal-finance-aws",
+  "name": "arthasight-backend",
   "version": "0.2.3",
+  "author": {
+    "name": "Raj",
+    "url": "https://github.com/rajexcited"
+  },
+  "description": "This is backend service for Arthasight application. It provides APIs and handles data processing. All features are implemented using AWS services. The infrastructure is defined using AWS CDK. It is related to personal finance management and expense tracking.",
+  "license": "MIT",
+  "keywords": [
+    "arthasight",
+    "personal-finance",
+    "backend",
+    "budgeting",
+    "expense-tracking"
+  ],
   "bin": {
     "app": "src/main/app.js"
   },

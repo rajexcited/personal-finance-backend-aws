@@ -8,7 +8,7 @@ import { ConfigDbProps } from "./db-prop-type";
  * Dynamodb to manage user's config type
  *
  * wiki design:
- *    https://github.com/rajexcited/personal-finance-backend-aws/wiki/Config-Table
+ *    https://github.com/rajexcited/arthasight-backend/wiki/Config-Table
  *
  */
 export class ConfigTypeDBConstruct extends Construct {

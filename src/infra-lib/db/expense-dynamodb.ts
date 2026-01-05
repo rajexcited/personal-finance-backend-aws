@@ -8,7 +8,7 @@ import { ExpenseDbProps } from "./db-prop-type";
  * Dynamodb to manage user's expenses
  *
  * wiki design:
- *    https://github.com/rajexcited/personal-finance-backend-aws/wiki/Expense-Table
+ *    https://github.com/rajexcited/arthasight-backend/wiki/Expense-Table
  *
  */
 export class ExpenseDBConstruct extends Construct {
