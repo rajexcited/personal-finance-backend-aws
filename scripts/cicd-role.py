@@ -1,11 +1,36 @@
 from pathlib import Path
 from string import Template
+from typing import Dict
 from .utils import Environment, ArgumentProcessor
-from .iam_role.role import create_role, delete_role, save_json
+from .iam_role.role import create_role, delete_role, save_json, update_role
 from .iam_role.policy import PolicyAction, delete_inline_policies, detach_manage_policies, revert_manage_policies
 
+cicd_role_name_template = Template("$app_name-$env_name-cicd-role")
 
-def create_cicd_role(args: dict):
+
+def update_cicd_role(args: Dict):
+    if args['dry_run']:
+        raise ValueError("dry run is not supported")
+    update_role_policy_actions = [
+        PolicyAction.CREATE_CUSTOM_MANAGED_POLICY_IF_NEEDED,
+        PolicyAction.ATTACH_MANAGE_POLICY,
+        PolicyAction.UPDATE_INLINE
+    ]
+    update_role_response = update_role(
+        role_base_dir=args["cicd_role_base_dir"],
+        aws_account_number=args["aws_account"],
+        environment=args["environment"] if isinstance(
+            args["environment"], Environment) else Environment[args["environment"]],
+        github_owner=args["github_owner"],
+        github_repo_aws=args["github_repo_aws"],
+        github_repo_ui=args["github_repo_ui"],
+        aws_region=args["aws_region"],
+        role_name_template=cicd_role_name_template,
+        policy_actions=update_role_policy_actions
+    )
+
+
+def create_cicd_role(args: Dict):
     create_role_policy_actions = [
         PolicyAction.CREATE_CUSTOM_MANAGED_POLICY_IF_NEEDED,
         PolicyAction.ATTACH_MANAGE_POLICY
@@ -19,24 +44,27 @@ def create_cicd_role(args: dict):
         github_repo_aws=args["github_repo_aws"],
         github_repo_ui=args["github_repo_ui"],
         aws_region=args["aws_region"],
-        role_name_template=Template("$app_name-$env_name-cicd-role"),
+        role_name_template=cicd_role_name_template,
         policy_actions=create_role_policy_actions
     )
-    role_name = create_role_response["role_aws_response"]["Role"]["RoleName"]
+    role_name = ""
+    if create_role_response["role_aws_response"]:
+        role_name = create_role_response["role_aws_response"]["Role"]["RoleName"]
 
     if args['dry_run']:
         print('Dry run, so deleting that was created')
-        delete_inline_request = {
-            "role_name": role_name,
-            "policy_names": create_role_response["inline_policies"].keys()
-        }
-        delete_inline_response = delete_inline_policies(
-            **delete_inline_request)
-        save_json(data={"request": delete_inline_request, "response": delete_inline_response},
-                  role_base_dir=args["cicd_role_base_dir"],
-                  role_name=role_name,
-                  save_for=f"Delete Inline Policies"
-                  )
+        if create_role_response["inline_policies"]:
+            delete_inline_request = {
+                "role_name": role_name,
+                "policy_names": create_role_response["inline_policies"].keys()
+            }
+            delete_inline_response = delete_inline_policies(
+                **delete_inline_request)
+            save_json(data={"request": delete_inline_request, "response": delete_inline_response},
+                      role_base_dir=args["cicd_role_base_dir"],
+                      role_name=role_name,
+                      save_for=f"Delete Inline Policies"
+                      )
         detach_policies_request = []
         for policy_name, attach_result in create_role_response["attach_manage_policies"].items():
             detach_policies_request.append({
@@ -66,8 +94,11 @@ def create_cicd_role(args: dict):
 if __name__ == "__main__":
     arg_processor = ArgumentProcessor(
         description="support utility to create iam cicd assume role")
-    arg_processor.add_argument("--create", action="store_true", value_type=bool, is_required=True,
+    manage_role_action = arg_processor.get_group("manage role action", min_required_in_group=1)
+    arg_processor.add_argument("--create", action="store_true", value_type=bool, group=manage_role_action,
                                help="Indicate create role")
+    arg_processor.add_argument("--update", action="store_true", value_type=bool, group=manage_role_action,
+                               help="Indicate update role")
     arg_processor.add_argument("--cicd-role-base-dir", value_type=Path, is_required=True,
                                help="Provide base directory where all necessary template files located in creating cicd role. ex. 'cicd-role'")
     arg_processor.add_argument("--aws-account", value_type=int, is_required=True,
@@ -87,4 +118,7 @@ if __name__ == "__main__":
 
     args_values = arg_processor.parse_and_validate_args()
 
-    create_cicd_role(args_values)
+    if args_values["create"]:
+        create_cicd_role(args_values)
+    elif args_values["update"]:
+        update_cicd_role(args_values)

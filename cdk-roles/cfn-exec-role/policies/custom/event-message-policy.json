@@ -24,6 +24,32 @@
       "Effect": "Allow",
       "Action": "sqs:ListQueues",
       "Resource": "*"
+    },
+    {
+      "Sid": "VisualEditor2",
+      "Effect": "Allow",
+      "Action": ["events:List*", "events:Describe*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "VisualEditor3",
+      "Effect": "Allow",
+      "Action": [
+        "events:PutRule",
+        "events:DeleteRule",
+        "events:DescribeRule",
+        "events:EnableRule",
+        "events:DisableRule",
+        "events:PutTargets",
+        "events:RemoveTargets",
+        "events:TagResource",
+        "events:UntagResource"
+      ],
+      "Resource": [
+        "arn:aws:events:*:$aws_principal_account:rule/${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*",
+        "arn:aws:events:*:$aws_principal_account:event-bus/${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*",
+        "arn:aws:events:*:$aws_principal_account:rule/${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*/${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*"
+      ]
     }
   ]
 }

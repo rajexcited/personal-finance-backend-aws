@@ -5,3 +5,5 @@ mypy-boto3-iam>=1.37.0
 mypy-boto3-cloudformation>=1.37.0
 mypy-boto3-s3>=1.37.0
 colorama==0.4.6
+pydantic==2.11.1
+pydantic_core==2.33.0

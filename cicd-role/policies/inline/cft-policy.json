@@ -4,10 +4,7 @@
     {
       "Sid": "VisualEditor0",
       "Effect": "Allow",
-      "Action": [
-        "cloudformation:Describe*",
-        "cloudformation:ListStackResources"
-      ],
+      "Action": ["cloudformation:Describe*", "cloudformation:ListStackResources"],
       "Resource": "arn:aws:cloudformation:*:$aws_principal_account:stack/${aws:PrincipalTag/appId}-${aws:PrincipalTag/environment}*/*"
     },
     {
@@ -21,6 +18,12 @@
       "Effect": "Allow",
       "Action": ["cloudfront:GetInvalidation", "cloudfront:CreateInvalidation"],
       "Resource": ["arn:aws:cloudfront::$aws_principal_account:distribution/*"]
+    },
+    {
+      "Sid": "VisualEditor3",
+      "Effect": "Allow",
+      "Action": ["events:List*", "events:Describe*"],
+      "Resource": "*"
     }
   ]
 }

@@ -2,10 +2,11 @@ from enum import Enum
 import json
 from pathlib import Path
 from string import Template
-from typing import Any, Dict, List, TypedDict
+from typing import Any, Dict, List, Optional
+from pydantic import BaseModel
 from ..utils import rootpath, Environment, app_config, aws_error_handler
 from .client import iam
-from mypy_boto3_iam.type_defs import CreatePolicyResponseTypeDef, CreatePolicyVersionResponseTypeDef, DeleteRolePolicyRequestTypeDef, DetachRolePolicyRequestTypeDef, SetDefaultPolicyVersionRequestTypeDef, DeletePolicyVersionRequestTypeDef
+from mypy_boto3_iam.type_defs import CreatePolicyResponseTypeDef, CreatePolicyVersionResponseTypeDef, DeleteRolePolicyRequestTypeDef, DetachRolePolicyRequestTypeDef, SetDefaultPolicyVersionRequestTypeDef, DeletePolicyVersionRequestTypeDef, TagTypeDef
 
 
 class PolicyAction(Enum):
@@ -15,14 +16,14 @@ class PolicyAction(Enum):
     CREATE_ONLY = "create-policy"
 
 
-class PolicyResponseTypeDef(TypedDict):
+class PolicyResponseTypeDef(BaseModel):
     is_created: bool = False
     is_updated: bool = False
-    aws_response: CreatePolicyResponseTypeDef | CreatePolicyVersionResponseTypeDef = None
-    message: str = None
-    PolicyName: str = None
-    PolicyArn: str = None
-    previous_default_version_id: str = None
+    aws_response: Optional[CreatePolicyResponseTypeDef | CreatePolicyVersionResponseTypeDef] = None
+    message: Optional[str] = None
+    PolicyName: Optional[str] = None
+    PolicyArn: Optional[str] = None
+    previous_default_version_id: Optional[str] = None
 
 
 def validate_policy_document(policy_document: str, policy_name: str):
@@ -72,7 +73,7 @@ def get_policy_document(data: Dict[str, str], policy_path: Path) -> tuple[str, s
     return policy_document, policy_name
 
 
-def get_trust_policy(role_base_dir: Path, aws_account_number: int | str, environment: Environment, github_owner: str = None, github_repo_aws: str = None, github_repo_ui: str = None) -> str | None:
+def get_trust_policy(role_base_dir: Path, aws_account_number: int | str, environment: Environment, github_owner: Optional[str] = None, github_repo_aws: Optional[str] = None, github_repo_ui: Optional[str] = None):
     json_file = Path('trust-relationship.json')
     trust_file_path = rootpath/role_base_dir/json_file
     if not trust_file_path.exists():
@@ -92,7 +93,7 @@ def get_trust_policy(role_base_dir: Path, aws_account_number: int | str, environ
     return trust_policy
 
 
-def prepare_policies(policy_dir: Path, aws_account_number: int | str, environment: Environment, aws_region: str = None) -> Dict[str, str]:
+def prepare_policies(policy_dir: Path, aws_account_number: int | str, environment: Environment, aws_region: Optional[str] = None) -> Dict[str, str]:
     data = {
         "aws_principal_account": aws_account_number,
         "aws_region": aws_region,
@@ -112,7 +113,7 @@ def prepare_policies(policy_dir: Path, aws_account_number: int | str, environmen
     return policy_dict
 
 
-def create_inline_policies(role_name: str, role_base_dir: Path, aws_account_number: int | str, environment: Environment, aws_region: str = None) -> Dict[str, Dict]:
+def create_inline_policies(role_name: str, role_base_dir: Path, aws_account_number: int | str, environment: Environment, aws_region: Optional[str] = None) -> Dict[str, Dict]:
     inline_policies_dir = rootpath/role_base_dir/"policies/inline"
     inline_policy_dict = prepare_policies(policy_dir=inline_policies_dir,
                                           aws_account_number=aws_account_number,
@@ -237,10 +238,10 @@ def create_custom_policies(role_base_dir: Path, aws_account_number: int | str, a
                                           aws_region=aws_region,
                                           environment=environment)
 
-    result = {}
+    result: Dict[str, Dict[str, str | PolicyResponseTypeDef]] = {}
     tags = [
-        {'Key': 'appId', 'Value': app_config["app_id"]},
-        {'Key': 'environment', 'Value': environment.value}
+        TagTypeDef(Key='appId', Value=app_config["app_id"]),
+        TagTypeDef(Key='environment', Value=environment.value)
     ]
     for policy_name_key, policy_document in custom_policy_dict.items():
         policy_name = policy_name_key.capitalize()
@@ -263,14 +264,14 @@ def create_custom_policies(role_base_dir: Path, aws_account_number: int | str, a
             policy_response = PolicyResponseTypeDef(
                 is_created=True,
                 aws_response=create_response,
-                PolicyName=create_response["Policy"]["PolicyName"],
-                PolicyArn=create_response["Policy"]["Arn"],
+                PolicyName=create_response["Policy"]["PolicyName"] if "PolicyName" in create_response["Policy"] else None,
+                PolicyArn=create_response["Policy"]["Arn"] if "Arn" in create_response["Policy"] else None,
                 message="created policy first time"
             )
         elif fail_if_exists:
             raise ValueError(
                 f"Custom Policy [{capitalize_policy_name}] already exists.")
-        elif update_if_exists:
+        elif update_if_exists and "Arn" in get_policy_response["Policy"] and "DefaultVersionId" in get_policy_response["Policy"]:
             create_version_response = iam.create_policy_version(
                 PolicyArn=get_policy_response["Policy"]["Arn"],
                 PolicyDocument=str(policy_document),
@@ -286,12 +287,14 @@ def create_custom_policies(role_base_dir: Path, aws_account_number: int | str, a
                 message="updated policy with new version",
                 previous_default_version_id=get_policy_response["Policy"]["DefaultVersionId"]
             )
-        else:
+        elif "Arn" in get_policy_response["Policy"]:
             policy_response = PolicyResponseTypeDef(
                 PolicyArn=get_policy_response["Policy"]["Arn"],
                 PolicyName=capitalize_policy_name,
                 message="Policy Already Exists. Skipping Creation/Updation"
             )
+        else:
+            raise ValueError("did not match any conditions")
 
         result[capitalize_policy_name] = {
             "request": policy_document,
@@ -327,17 +330,23 @@ def revert_manage_policies(manage_policy_results: Dict):
     for policy_name, result in manage_policy_results.items():
         policy_response: PolicyResponseTypeDef = result["response"]
         print("policy response:", policy_response)
-        if "is_created" in policy_response and policy_response["is_created"]:
+        if policy_response.is_created:
             delete_policies_request.append({
                 "policy_name": policy_name,
-                "policy_arn": policy_response["PolicyArn"]
+                "policy_arn": policy_response.PolicyArn
             })
-        elif "is_updated" in policy_response and policy_response["is_updated"]:
+        elif policy_response.is_updated:
+            curr_dflt_ver_id = None
+            if policy_response.aws_response and "PolicyVersion" in policy_response.aws_response:
+                policy_ver = policy_response.aws_response["PolicyVersion"]
+                if "VersionId" in policy_ver:
+                    curr_dflt_ver_id = policy_ver["VersionId"]
+
             default_version_request.append({
                 "policy_name": policy_name,
-                "policy_arn": policy_response["PolicyArn"],
-                "new_default_version_id": policy_response["previous_default_version_id"],
-                "current_default_version_id": policy_response["aws_response"]["PolicyVersion"]["VersionId"]
+                "policy_arn": policy_response.PolicyArn,
+                "new_default_version_id": policy_response.previous_default_version_id,
+                "current_default_version_id": curr_dflt_ver_id
             })
     delete_policy_response = delete_custom_policies(delete_policies_request)
     default_version_response = set_default_version(default_version_request)
